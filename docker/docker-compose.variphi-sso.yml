@@ -1,0 +1,121 @@
+# Variphi IoT (ThingsBoard) SSO — connects to your EXISTING shared infrastructure.
+#
+# Reuses (does NOT duplicate):
+#   - Keycloak from vgi-microservices (published on the host at :8081, realm "things",
+#     confidential client "thingsboard"). KC_HOSTNAME=http://localhost:8081 +
+#     KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true let this container reach it via host.docker.internal:8081
+#     while tokens keep iss=http://localhost:8081/realms/things.
+#   - Shared external PostgreSQL at 3.110.77.148:5432, database "tb" (same server that hosts the
+#     "keycloak" database). No DB container is started here.
+#
+# This compose only runs Variphi IoT (monolithic ThingsBoard: TB_SERVICE_TYPE=monolith,
+# TB_QUEUE_TYPE=in-memory) with the SSO seeding + dark/branding from this fork.
+#
+# Prerequisites:
+#   1. The vgi-microservices Keycloak is up and reachable at http://localhost:8081
+#        (cd ../../../var/vgi-microservices && docker compose up -d keycloak)
+#   2. An EMPTY database "tb" exists on the external Postgres, owned by variphi.
+#   3. Build the Variphi IoT image from this fork and tag it ${TB_IMAGE} (default variphi/tb-node:latest).
+#
+# All external endpoints/secrets (Postgres, Redis incl. REDIS_PASSWORD, image, client secret) live in
+# `variphi-sso.env` next to this file. Load it with `--env-file`.
+#
+# Run (two steps — install is a one-time bootstrap):
+#   cd docker
+#   docker compose --env-file variphi-sso.env -f docker-compose.variphi-sso.yml --profile install up tb-install
+#   docker compose --env-file variphi-sso.env -f docker-compose.variphi-sso.yml up -d mytb
+#   open http://localhost:9090   -> auto-redirects to Keycloak (Variphi, dark)
+#     demo user:                 demo@things.local / demo
+#     system administrator (local, no SSO):  http://localhost:9090/login?ssoBypass=true
+#                                            sysadmin@thingsboard.org / sysadmin
+#
+# Production: if Keycloak has a single public issuer reachable by both browser and backend,
+# set SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI to it and drop SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI.
+
+x-tb-db-env: &tb-db-env
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-3.110.77.148}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb}"
+  SPRING_DATASOURCE_USERNAME: "${DATABASE_USER:-variphi}"
+  SPRING_DATASOURCE_PASSWORD: "${DATABASE_PASSWORD:-vgi@2026}"
+  DATABASE_TS_TYPE: "sql"
+  TB_QUEUE_TYPE: "in-memory"
+  TB_SERVICE_TYPE: "monolith"
+
+# Shared external Redis cache (3.110.77.148:6379). Recommended when running >1 TB node
+# (shared, survives restarts). For a single node you can switch to local cache with CACHE_TYPE=caffeine.
+x-tb-cache-env: &tb-cache-env
+  CACHE_TYPE: "${CACHE_TYPE:-redis}"
+  REDIS_CONNECTION_TYPE: "${REDIS_CONNECTION_TYPE:-standalone}"
+  REDIS_HOST: "${REDIS_HOST:-3.110.77.148}"
+  REDIS_PORT: "${REDIS_PORT:-6379}"
+  REDIS_DB: "${REDIS_DB:-0}"
+  REDIS_PASSWORD: "${REDIS_PASSWORD:-}"
+
+services:
+  # One-time bootstrap: create the TB schema + system data in the external "tb" database.
+  # This is where the Keycloak OAuth2 client + domain are seeded (createKeycloakOAuth2Client()).
+  # Runs only with `--profile install`; remove/skip once the "tb" database is provisioned.
+  tb-install:
+    image: ${TB_IMAGE:-variphi/tb-node:latest}
+    # Local fork image only (never published). Build it locally from the Maven-produced deb
+    # instead of pulling from a registry; Compose auto-builds it if the image is missing.
+    pull_policy: never
+    build:
+      context: ../msa/tb-node/target
+      dockerfile: Dockerfile
+    profiles: ["install"]
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      <<: [*tb-db-env, *tb-cache-env]
+      INSTALL_TB: "true"
+      LOAD_DEMO: "${LOAD_DEMO:-false}"
+      # Keycloak SSO seeding (consumed during install only).
+      SECURITY_OAUTH2_KEYCLOAK_ENABLED: "true"
+      SECURITY_OAUTH2_KEYCLOAK_TITLE: "Variphi SSO"
+      SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID: "thingsboard"
+      SECURITY_OAUTH2_KEYCLOAK_CLIENT_SECRET: "${TB_OAUTH2_CLIENT_SECRET:-thingsboard-oauth2-secret}"
+      # Dev defaults use the docker split-horizon (host.docker.internal). In PRODUCTION set these to a
+      # single public issuer (e.g. https://auth.variphi.com/realms/things) and leave AUTH_ISSUER_URI blank.
+      SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-http://localhost:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:-localhost:9090}"
+      SECURITY_OAUTH2_KEYCLOAK_SCOPES: "openid,email,profile"
+
+  mytb:
+    image: ${TB_IMAGE:-variphi/tb-node:latest}
+    # Local fork image only (never published). Build locally from the deb; no registry pull.
+    pull_policy: never
+    build:
+      context: ../msa/tb-node/target
+      dockerfile: Dockerfile
+    restart: always
+    extra_hosts:
+      # Resolve the existing Keycloak's token/userinfo/jwks at host.docker.internal:8081.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9090:8080"   # Web UI + HTTP device API -> http://localhost:9090
+      - "1883:1883"   # MQTT device API
+      # - "7070:7070" # Edge RPC (uncomment if the host port is free)
+    environment:
+      <<: [*tb-db-env, *tb-cache-env]
+      # Keycloak SSO (seeded on startup when missing; same values as tb-install).
+      SECURITY_OAUTH2_KEYCLOAK_ENABLED: "true"
+      SECURITY_OAUTH2_KEYCLOAK_TITLE: "Variphi SSO"
+      SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID: "thingsboard"
+      SECURITY_OAUTH2_KEYCLOAK_CLIENT_SECRET: "${TB_OAUTH2_CLIENT_SECRET:-thingsboard-oauth2-secret}"
+      SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-http://localhost:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:-localhost:9090}"
+      SECURITY_OAUTH2_KEYCLOAK_SCOPES: "openid,email,profile"
+      # "Connect device" instructions must show the PUBLISHED host:port (container 8080 -> host 9090),
+      # otherwise TB tells users to POST to :8080 which isn't reachable.
+      DEVICE_CONNECTIVITY_HTTP_HOST: "${DEVICE_CONNECTIVITY_HTTP_HOST:-localhost}"
+      DEVICE_CONNECTIVITY_HTTP_PORT: "${DEVICE_CONNECTIVITY_HTTP_PORT:-9090}"
+      DEVICE_CONNECTIVITY_MQTT_HOST: "${DEVICE_CONNECTIVITY_MQTT_HOST:-localhost}"
+      DEVICE_CONNECTIVITY_MQTT_PORT: "${DEVICE_CONNECTIVITY_MQTT_PORT:-1883}"
+    volumes:
+      - tb-logs:/var/log/thingsboard
+
+volumes:
+  tb-logs:

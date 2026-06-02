@@ -162,6 +162,7 @@ public class ThingsboardInstallService {
                 systemDataLoaderService.createRandomJwtSettings();
                 systemDataLoaderService.loadSystemWidgets();
                 systemDataLoaderService.createOAuth2Templates();
+                systemDataLoaderService.createKeycloakOAuth2Client();
                 systemDataLoaderService.createQueues();
                 systemDataLoaderService.createDefaultNotificationConfigs();
 

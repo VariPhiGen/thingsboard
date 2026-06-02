@@ -1,0 +1,24 @@
+{
+  "providerId": "Keycloak",
+  "additionalInfo": null,
+  "accessTokenUri": "http://localhost:8081/realms/things/protocol/openid-connect/token",
+  "authorizationUri": "http://localhost:8081/realms/things/protocol/openid-connect/auth",
+  "scope": ["openid","email","profile"],
+  "jwkSetUri": "http://localhost:8081/realms/things/protocol/openid-connect/certs",
+  "userInfoUri": "http://localhost:8081/realms/things/protocol/openid-connect/userinfo",
+  "clientAuthenticationMethod": "POST",
+  "userNameAttributeName": "email",
+  "mapperConfig": {
+    "type": "BASIC",
+    "basic": {
+      "emailAttributeKey": "email",
+      "firstNameAttributeKey": "given_name",
+      "lastNameAttributeKey": "family_name",
+      "tenantNameStrategy": "DOMAIN"
+    }
+  },
+  "comment": null,
+  "loginButtonIcon": "login",
+  "loginButtonLabel": "Variphi SSO",
+  "helpLink": "https://www.keycloak.org/docs/latest/securing_apps/#_oidc"
+}

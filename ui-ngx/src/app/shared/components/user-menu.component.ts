@@ -108,7 +108,8 @@ export class UserMenuComponent implements OnInit, OnDestroy {
   }
 
   logout(): void {
-    this.authService.logout();
+    // Explicit user logout: break the SSO auto-redirect loop and land on the login form.
+    this.authService.logout(false, false, true);
   }
 
 }

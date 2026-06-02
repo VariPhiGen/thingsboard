@@ -460,29 +460,6 @@
         "no-auto-commit-entities-prompt": "No entities configured for auto-commit",
         "delete-auto-commit-settings-title": "Are you sure you want to delete auto-commit settings?",
         "delete-auto-commit-settings-text": "Be careful, after the confirmation the auto-commit settings will be removed and auto-commit will be disabled for all entities.",
-        "mobile-app": {
-            "mobile-app": "Mobile app",
-            "mobile-app-qr-code-widget-settings": "Mobile app QR code widget settings",
-            "applications": "Applications",
-            "default": "Default",
-            "custom": "Custom",
-            "android": "Android",
-            "ios": "iOS",
-            "appearance": "Appearance",
-            "appearance-on-home-page": "Appearance on Home page",
-            "enabled": "Enabled",
-            "disabled": "Disabled",
-            "badges": "Badges",
-            "label": "Label",
-            "label-required": "Label is required",
-            "label-max-length": "Label should be less than or equal to 50 characters",
-            "right": "Right",
-            "left": "Left",
-            "set": "Set",
-            "preview": "Preview",
-            "connect-mobile-app": "Connect mobile app",
-            "use-system-settings": "Use system settings"
-        },
         "2fa":  {
             "2fa": "Two-factor authentication",
             "available-providers": "Available providers",
@@ -1878,8 +1855,8 @@
         "make-private-dashboard-title": "Are you sure you want to make the dashboard '{{dashboardTitle}}' private?",
         "make-private-dashboard-text": "After the confirmation the dashboard will be made private and won't be accessible by others.",
         "make-private-dashboard": "Make dashboard private",
-        "socialshare-text": "'{{dashboardTitle}}' powered by ThingsBoard",
-        "socialshare-title": "'{{dashboardTitle}}' powered by ThingsBoard",
+        "socialshare-text": "'{{dashboardTitle}}' powered by Variphi IoT",
+        "socialshare-title": "'{{dashboardTitle}}' powered by Variphi IoT",
         "select-dashboard": "Select dashboard",
         "no-dashboards-matching": "No dashboards matching '{{entity}}' were found.",
         "dashboard-required": "Dashboard is required.",
@@ -10091,90 +10068,6 @@
             "critical": "Critical",
             "assigned-to-me": "Assigned to me",
             "total": "Total"
-        },
-        "getting-started": {
-            "get-started": "Get started",
-            "finish": "Finish",
-            "done-welcome-title": "Welcome on board",
-            "done-welcome-text": "You did great with it!",
-            "sys-admin": {
-                "step1": {
-                    "title": "Create Tenant & Tenant Administrator",
-                    "content": "<p>A tenant is an individual or an organization that owns or produces devices and assets. The tenant may have multiple tenant administrator users, customers, devices, and assets.</p><p>The Tenant Administrator can create and manage devices, assets, customers, and dashboards within the tenant account.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-create-tenant": "How to create Tenant & Tenant Administrator"
-                },
-                "step2": {
-                    "title": "Configure feature: Mail server",
-                    "content": "<p>Mail server configuration is essential for user activation, password recovery, and alarm notification delivery.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-configure-mail-server": "How to configure Mail server"
-                },
-                "step3": {
-                    "title": "Configure feature: SMS provider",
-                    "content": "<p>Configure SMS providers to notify the customers about the alarms via SMS.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-configure-sms-provider": "How to configure SMS provider"
-                },
-                "step4": {
-                    "title": "Configure feature: 2FA",
-                    "content": "<p>Improve security of the platform accounts with two-factor authentication.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-configure-2fa": "How to configure 2FA"
-                },
-                "step5": {
-                    "title": "Configure feature: OAuth 2",
-                    "content": "<p>Simplify login for the tenant and customer users with Single Sign-On functionality via OAuth 2.0.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-configure-oauth2": "How to configure OAuth 2"
-                },
-                "step6": {
-                    "title": "Configure feature: Slack",
-                    "content": "<p>Distribute notifications to the tenant and customer users via Slack according to the notification rules you set.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-configure-notifications": "How to configure Slack"
-                }
-            },
-            "tenant-admin": {
-                "step1": {
-                    "title": "Create device",
-                    "content": "<p>Let's provision your first device to the platform via UI. Follow the documentation on how to do it:</p>",
-                    "how-to-create-device": "How to create Device"
-                },
-                "step2": {
-                    "title": "Connect device",
-                    "content-before": "<p>To connect the device you need to get the device credentials. We recommend using default auto-generated credentials which is access token for this guide.</p><ul><li>Go to device table</li><li>Click on the device row to open device details</li><li>Press the button \"Copy access token\"</li></ul><p>Use simple commands to publish data over HTTP. Don't forget to replace <em>$ACCESS_TOKEN</em> with your device access token:</p>",
-                    "ubuntu": {
-                        "install-curl": "Install cURL for Ubuntu:"
-                    },
-                    "macos": {
-                        "install-curl": "Install cURL for MacOS:"
-                    },
-                    "windows": {
-                        "install-curl": "Starting Windows 10 b17063, cURL is available by default."
-                    },
-                    "replace-access-token": "Replace <em>$ACCESS_TOKEN</em> with your device's token:",
-                    "content-after": "<p>You can also use other protocols such as MQTT, CoAP, etc.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-connect-device": "How to connect Device"
-                },
-                "step3": {
-                    "title": "Create dashboard",
-                    "content": "<p>Create a dashboard to visualize data from entities such as assets, devices, etc.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-create-dashboard": "How to create Dashboard"
-                },
-                "step4": {
-                    "title": "Configure alarm rules",
-                    "alarm-rules": "Alarm rules",
-                    "content": "<p>Let's raise an alarm when the temperature reaches 25°C. Follow the documentation on how to do it:</p>",
-                    "how-to-configure-alarm-rules": "How to configure Alarm rules"
-                },
-                "step5": {
-                    "title": "Create alarm",
-                    "content-before": "<p>To trigger the alarm, send a new telemetry value of 26°C or higher.</p>",
-                    "replace-access-token": "Replace <em>$ACCESS_TOKEN</em> with your device's token:",
-                    "content-after": "<p>Follow the documentation on how to do it:</p>",
-                    "how-to-create-alarm": "How to create Alarm"
-                },
-                "step6": {
-                    "title": "Create customer and assign dashboard",
-                    "content": "<p>By creating end-user dashboards, a customer user can only see his own devices, and data from another customer will be hidden.</p><p>Follow the documentation on how to do it:</p>",
-                    "how-to-create-customer-and-assign-dashboard": "How to create Customer and assign Dashboard"
-                }
-            }
         },
         "html-container": {
             "java-script": "JavaScript",

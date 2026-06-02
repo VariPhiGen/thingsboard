@@ -35,5 +35,8 @@ public class OAuth2ClientLoginInfo {
     @Schema(description = "URI for OAuth2 log in. On HTTP GET request to this URI, it redirects to the OAuth2 provider page",
             example = "/oauth2/authorization/8352f191-2b4d-11ec-9ed1-cbf57c026ecc")
     private String url;
+    @Schema(description = "Identity-provider RP-initiated logout URL (OpenID Connect end_session_endpoint with client_id). " +
+            "The UI appends post_logout_redirect_uri to end the IdP session on logout.")
+    private String logoutUrl;
 
 }

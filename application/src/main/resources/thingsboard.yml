@@ -191,6 +191,26 @@ security:
     githubMapper:
       # The email addresses that will be mapped from the URL
       emailUrl: "${SECURITY_OAUTH2_GITHUB_MAPPER_EMAIL_URL_KEY:https://api.github.com/user/emails}"
+    # Variphi Keycloak SSO client, seeded into the DB on install when enabled.
+    # Points at an existing Keycloak client; no realm changes are required.
+    keycloak:
+      # Enable to auto-create the Keycloak OAuth2 client + domain on a fresh install
+      enabled: "${SECURITY_OAUTH2_KEYCLOAK_ENABLED:false}"
+      # Title / login button label shown on the login page
+      title: "${SECURITY_OAUTH2_KEYCLOAK_TITLE:Variphi SSO}"
+      # Dedicated Keycloak client id and secret (confidential client; secret required by ThingsBoard)
+      client-id: "${SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID:thingsboard}"
+      client-secret: "${SECURITY_OAUTH2_KEYCLOAK_CLIENT_SECRET:thingsboard-oauth2-secret}"
+      # Keycloak realm issuer used by the ThingsBoard backend (token/userinfo/jwks). In production this is the
+      # single public issuer reachable by both browser and backend (e.g. https://auth.variphi.com/realms/things).
+      issuer-uri: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:http://localhost:8081/realms/things}"
+      # Optional browser-facing issuer for the authorization redirect only. Set this for split-horizon docker
+      # setups where the browser reaches Keycloak on a different host than the backend. Leave blank in production.
+      auth-issuer-uri: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:}"
+      # Domain (host:port) of this ThingsBoard instance the OAuth2 login is bound to
+      domain-name: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:localhost:9090}"
+      # Comma-separated OAuth2 scopes
+      scopes: "${SECURITY_OAUTH2_KEYCLOAK_SCOPES:openid,email,profile}"
   java_cacerts:
     # CA certificates keystore default path. Typically this keystore is at JAVA_HOME/lib/security/cacerts
     path: "${SECURITY_JAVA_CACERTS_PATH:${java.home}/lib/security/cacerts}"

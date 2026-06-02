@@ -49,7 +49,7 @@ export class AppComponent {
               private domSanitizer: DomSanitizer,
               private authService: AuthService) {
 
-    console.log(`ThingsBoard Version: ${env.tbVersion}`);
+    console.log(`Variphi IoT Version: ${env.tbVersion}`);
 
     this.matIconRegistry.addSvgIconResolver((name, namespace) => {
       if (namespace === 'mdi') {

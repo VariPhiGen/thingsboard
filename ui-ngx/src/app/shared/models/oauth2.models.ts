@@ -160,6 +160,7 @@ export interface OAuth2ClientLoginInfo {
   name: string;
   icon: string;
   url: string;
+  logoutUrl?: string;
 }
 
 export function getProviderHelpLink(provider: Provider): string {

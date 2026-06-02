@@ -28,6 +28,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -114,6 +115,14 @@ import org.thingsboard.server.dao.tenant.TenantProfileService;
 import org.thingsboard.server.dao.tenant.TenantService;
 import org.thingsboard.server.dao.timeseries.TimeseriesService;
 import org.thingsboard.server.dao.user.UserService;
+import org.thingsboard.server.dao.domain.DomainService;
+import org.thingsboard.server.dao.oauth2.OAuth2ClientService;
+import org.thingsboard.server.common.data.domain.Domain;
+import org.thingsboard.server.common.data.oauth2.MapperType;
+import org.thingsboard.server.common.data.oauth2.OAuth2BasicMapperConfig;
+import org.thingsboard.server.common.data.oauth2.OAuth2Client;
+import org.thingsboard.server.common.data.oauth2.OAuth2MapperConfig;
+import org.thingsboard.server.common.data.oauth2.TenantNameStrategyType;
 import org.thingsboard.server.service.security.auth.jwt.settings.JwtSettingsService;
 
 import java.nio.charset.StandardCharsets;
@@ -160,9 +169,30 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     private final NotificationSettingsService notificationSettingsService;
     private final NotificationTargetService notificationTargetService;
     private final CalculatedFieldService calculatedFieldService;
+    private final OAuth2ClientService oAuth2ClientService;
+    private final DomainService domainService;
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Value("${security.oauth2.keycloak.enabled:false}")
+    private boolean keycloakSsoEnabled;
+    @Value("${security.oauth2.keycloak.title:Variphi SSO}")
+    private String keycloakSsoTitle;
+    @Value("${security.oauth2.keycloak.client-id:}")
+    private String keycloakClientId;
+    @Value("${security.oauth2.keycloak.client-secret:}")
+    private String keycloakClientSecret;
+    @Value("${security.oauth2.keycloak.issuer-uri:http://localhost:8081/realms/things}")
+    private String keycloakIssuerUri;
+    // Optional browser-facing issuer for the authorization URI (split-horizon docker setups).
+    // Leave blank in production where a single public issuer is reachable by both browser and backend.
+    @Value("${security.oauth2.keycloak.auth-issuer-uri:}")
+    private String keycloakAuthIssuerUri;
+    @Value("${security.oauth2.keycloak.domain-name:localhost:9090}")
+    private String keycloakDomainName;
+    @Value("${security.oauth2.keycloak.scopes:openid,email,profile}")
+    private String keycloakScopes;
 
     @Value("${state.persistToTelemetry:false}")
     @Getter
@@ -341,6 +371,74 @@ public class DefaultSystemDataLoaderService implements SystemDataLoaderService {
     @Override
     public void createOAuth2Templates() throws Exception {
         installScripts.createOAuth2Templates();
+    }
+
+    @Override
+    public void createKeycloakOAuth2Client() throws Exception {
+        if (!keycloakSsoEnabled) {
+            log.info("Keycloak SSO seeding is disabled (security.oauth2.keycloak.enabled=false). Skipping.");
+            return;
+        }
+        if (StringUtils.isBlank(keycloakClientId) || StringUtils.isBlank(keycloakClientSecret) || StringUtils.isBlank(keycloakIssuerUri)) {
+            log.warn("Keycloak SSO is enabled but client-id/client-secret/issuer-uri are not fully configured. Skipping seeding.");
+            return;
+        }
+
+        TenantId tenantId = TenantId.SYS_TENANT_ID;
+
+        boolean alreadyExists = oAuth2ClientService.findOAuth2ClientsByTenantId(tenantId).stream()
+                .anyMatch(client -> keycloakSsoTitle.equals(client.getTitle()));
+        if (alreadyExists) {
+            log.info("Keycloak OAuth2 client [{}] already exists. Skipping seeding.", keycloakSsoTitle);
+            return;
+        }
+
+        String issuer = keycloakIssuerUri.replaceAll("/+$", "");
+        // Browser-facing issuer for the authorization redirect; falls back to the backend issuer when not set.
+        String authIssuer = StringUtils.isBlank(keycloakAuthIssuerUri) ? issuer : keycloakAuthIssuerUri.replaceAll("/+$", "");
+        List<String> scopes = Arrays.stream(keycloakScopes.split(","))
+                .map(String::trim).filter(s -> !s.isEmpty()).toList();
+
+        OAuth2Client client = new OAuth2Client();
+        client.setTenantId(tenantId);
+        client.setTitle(keycloakSsoTitle);
+        client.setClientId(keycloakClientId);
+        client.setClientSecret(keycloakClientSecret);
+        client.setAuthorizationUri(authIssuer + "/protocol/openid-connect/auth");
+        client.setAccessTokenUri(issuer + "/protocol/openid-connect/token");
+        client.setUserInfoUri(issuer + "/protocol/openid-connect/userinfo");
+        client.setJwkSetUri(issuer + "/protocol/openid-connect/certs");
+        client.setScope(scopes);
+        client.setUserNameAttributeName("email");
+        client.setClientAuthenticationMethod("POST");
+        client.setLoginButtonLabel(keycloakSsoTitle);
+        client.setLoginButtonIcon("login");
+        client.setAdditionalInfo(JacksonUtil.newObjectNode().put("providerName", "Keycloak"));
+        client.setMapperConfig(OAuth2MapperConfig.builder()
+                .allowUserCreation(true)
+                .activateUser(true)
+                .type(MapperType.BASIC)
+                .basic(OAuth2BasicMapperConfig.builder()
+                        .emailAttributeKey("email")
+                        .firstNameAttributeKey("given_name")
+                        .lastNameAttributeKey("family_name")
+                        .tenantNameStrategy(TenantNameStrategyType.DOMAIN)
+                        .alwaysFullScreen(false)
+                        .build())
+                .build());
+
+        OAuth2Client savedClient = oAuth2ClientService.saveOAuth2Client(tenantId, client);
+
+        Domain domain = new Domain();
+        domain.setTenantId(tenantId);
+        domain.setName(keycloakDomainName);
+        domain.setOauth2Enabled(true);
+        domain.setPropagateToEdge(false);
+        Domain savedDomain = domainService.saveDomain(tenantId, domain);
+        domainService.updateOauth2Clients(tenantId, savedDomain.getId(), List.of(savedClient.getId()));
+
+        log.info("Seeded Keycloak OAuth2 client [{}] (clientId={}) on domain [{}] for SSO login.",
+                keycloakSsoTitle, keycloakClientId, keycloakDomainName);
     }
 
     @Override

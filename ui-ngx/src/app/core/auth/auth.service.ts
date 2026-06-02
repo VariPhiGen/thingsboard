@@ -191,21 +191,46 @@ export class AuthService {
       ));
   }
 
-  public logout(captureLastUrl: boolean = false, ignoreRequest = false) {
+  public logout(captureLastUrl: boolean = false, ignoreRequest = false, ssoLogout = false) {
     if (captureLastUrl) {
       this.redirectUrl = this.router.url;
     }
+    const ssoLogoutRedirect = (clients: Array<OAuth2ClientLoginInfo>) => {
+      const client = clients?.find(c => c.logoutUrl);
+      if (client?.logoutUrl) {
+        // RP-initiated logout: end the Keycloak session, then go STRAIGHT back into the SSO
+        // authorization endpoint (instant 302) instead of /login. This way the user only ever sees
+        // Keycloak pages (logout -> login) — no flash of the ThingsBoard /login screen in between.
+        const postLogout = encodeURIComponent(window.location.origin + client.url);
+        window.location.href = client.logoutUrl + '&post_logout_redirect_uri=' + postLogout;
+      } else {
+        window.location.href = '/login';
+      }
+    };
+    const onLogout = () => {
+      if (ssoLogout) {
+        // Explicit user logout in an SSO deployment: terminate the Keycloak session too.
+        // Clear tokens WITHOUT an in-app navigation (notify=false), then do ONE full-page redirect.
+        // Using clearJwtToken() here would navigate to /login and auto-redirect, racing this redirect
+        // and spawning a second SSO flow that fails with [authorization_request_not_found].
+        this.setUserFromJwtToken(null, null, false);
+        if (this.oauth2Clients?.length) {
+          ssoLogoutRedirect(this.oauth2Clients);
+        } else {
+          this.loadOAuth2Clients().subscribe({
+            next: ssoLogoutRedirect,
+            error: () => { window.location.href = '/login'; }
+          });
+        }
+      } else {
+        this.clearJwtToken();
+      }
+    };
     if (!ignoreRequest) {
       this.http.post('/api/auth/logout', null, defaultHttpOptions(true, true))
-        .subscribe(() => {
-            this.clearJwtToken();
-          },
-          () => {
-            this.clearJwtToken();
-          }
-        );
+        .subscribe({ next: onLogout, error: onLogout });
     } else {
-      this.clearJwtToken();
+      onLogout();
     }
   }
 
@@ -361,7 +386,12 @@ export class AuthService {
           )
         );
       } else if (loginError) {
-        Promise.resolve().then(() => this.showLoginErrorDialog(loginError));
+        const decodedError = decodeURIComponent(loginError);
+        // Let the login page handle stale OAuth2 state with a recovery loader/retry UI.
+        if (/authorization_request_not_found/i.test(decodedError)) {
+          return throwError(Error(decodedError));
+        }
+        Promise.resolve().then(() => this.showLoginErrorDialog(decodedError));
         this.utils.updateQueryParam('loginError', null);
         return throwError(Error());
       }

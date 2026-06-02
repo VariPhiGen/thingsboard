@@ -29,6 +29,8 @@ public interface SystemDataLoaderService {
 
     void createOAuth2Templates() throws Exception;
 
+    void createKeycloakOAuth2Client() throws Exception;
+
     void loadSystemWidgets() throws Exception;
 
     void loadDemoData() throws Exception;

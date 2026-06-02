@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// Variphi brand mark for ThingsBoard sidebar
+$brand-logo-height: 56px;
+$brand-logo-width: 220px; // logo_title_white.svg viewBox 200×48
+
 :host {
   pointer-events: auto;
   a {
@@ -20,13 +24,26 @@
     img {
       width: 100%;
       height: 100%;
+      object-fit: contain;
     }
   }
 }
 
+:host-context(.tb-logo-title) {
+  width: $brand-logo-width;
+  height: $brand-logo-height;
+  display: block;
+  flex-shrink: 0;
+  a {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+}
+
 :host-context(.login-logo) {
-  width: 280px;
-  height: 60px;
+  width: $brand-logo-width;
+  height: $brand-logo-height;
   a {
     text-decoration: none;
     border: none;

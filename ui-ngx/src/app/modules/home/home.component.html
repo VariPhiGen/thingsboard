@@ -23,7 +23,7 @@
                [opened]="sidenavOpened && !forceFullscreen">
     <header class="tb-nav-header">
       <mat-toolbar color="primary" class="tb-nav-header-toolbar">
-        <div class="flex flex-auto">
+        <div class="tb-nav-logo flex w-full flex-auto items-center justify-center">
           <tb-logo [src]="logo" class="tb-logo-title"></tb-logo>
         </div>
       </mat-toolbar>
@@ -61,7 +61,6 @@
                    placeholder="{{ 'common.enter-search' | translate }}"/>
           </mat-form-field>
         </div>
-        <tb-github-badge class="lt-md:!hidden"></tb-github-badge>
         <button [class.!hidden]="!searchEnabled"
                 mat-icon-button (click)="openSearch()">
           <mat-icon class="material-icons">search</mat-icon>

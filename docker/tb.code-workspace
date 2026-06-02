@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../var/vgi-microservices"
+		},
+		{
+			"path": "../../../var/packages"
+		}
+	],
+	"settings": {}
+}

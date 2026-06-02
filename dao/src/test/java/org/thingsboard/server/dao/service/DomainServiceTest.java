@@ -116,7 +116,7 @@ public class DomainServiceTest extends AbstractServiceTest {
 
         //find clients by domain name
         List<OAuth2ClientLoginInfo> oauth2LoginInfo = oAuth2ClientService.findOAuth2ClientLoginInfosByDomainName(savedDomain.getName());
-        assertThat(oauth2LoginInfo).containsOnly(new OAuth2ClientLoginInfo(savedOauth2Client.getLoginButtonLabel(), savedOauth2Client.getLoginButtonIcon(), String.format(OAUTH2_AUTHORIZATION_PATH_TEMPLATE, savedOauth2Client.getUuidId().toString())));
+        assertThat(oauth2LoginInfo).containsOnly(org.thingsboard.server.dao.oauth2.OAuth2Utils.toClientLoginInfo(savedOauth2Client));
     }
 
     private Domain constructDomain(TenantId tenantId, String domainName, boolean oauth2Enabled, boolean propagateToEdge) {
