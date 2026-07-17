@@ -22,7 +22,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.thingsboard.server.service.install.SystemDataLoaderService;
+import org.thingsboard.server.service.security.oauth2.KeycloakOAuth2SeederService;
+import org.thingsboard.server.service.security.oauth2.VariphiRuleChainSeederService;
 
 /**
  * Ensures Keycloak OAuth2 client + domain exist when TB starts against an already-provisioned DB
@@ -34,7 +35,8 @@ import org.thingsboard.server.service.install.SystemDataLoaderService;
 @Slf4j
 public class KeycloakOAuth2StartupSeeder {
 
-    private final SystemDataLoaderService systemDataLoaderService;
+    private final KeycloakOAuth2SeederService keycloakOAuth2SeederService;
+    private final VariphiRuleChainSeederService variphiRuleChainSeederService;
 
     @Value("${install:false}")
     private boolean installProfile;
@@ -45,7 +47,10 @@ public class KeycloakOAuth2StartupSeeder {
             return;
         }
         try {
-            systemDataLoaderService.createKeycloakOAuth2Client();
+            keycloakOAuth2SeederService.seedIfMissing();
+            keycloakOAuth2SeederService.syncOAuth2ClientConfig();
+            keycloakOAuth2SeederService.syncVariphiMapperConfig();
+            variphiRuleChainSeederService.seedViewerAutoAssignRuleChain();
         } catch (Exception e) {
             log.error("Failed to seed Keycloak OAuth2 client on startup", e);
         }

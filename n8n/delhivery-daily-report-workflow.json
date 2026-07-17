@@ -1,0 +1,276 @@
+{
+  "name": "Delhivery Daily TB Alarm+Telemetry Report",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1000001-0000-4000-8000-000000000001",
+      "name": "Manual test run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000002",
+      "name": "Daily 08:00 IST",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "notes": "GENERIC_TIMEZONE=UTC \u2192 02:30 UTC = 08:00 Asia/Kolkata"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.31.16.106:5060/v1/delhivery/daily-report",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"hours\": 24\n}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000003",
+      "name": "Generate Delhivery Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = items[0].json;\nif (!r.ok) {\n  throw new Error(r.error || 'Report generation failed');\n}\nconst s = r.summary || {};\nconst urls = r.download_urls || {};\nconst subject = `Delhivery Daily Report ${s.report_date || ''} \u2014 alarms ${s.alarm_count || 0} (active ${s.active_count || 0})`;\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:720px\">\n  <h2 style=\"margin:0 0 8px\">Delhivery \u2014 Daily Alarm & Telemetry Report</h2>\n  <p style=\"color:#64748b;margin:0 0 16px\">${s.window || ''}</p>\n  <table style=\"border-collapse:collapse;width:100%;margin-bottom:16px\">\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Total alarms</td><td style=\"padding:8px;border:1px solid #e2e8f0\"><b>${s.alarm_count ?? 0}</b></td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Active</td><td style=\"padding:8px;border:1px solid #e2e8f0\"><b>${s.active_count ?? 0}</b></td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Critical</td><td style=\"padding:8px;border:1px solid #e2e8f0\"><b>${s.critical_count ?? 0}</b></td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Major</td><td style=\"padding:8px;border:1px solid #e2e8f0\"><b>${s.major_count ?? 0}</b></td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Devices</td><td style=\"padding:8px;border:1px solid #e2e8f0\">${(s.devices||[]).join(', ')}</td></tr>\n    <tr><td style=\"padding:8px;border:1px solid #e2e8f0\">Telemetry points</td><td style=\"padding:8px;border:1px solid #e2e8f0\">${s.telemetry_points ?? 0}</td></tr>\n  </table>\n  <p>Attachments: <b>report.pdf</b>, <b>alarms.csv</b>, <b>telemetry_latest.csv</b></p>\n  <p style=\"color:#94a3b8;font-size:12px\">Dashboard: https://viot.virtuosonetsoft.com/dashboards/c7229d20-812a-11f1-a760-b3ba4cbe1b98</p>\n</div>`;\nreturn [{\n  json: {\n    ...r,\n    subject,\n    html,\n    fromEmail: 'information@variphi.com',\n    toEmail: 'delhivery@virtuosonetsoft.com, information@variphi.com',\n    pdfUrl: urls.pdf,\n    alarmsCsvUrl: urls.alarms_csv,\n    telemetryCsvUrl: urls.telemetry_csv,\n  }\n}];"
+      },
+      "id": "a1000001-0000-4000-8000-000000000004",
+      "name": "Format email HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.pdfUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdf"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000005",
+      "name": "Download PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Format email HTML').item.json.alarmsCsvUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "alarms_csv"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000006",
+      "name": "Download alarms CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Format email HTML').item.json.telemetryCsvUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "telemetry_csv"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000007",
+      "name": "Download telemetry CSV",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1240,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const meta = $('Format email HTML').first().json;\nconst pdfBin = $('Download PDF').first().binary || {};\nconst alarmsBin = $('Download alarms CSV').first().binary || {};\nconst telemBin = $('Download telemetry CSV').first().binary || {};\n\nconst binary = {};\nif (pdfBin.pdf) {\n  binary.pdf = { ...pdfBin.pdf, fileName: `delhivery-report-${meta.report_date}.pdf`, mimeType: 'application/pdf' };\n}\nif (alarmsBin.alarms_csv) {\n  binary.alarms_csv = { ...alarmsBin.alarms_csv, fileName: `delhivery-alarms-${meta.report_date}.csv`, mimeType: 'text/csv' };\n}\nif (telemBin.telemetry_csv) {\n  binary.telemetry_csv = { ...telemBin.telemetry_csv, fileName: `delhivery-telemetry-${meta.report_date}.csv`, mimeType: 'text/csv' };\n}\n\nreturn [{\n  json: {\n    subject: meta.subject,\n    html: meta.html,\n    fromEmail: meta.fromEmail,\n    toEmail: meta.toEmail,\n    report_date: meta.report_date,\n    summary: meta.summary,\n  },\n  binary,\n}];"
+      },
+      "id": "a1000001-0000-4000-8000-000000000008",
+      "name": "Prepare email payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.fromEmail }}",
+        "toEmail": "={{ $json.toEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "attachments": "pdf,alarms_csv,telemetry_csv"
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000009",
+      "name": "Send report email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1720,
+        100
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "ccjpoD0RTbvzQQLf",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Manual test run": {
+      "main": [
+        [
+          {
+            "node": "Generate Delhivery Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 08:00 IST": {
+      "main": [
+        [
+          {
+            "node": "Generate Delhivery Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Delhivery Report": {
+      "main": [
+        [
+          {
+            "node": "Format email HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format email HTML": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Download alarms CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download alarms CSV": {
+      "main": [
+        [
+          {
+            "node": "Download telemetry CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download telemetry CSV": {
+      "main": [
+        [
+          {
+            "node": "Prepare email payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare email payload": {
+      "main": [
+        [
+          {
+            "node": "Send report email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "UTC"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

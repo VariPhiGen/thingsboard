@@ -1,17 +1,5 @@
 /**
  * Copyright © 2016-2026 The Thingsboard Authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
  */
 package org.thingsboard.server.service.security.auth.oauth2;
 
@@ -32,13 +20,22 @@ import java.util.Map;
 @TbCoreComponent
 public class BasicOAuth2ClientMapper extends AbstractOAuth2ClientMapper implements OAuth2ClientMapper {
 
+    public static final String VARIPHI_MAPPER_ENABLED = "variphiMapperEnabled";
+    public static final String VARIPHI_USER_TYPE_CLAIM = "variphiUserTypeClaim";
+    public static final String VARIPHI_CLIENT_ID_CLAIM = "variphiClientIdClaim";
+    public static final String VARIPHI_TENANT_NAME_CLAIM = "variphiTenantNameClaim";
+
     @Override
     public SecurityUser getOrCreateUserByClientPrincipal(HttpServletRequest request, OAuth2AuthenticationToken token, String providerAccessToken, OAuth2Client oAuth2Client) {
         OAuth2MapperConfig config = oAuth2Client.getMapperConfig();
         Map<String, Object> attributes = token.getPrincipal().getAttributes();
         String email = BasicMapperUtils.getStringAttributeByKey(attributes, config.getBasic().getEmailAttributeKey());
-        OAuth2User oauth2User = BasicMapperUtils.getOAuth2User(email, attributes, config);
 
+        if (VariphiOAuth2MappingHelper.isEnabled(oAuth2Client)) {
+            return handleVariphiAuth(email, attributes, config, oAuth2Client);
+        }
+
+        OAuth2User oauth2User = BasicMapperUtils.getOAuth2User(email, attributes, config);
         return getOrCreateSecurityUserFromOAuth2User(oauth2User, oAuth2Client);
     }
 }

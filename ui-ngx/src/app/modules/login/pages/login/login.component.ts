@@ -73,7 +73,8 @@ export class LoginComponent extends PageComponent implements OnInit {
     }
     const loginError = decodeURIComponent(qp.get('loginError') || '');
     const authRequestNotFound = /authorization_request_not_found/i.test(loginError);
-    const afterError = !!qp.get('loginError');
+    const provisioningError = /tenant assignment|not provisioned|identity provider/i.test(loginError);
+    const afterError = !!qp.get('loginError') || provisioningError;
 
     const decide = (clients: Array<OAuth2ClientLoginInfo>) => {
       this.oauth2Clients = clients;

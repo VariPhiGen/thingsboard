@@ -1,0 +1,35 @@
+# Dedicated Keycloak for Virtuoso NetSoft IoT — auth.virtuosonetsoft.variphi.com
+# Deploy on gateway host 43.204.247.12 (nginx terminates TLS on :443 -> :8082).
+services:
+  keycloak-virtuoso:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: keycloak-virtuoso
+    restart: unless-stopped
+    command: start-dev
+    ports:
+      - "8082:8080"
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://${KC_DB_HOST:-3.110.77.148}:5432/${KC_DB_NAME:-keycloak_virtuoso}
+      KC_DB_USERNAME: ${KC_DB_USER:-variphi}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:-vgi@2026}
+      KC_DB_SCHEMA: public
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME: https://auth.virtuosonetsoft.variphi.com
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - ./themes:/opt/keycloak/themes:ro
+      - /home/ubuntu/vgi-microservices/keycloak/providers:/opt/keycloak/providers:ro
+    networks:
+      - default
+      - microservices
+
+networks:
+  microservices:
+    external: true
+    name: vgi-microservices_microservices

@@ -36,7 +36,10 @@ x-tb-db-env: &tb-db-env
   SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-3.110.77.148}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb}"
   SPRING_DATASOURCE_USERNAME: "${DATABASE_USER:-variphi}"
   SPRING_DATASOURCE_PASSWORD: "${DATABASE_PASSWORD:-vgi@2026}"
-  DATABASE_TS_TYPE: "sql"
+  DATABASE_TS_TYPE: "${DATABASE_TS_TYPE:-sql}"
+  DATABASE_TS_LATEST_TYPE: "${DATABASE_TS_LATEST_TYPE:-sql}"
+  SQL_TIMESCALE_CHUNK_TIME_INTERVAL: "${SQL_TIMESCALE_CHUNK_TIME_INTERVAL:-604800000}"
+  SQL_TIMESCALE_BATCH_THREADS: "${SQL_TIMESCALE_BATCH_THREADS:-3}"
   TB_QUEUE_TYPE: "in-memory"
   TB_SERVICE_TYPE: "monolith"
 
@@ -78,7 +81,7 @@ services:
       # Dev defaults use the docker split-horizon (host.docker.internal). In PRODUCTION set these to a
       # single public issuer (e.g. https://auth.variphi.com/realms/things) and leave AUTH_ISSUER_URI blank.
       SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/things}"
-      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-http://localhost:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-}"
       SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:-localhost:9090}"
       SECURITY_OAUTH2_KEYCLOAK_SCOPES: "openid,email,profile"
 
@@ -96,16 +99,17 @@ services:
     ports:
       - "9090:8080"   # Web UI + HTTP device API -> http://localhost:9090
       - "1883:1883"   # MQTT device API
+      - "8883:8883"   # MQTT over TLS (mutual TLS for X.509)
       # - "7070:7070" # Edge RPC (uncomment if the host port is free)
     environment:
       <<: [*tb-db-env, *tb-cache-env]
       # Keycloak SSO (seeded on startup when missing; same values as tb-install).
       SECURITY_OAUTH2_KEYCLOAK_ENABLED: "true"
       SECURITY_OAUTH2_KEYCLOAK_TITLE: "Variphi SSO"
-      SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID: "thingsboard"
+      SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID: "${SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID:-viot}"
       SECURITY_OAUTH2_KEYCLOAK_CLIENT_SECRET: "${TB_OAUTH2_CLIENT_SECRET:-thingsboard-oauth2-secret}"
-      SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/things}"
-      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-http://localhost:8081/realms/things}"
+      SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI:-http://host.docker.internal:8081/realms/viot}"
+      SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI: "${SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI:-}"
       SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:-localhost:9090}"
       SECURITY_OAUTH2_KEYCLOAK_SCOPES: "openid,email,profile"
       # "Connect device" instructions must show the PUBLISHED host:port (container 8080 -> host 9090),
@@ -114,8 +118,15 @@ services:
       DEVICE_CONNECTIVITY_HTTP_PORT: "${DEVICE_CONNECTIVITY_HTTP_PORT:-9090}"
       DEVICE_CONNECTIVITY_MQTT_HOST: "${DEVICE_CONNECTIVITY_MQTT_HOST:-localhost}"
       DEVICE_CONNECTIVITY_MQTT_PORT: "${DEVICE_CONNECTIVITY_MQTT_PORT:-1883}"
+      # MQTT over TLS (required for X.509 client-cert auth)
+      MQTT_SSL_ENABLED: "true"
+      MQTT_SSL_CREDENTIALS_TYPE: "PEM"
+      MQTT_SSL_PEM_CERT: "/mqtt-certs/server.pem"
+      MQTT_SSL_PEM_KEY: "/mqtt-certs/server_key.pem"
+      MQTT_SSL_BIND_PORT: "8883"
     volumes:
       - tb-logs:/var/log/thingsboard
+      - ./mqtt-certs:/mqtt-certs:ro
 
 volumes:
   tb-logs:

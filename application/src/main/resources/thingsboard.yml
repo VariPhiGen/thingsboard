@@ -211,6 +211,9 @@ security:
       domain-name: "${SECURITY_OAUTH2_KEYCLOAK_DOMAIN_NAME:localhost:9090}"
       # Comma-separated OAuth2 scopes
       scopes: "${SECURITY_OAUTH2_KEYCLOAK_SCOPES:openid,email,profile}"
+      user-type-claim: "${SECURITY_OAUTH2_KEYCLOAK_USER_TYPE_CLAIM:user_type}"
+      client-id-claim: "${SECURITY_OAUTH2_KEYCLOAK_CLIENT_ID_CLAIM:client_id}"
+      tenant-name-claim: "${SECURITY_OAUTH2_KEYCLOAK_TENANT_NAME_CLAIM:client_id}"
   java_cacerts:
     # CA certificates keystore default path. Typically this keystore is at JAVA_HOME/lib/security/cacerts
     path: "${SECURITY_JAVA_CACERTS_PATH:${java.home}/lib/security/cacerts}"
