@@ -1075,8 +1075,8 @@
                   "settings": {
                     "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
                   },
-                  "decimals": null,
-                  "units": "RPM",
+                  "decimals": 0,
+                  "units": "",
                   "aggregationType": null
                 }
               ],
@@ -1101,8 +1101,8 @@
             "minValue": 0,
             "donutStartAngle": 90,
             "showValue": true,
-            "showMinMax": true,
-            "gaugeWidthScale": 0.85,
+            "showMinMax": false,
+            "gaugeWidthScale": 0.75,
             "levelColors": [
               "#008000",
               "#fbc02d",
@@ -1123,10 +1123,10 @@
               "color": "#6B7280"
             },
             "valueFont": {
-              "family": "Segment7Standard",
+              "family": "Roboto",
               "style": "normal",
-              "weight": "500",
-              "size": 32,
+              "weight": "600",
+              "size": 20,
               "color": "#2563EB"
             },
             "minMaxFont": {
@@ -1145,7 +1145,8 @@
             "animation": true,
             "animationDuration": 500,
             "animationRule": "linear",
-            "title": "Engine RPM"
+            "title": "Engine RPM",
+            "decimals": 0
           },
           "title": "Engine RPM",
           "dropShadow": true,
@@ -1367,11 +1368,12 @@
                   "label": "Oil Pressure",
                   "color": "#EA580C",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "if (value == null || value === '' || value === 32767 || value >= 30000) { return null; } var n = Number(value); if (!isFinite(n)) return null; return Math.round(n);"
                   },
-                  "decimals": null,
+                  "decimals": 0,
                   "units": "kPa",
-                  "aggregationType": null
+                  "aggregationType": null,
+                  "usePostProcessing": true
                 }
               ],
               "alarmFilterConfig": {
@@ -1395,8 +1397,8 @@
             "minValue": 0,
             "donutStartAngle": 90,
             "showValue": true,
-            "showMinMax": true,
-            "gaugeWidthScale": 0.75,
+            "showMinMax": false,
+            "gaugeWidthScale": 0.7,
             "levelColors": [],
             "refreshAnimationType": ">",
             "refreshAnimationTime": 700,
@@ -1410,16 +1412,17 @@
             },
             "labelFont": {
               "family": "Roboto",
-              "size": 8,
+              "size": 12,
               "style": "normal",
-              "weight": "500"
+              "weight": "500",
+              "color": "#6B7280"
             },
             "valueFont": {
               "family": "Roboto",
               "style": "normal",
               "weight": "500",
-              "size": 32,
-              "color": "#666666"
+              "size": 18,
+              "color": "#374151"
             },
             "minMaxFont": {
               "family": "Segment7Standard",
@@ -6006,6 +6009,6 @@
     }
   },
   "resources": null,
-  "version": 14,
+  "version": 16,
   "externalId": null
 }

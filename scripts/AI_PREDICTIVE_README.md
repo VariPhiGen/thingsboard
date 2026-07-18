@@ -8,8 +8,8 @@ Branch: `ai`
    - API key stored only in ThingsBoard (never commit keys)
 2. **Root Rule Chain** production AI path (see below)
 3. **Dashboard** [DG SET1 — Woodward KG1500](https://viot.virtuosonetsoft.com/dashboards/09c06030-81cc-11f1-a760-b3ba4cbe1b98)
-   - **AI Summary** (text only — no repeated status/severity)
-   - **AI Status** + **AI Severity** + predictive KPIs (each shown once)
+   - **AI Summary** — 1–2 operator sentences citing live key readings (RPM, coolant, oil, load); not a vague “all normal” line only
+   - **AI Status** + **AI Severity** + predictive KPIs (each shown once; not repeated inside Summary)
    - Maintenance recommendation (short action; does not repeat summary)
    - Sensor widgets map Modbus sentinel `32767` / `>=30000` to **N/A**
 
@@ -17,7 +17,7 @@ Branch: `ai`
 
 ```
 Save Timeseries
-  → DG AI Dedup 5m (300s, FIRST)
+  → DG AI Dedup 1m (60s, LAST)
   → Only DG Telemetry
   → Core Sensors Valid
        True  → Sanitize DG Sensors → DG SET1 AI Predictive → Clamp AI Outputs → Save AI Predictive Telemetry
@@ -40,7 +40,7 @@ Detail sits in **AI Reason** / **AI Summary** (not inside the KPI value).
 
 | Stage | Purpose |
 |-------|---------|
-| **Dedup 5m FIRST** | At most one AI evaluation per device per 5 minutes |
+| **Dedup 1m LAST** | About one AI evaluation per minute using the **latest** telemetry (avoids staying stuck on an old PAUSED/FIRST sample) |
 | **Core Sensors Valid** | ≥2 valid among RPM (0–2500), coolant (20–130°C), oil (50–800 kPa) |
 | **Sanitize** | Strip invalid metrics; sets `metadata.valid_metric_count` |
 | **OpenAI** | JSON predictive scoring on cleaned metrics |
