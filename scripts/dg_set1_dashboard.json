@@ -3839,6 +3839,31 @@
                   "ACTIVE"
                 ]
               }
+            },
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
+              "filterId": null,
+              "dataKeys": [
+                {
+                  "name": "fuel_level",
+                  "type": "timeseries",
+                  "label": "Fuel Level",
+                  "color": "#CA8A04",
+                  "settings": {
+                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return null; } return value;"
+                  },
+                  "decimals": 0,
+                  "units": "%",
+                  "aggregationType": null
+                }
+              ],
+              "alarmFilterConfig": {
+                "statusList": [
+                  "ACTIVE"
+                ]
+              }
             }
           ],
           "timewindow": {
@@ -6050,6 +6075,433 @@
         },
         "id": "c4e7f892-1a2b-4c3d-9e8f-0a1b2c3d4e5f",
         "typeFullFqn": "system.digital_gauges.digital_speedometer"
+      },
+      "f8e7d6c5-b4a3-4291-8f6d-5e4d3c2b1a09": {
+        "type": "latest",
+        "sizeX": 6,
+        "sizeY": 4,
+        "config": {
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
+              "filterId": null,
+              "dataKeys": [
+                {
+                  "name": "fuel_level",
+                  "type": "timeseries",
+                  "label": "Fuel Level",
+                  "color": "#CA8A04",
+                  "settings": {
+                    "postFuncBody": "if (value == null || value === '' || value === 32767 || value >= 30000) { return null; } var n = Number(value); if (!isFinite(n)) return null; if (n === 0) return null; return Math.max(0, Math.min(100, Math.round(n)));"
+                  },
+                  "decimals": 0,
+                  "units": "%",
+                  "aggregationType": null,
+                  "usePostProcessing": true
+                }
+              ],
+              "alarmFilterConfig": {
+                "statusList": [
+                  "ACTIVE"
+                ]
+              }
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "timewindowMs": 60000
+            }
+          },
+          "showTitle": false,
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "0px",
+          "settings": {
+            "labelPosition": "top",
+            "layout": "square",
+            "showLabel": true,
+            "labelFont": {
+              "family": "Roboto",
+              "size": 16,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500"
+            },
+            "labelColor": {
+              "type": "constant",
+              "color": "rgba(0, 0, 0, 0.87)",
+              "colorFunction": "var temperature = value;\nif (typeof temperature !== undefined) {\n  var percent = (temperature + 60)/120 * 100;\n  return tinycolor.mix('blue', 'red', percent).toHexString();\n}\nreturn 'blue';"
+            },
+            "showIcon": true,
+            "iconSize": 40,
+            "iconSizeUnit": "px",
+            "icon": "local_gas_station",
+            "iconColor": {
+              "type": "constant",
+              "color": "#CA8A04",
+              "colorFunction": "return '#CA8A04';"
+            },
+            "valueFont": {
+              "family": "Roboto",
+              "size": 52,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500"
+            },
+            "valueColor": "#CA8A04",
+            "showDate": true,
+            "dateFormat": {
+              "format": null,
+              "lastUpdateAgo": true,
+              "custom": false
+            },
+            "dateFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500"
+            },
+            "dateColor": {
+              "type": "constant",
+              "color": "rgba(0, 0, 0, 0.38)",
+              "colorFunction": "var temperature = value;\nif (typeof temperature !== undefined) {\n  var percent = (temperature + 60)/120 * 100;\n  return tinycolor.mix('blue', 'red', percent).toHexString();\n}\nreturn 'blue';"
+            },
+            "background": {
+              "type": "color",
+              "color": "#fff",
+              "overlay": {
+                "enabled": false,
+                "color": "rgba(255,255,255,0.72)",
+                "blur": 3
+              }
+            },
+            "label": "Fuel Level"
+          },
+          "title": "Fuel Level",
+          "dropShadow": true,
+          "enableFullscreen": false,
+          "titleStyle": {
+            "fontSize": "16px",
+            "fontWeight": 400
+          },
+          "units": "%",
+          "decimals": 0,
+          "useDashboardTimewindow": true,
+          "showLegend": false,
+          "widgetStyle": {},
+          "actions": {},
+          "configMode": "basic",
+          "displayTimewindow": true,
+          "margin": "0px",
+          "borderRadius": "0px",
+          "widgetCss": "",
+          "pageSize": 1024,
+          "noDataDisplayMessage": "--",
+          "showTitleIcon": false,
+          "titleTooltip": "",
+          "titleFont": {
+            "size": 12,
+            "sizeUnit": "px",
+            "family": null,
+            "weight": null,
+            "style": null,
+            "lineHeight": "1.6"
+          },
+          "titleIcon": "",
+          "iconColor": "rgba(0, 0, 0, 0.87)",
+          "iconSize": "14px",
+          "timewindowStyle": {
+            "showIcon": true,
+            "iconSize": "14px",
+            "icon": "query_builder",
+            "iconPosition": "left",
+            "font": {
+              "size": 12,
+              "sizeUnit": "px",
+              "family": null,
+              "weight": null,
+              "style": null,
+              "lineHeight": "1"
+            },
+            "color": null
+          }
+        },
+        "id": "f8e7d6c5-b4a3-4291-8f6d-5e4d3c2b1a09",
+        "typeFullFqn": "system.cards.value_card"
+      },
+      "a1b2c3d4-e5f6-7890-abcd-ef1234567891": {
+        "type": "latest",
+        "sizeX": 8,
+        "sizeY": 8,
+        "config": {
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
+              "filterId": null,
+              "dataKeys": [
+                {
+                  "name": "fuel_level",
+                  "type": "timeseries",
+                  "label": "Fuel Level",
+                  "color": "#CA8A04",
+                  "settings": {
+                    "postFuncBody": "if (value == null || value === '' || value === 32767 || value >= 30000) { return null; } var n = Number(value); if (!isFinite(n)) return null; if (n === 0) return null; return Math.max(0, Math.min(100, Math.round(n)));"
+                  },
+                  "decimals": 0,
+                  "units": "%",
+                  "aggregationType": null,
+                  "usePostProcessing": true
+                }
+              ],
+              "alarmFilterConfig": {
+                "statusList": [
+                  "ACTIVE"
+                ]
+              }
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "timewindowMs": 60000
+            }
+          },
+          "showTitle": true,
+          "backgroundColor": "#FFFFFF",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "0px",
+          "settings": {
+            "maxValue": 100,
+            "minValue": 0,
+            "donutStartAngle": 90,
+            "showValue": true,
+            "showMinMax": true,
+            "gaugeWidthScale": 0.72,
+            "levelColors": [
+              "#EF4444",
+              "#F59E0B",
+              "#22C55E"
+            ],
+            "titleFont": {
+              "family": "Roboto",
+              "size": 13,
+              "style": "normal",
+              "weight": "600",
+              "color": "#111827"
+            },
+            "labelFont": {
+              "family": "Roboto",
+              "size": 10,
+              "style": "normal",
+              "weight": "500",
+              "color": "#6B7280"
+            },
+            "valueFont": {
+              "family": "Roboto",
+              "style": "normal",
+              "weight": "700",
+              "size": 22,
+              "color": "#CA8A04"
+            },
+            "minMaxFont": {
+              "family": "Roboto",
+              "size": 9,
+              "style": "normal",
+              "weight": "500",
+              "color": "#9CA3AF"
+            },
+            "neonGlowBrightness": 0,
+            "dashThickness": 2.0,
+            "unitTitle": "%",
+            "showUnitTitle": true,
+            "gaugeColor": "#E2E8F0",
+            "gaugeType": "arc",
+            "animation": true,
+            "animationDuration": 500,
+            "animationRule": "linear",
+            "title": "Fuel Level",
+            "decimals": 0
+          },
+          "title": "Fuel Level",
+          "dropShadow": true,
+          "enableFullscreen": true,
+          "titleStyle": {
+            "fontSize": "15px",
+            "fontWeight": 500
+          },
+          "widgetStyle": {},
+          "useDashboardTimewindow": true,
+          "showLegend": false,
+          "actions": {},
+          "configMode": "basic",
+          "noDataDisplayMessage": "--",
+          "widgetCss": "\n.tb-widget {\n  border-radius: 12px !important;\n  border: 1px solid #E5E7EB !important;\n  box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;\n}\n"
+        },
+        "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567891",
+        "typeFullFqn": "system.digital_gauges.digital_speedometer"
+      },
+      "b2c3d4e5-f6a7-8901-bcde-f12345678902": {
+        "type": "latest",
+        "sizeX": 6,
+        "sizeY": 4,
+        "config": {
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
+              "filterId": null,
+              "dataKeys": [
+                {
+                  "name": "common_alarm",
+                  "type": "timeseries",
+                  "label": "Common Alarm",
+                  "color": "#475569",
+                  "settings": {
+                    "postFuncBody": "if (value == null || value === '') return '--';\nvar n = Number(value);\nif (!isFinite(n)) return '--';\nreturn (n === 1) ? 'ALARM' : 'OK';"
+                  },
+                  "decimals": 0,
+                  "units": "",
+                  "aggregationType": null,
+                  "usePostProcessing": true
+                }
+              ],
+              "alarmFilterConfig": {
+                "statusList": [
+                  "ACTIVE"
+                ]
+              }
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "timewindowMs": 60000
+            }
+          },
+          "showTitle": false,
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "0px",
+          "settings": {
+            "labelPosition": "top",
+            "layout": "square",
+            "showLabel": true,
+            "labelFont": {
+              "family": "Roboto",
+              "size": 16,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500"
+            },
+            "labelColor": {
+              "type": "constant",
+              "color": "rgba(0, 0, 0, 0.87)",
+              "colorFunction": "var temperature = value;\nif (typeof temperature !== undefined) {\n  var percent = (temperature + 60)/120 * 100;\n  return tinycolor.mix('blue', 'red', percent).toHexString();\n}\nreturn 'blue';"
+            },
+            "showIcon": true,
+            "iconSize": 40,
+            "iconSizeUnit": "px",
+            "icon": "notifications_active",
+            "iconColor": {
+              "type": "function",
+              "colorFunction": "if (value === 'ALARM' || value === 1 || value === '1' || value === true) return '#DC2626';\nif (value === 'OK' || value === 0 || value === '0' || value === false) return '#16A34A';\nreturn '#6B7280';"
+            },
+            "valueFont": {
+              "family": "Roboto",
+              "size": 40,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "700"
+            },
+            "valueColor": {
+              "type": "function",
+              "colorFunction": "if (value === 'ALARM' || value === 1 || value === '1' || value === true) return '#DC2626';\nif (value === 'OK' || value === 0 || value === '0' || value === false) return '#16A34A';\nreturn '#6B7280';"
+            },
+            "showDate": true,
+            "dateFormat": {
+              "format": null,
+              "lastUpdateAgo": true,
+              "custom": false
+            },
+            "dateFont": {
+              "family": "Roboto",
+              "size": 12,
+              "sizeUnit": "px",
+              "style": "normal",
+              "weight": "500"
+            },
+            "dateColor": {
+              "type": "constant",
+              "color": "rgba(0, 0, 0, 0.38)",
+              "colorFunction": "var temperature = value;\nif (typeof temperature !== undefined) {\n  var percent = (temperature + 60)/120 * 100;\n  return tinycolor.mix('blue', 'red', percent).toHexString();\n}\nreturn 'blue';"
+            },
+            "background": {
+              "type": "color",
+              "color": "#fff",
+              "colorFunction": "if (value === 'ALARM' || value === 1 || value === '1' || value === true) return '#FEF2F2';\nif (value === 'OK' || value === 0 || value === '0' || value === false) return '#ECFDF5';\nreturn '#FFFFFF';",
+              "overlay": {
+                "enabled": false,
+                "color": "rgba(255,255,255,0.72)",
+                "blur": 3
+              }
+            },
+            "label": "Common Alarm"
+          },
+          "title": "Common Alarm",
+          "dropShadow": true,
+          "enableFullscreen": false,
+          "titleStyle": {
+            "fontSize": "16px",
+            "fontWeight": 400
+          },
+          "units": "",
+          "decimals": 0,
+          "useDashboardTimewindow": true,
+          "showLegend": false,
+          "widgetStyle": {},
+          "actions": {},
+          "configMode": "basic",
+          "displayTimewindow": true,
+          "margin": "0px",
+          "borderRadius": "0px",
+          "widgetCss": "",
+          "pageSize": 1024,
+          "noDataDisplayMessage": "--",
+          "showTitleIcon": false,
+          "titleTooltip": "Live Modbus bit \u2014 register 50045, mask 63 (not TB Alarms)",
+          "titleFont": {
+            "size": 12,
+            "sizeUnit": "px",
+            "family": null,
+            "weight": null,
+            "style": null,
+            "lineHeight": "1.6"
+          },
+          "titleIcon": "",
+          "iconColor": "rgba(0, 0, 0, 0.87)",
+          "iconSize": "14px",
+          "timewindowStyle": {
+            "showIcon": true,
+            "iconSize": "14px",
+            "icon": "query_builder",
+            "iconPosition": "left",
+            "font": {
+              "size": 12,
+              "sizeUnit": "px",
+              "family": null,
+              "weight": null,
+              "style": null,
+              "lineHeight": "1"
+            },
+            "color": null
+          }
+        },
+        "id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
+        "typeFullFqn": "system.cards.value_card"
       }
     },
     "states": {
@@ -6060,31 +6512,31 @@
           "main": {
             "widgets": {
               "ba542d46-e2ac-4ef2-9ba1-d662c22a1322": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 4,
                 "row": 5,
                 "col": 0
               },
               "94e2bda2-ffe2-4cf1-b8b2-58d8ed20879d": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 4,
                 "row": 5,
-                "col": 6
+                "col": 5
               },
               "135a0327-8334-468a-b479-9018cc9823da": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 4,
                 "row": 5,
-                "col": 12
+                "col": 10
               },
               "8d5c565a-2b26-4599-a8e2-37ff57de020d": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 4,
                 "row": 5,
-                "col": 18
+                "col": 15
               },
               "d6d30705-10d9-45f7-8703-73fb9b91af22": {
-                "sizeX": 12,
+                "sizeX": 8,
                 "sizeY": 4,
                 "row": 14,
                 "col": 0
@@ -6114,22 +6566,22 @@
                 "col": 16
               },
               "a91bdd34-d779-4918-b47e-29d870dfbe76": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 8,
                 "row": 27,
                 "col": 0
               },
               "53ce0530-e29f-4fac-a68a-71ac4f0dbefb": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 8,
                 "row": 27,
-                "col": 12
+                "col": 15
               },
               "bb0be4ca-bfdd-4a90-a440-0765f0ab69e8": {
-                "sizeX": 6,
+                "sizeX": 4,
                 "sizeY": 8,
                 "row": 27,
-                "col": 18
+                "col": 20
               },
               "4c9cf23f-717b-4ce1-a183-dcb9abe7f49b": {
                 "sizeX": 6,
@@ -6270,10 +6722,28 @@
                 "col": 0
               },
               "c4e7f892-1a2b-4c3d-9e8f-0a1b2c3d4e5f": {
-                "sizeX": 6,
+                "sizeX": 5,
                 "sizeY": 8,
                 "row": 27,
-                "col": 6
+                "col": 5
+              },
+              "f8e7d6c5-b4a3-4291-8f6d-5e4d3c2b1a09": {
+                "sizeX": 4,
+                "sizeY": 4,
+                "row": 5,
+                "col": 20
+              },
+              "b2c3d4e5-f6a7-8901-bcde-f12345678902": {
+                "sizeX": 4,
+                "sizeY": 4,
+                "row": 14,
+                "col": 8
+              },
+              "a1b2c3d4-e5f6-7890-abcd-ef1234567891": {
+                "sizeX": 5,
+                "sizeY": 8,
+                "row": 27,
+                "col": 10
               }
             },
             "gridSettings": {
