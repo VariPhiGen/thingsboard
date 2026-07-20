@@ -2932,7 +2932,7 @@
       "46af1447-72b5-413d-bb26-988d458d275e": {
         "type": "alarm",
         "sizeX": 24,
-        "sizeY": 6,
+        "sizeY": 8,
         "config": {
           "timewindow": {
             "selectedTab": 0,
@@ -3016,7 +3016,13 @@
                 "type": "alarm",
                 "label": "Details",
                 "color": "#9c27b0",
-                "settings": {}
+                "settings": {
+                  "columnWidth": "42%",
+                  "useCellContentFunction": true,
+                  "cellContentFunction": "var d = value;\nif (d == null || d === '') { return ''; }\nif (typeof d === 'string') {\n  try { d = JSON.parse(d); } catch (e) { return d; }\n}\nif (typeof d !== 'object') { return '' + d; }\nfunction esc(s) {\n  return String(s == null ? '' : s)\n    .replace(/&/g, '&amp;')\n    .replace(/</g, '&lt;')\n    .replace(/>/g, '&gt;')\n    .replace(/\"/g, '&quot;');\n}\nvar lines = [];\nvar msg = d.message || d.summary || d.description || d.data;\nvar action = d.recommended_action || d.recommendation;\nif (msg) {\n  lines.push('<div style=\"font-weight:600;line-height:1.4;margin-bottom:4px;white-space:normal;word-break:break-word;color:#111827;\">' + esc(msg) + '</div>');\n}\nif (d.description && d.message && String(d.description) !== String(d.message)) {\n  lines.push('<div style=\"color:#4B5563;font-size:12px;line-height:1.4;white-space:normal;word-break:break-word;\">' + esc(d.description) + '</div>');\n}\nif (action) {\n  lines.push('<div style=\"margin-top:4px;color:#9A3412;font-size:12px;line-height:1.4;white-space:normal;word-break:break-word;\"><b>Action:</b> ' + esc(action) + '</div>');\n}\nif (!lines.length) {\n  ['description','message','summary','data','recommended_action','recommendation'].forEach(function(k) {\n    if (d[k] != null && d[k] !== '') {\n      lines.push('<div style=\"font-size:12px;line-height:1.35;white-space:normal;word-break:break-word;\"><b>' + esc(k) + ':</b> ' + esc(d[k]) + '</div>');\n    }\n  });\n}\nif (!lines.length) { return ''; }\nreturn '<div style=\"padding:2px 0;max-width:560px;\">' + lines.join('') + '</div>';",
+                  "useCellStyleFunction": false,
+                  "cellStyleFunction": ""
+                }
               }
             ]
           },
@@ -6633,74 +6639,74 @@
               },
               "46af1447-72b5-413d-bb26-988d458d275e": {
                 "sizeX": 24,
-                "sizeY": 6,
+                "sizeY": 8,
                 "row": 43,
                 "col": 0
               },
               "fd83ff4f-8c94-4f01-bae1-13772a8255d7": {
                 "sizeX": 24,
                 "sizeY": 7,
-                "row": 49,
+                "row": 51,
                 "col": 0
               },
               "b1ff54c8-1115-43e5-811b-9b1c6ed4dcdc": {
                 "sizeX": 24,
                 "sizeY": 7,
-                "row": 56,
+                "row": 58,
                 "col": 0
               },
               "2a3ff8c1-8eef-4027-bdc9-1c5ceb5496fd": {
                 "sizeX": 24,
                 "sizeY": 7,
-                "row": 63,
+                "row": 65,
                 "col": 0
               },
               "f6b71209-b15e-41ae-8e14-70f7789f3eb4": {
                 "sizeX": 12,
                 "sizeY": 7,
-                "row": 70,
+                "row": 72,
                 "col": 0
               },
               "50c38d97-1643-422a-a393-e1d789c71b63": {
                 "sizeX": 12,
                 "sizeY": 7,
-                "row": 70,
+                "row": 72,
                 "col": 12
               },
               "ae1ecd9f-87cb-4ec8-a07b-6dc95f60bb16": {
                 "sizeX": 6,
                 "sizeY": 5,
-                "row": 77,
+                "row": 79,
                 "col": 12
               },
               "1a10f771-eb16-4fe2-ac10-e59dbfa4c866": {
                 "sizeX": 6,
                 "sizeY": 5,
-                "row": 77,
+                "row": 79,
                 "col": 18
               },
               "884ad4c3-089e-481a-a1ff-10cb6be33ccd": {
                 "sizeX": 12,
                 "sizeY": 5,
-                "row": 82,
+                "row": 84,
                 "col": 0
               },
               "455cf3d9-e7cc-4ed7-9581-056d324c63ae": {
                 "sizeX": 12,
                 "sizeY": 5,
-                "row": 82,
+                "row": 84,
                 "col": 12
               },
               "2b1158ea-afa5-42ab-bd1c-78fbb6637d99": {
                 "sizeX": 6,
                 "sizeY": 5,
-                "row": 77,
+                "row": 79,
                 "col": 0
               },
               "7ee3e0b6-ceb1-4fc8-a99a-beac1cf5aaa5": {
                 "sizeX": 6,
                 "sizeY": 5,
-                "row": 77,
+                "row": 79,
                 "col": 6
               },
               "e363ebe4-0b70-4370-95af-fff5f6eeab81": {
@@ -6712,7 +6718,7 @@
               "8ec824a2-2875-499c-9c5f-66c781dc1cfd": {
                 "sizeX": 24,
                 "sizeY": 5,
-                "row": 87,
+                "row": 89,
                 "col": 0
               },
               "b06fda2f-081d-43ee-b2d4-64c3740bfd05": {
