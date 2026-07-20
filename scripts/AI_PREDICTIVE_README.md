@@ -12,6 +12,8 @@ Branch: `ai`
    - **AI Status** + **AI Severity** + predictive KPIs (each shown once; not repeated inside Summary)
    - Maintenance recommendation (short action; does not repeat summary)
    - Sensor widgets map Modbus sentinel `32767` / `>=30000` to **N/A**
+   - **Oil Level** gauge (`oil_level`, %) beside Oil Pressure; included in engine trends chart
+   - Secondary sensor row uses matching **arc gauges** (Oil Pressure, Oil Level, Battery, Frequency) with red/amber/green bands; `0` / invalid reads show **`--`** when DG is off
 
 ## Production AI path (Root Rule Chain)
 
@@ -48,6 +50,11 @@ Detail sits in **AI Reason** / **AI Summary** (not inside the KPI value).
 | **Sensor Fault Fallback** | No OpenAI; `ai_status=PAUSED`; operator-safe `--` KPIs; **SYSTEM** maintenance guidance (deterministic, not LLM) |
 | **Alarms** | CRITICAL only when OpenAI says CRITICAL (never on pause) |
 
+### DG Offline alarm
+
+When `dg_status` becomes **OFF** (RPM ≤ 100 and power ≤ 5 kW), Root Rule Chain raises **DG Offline** (MAJOR).  
+When the genset is **RUNNING** again, that alarm is **auto-cleared**.
+
 **Production note:** Skipping OpenAI when core sensors are invalid is the correct pattern. A fixed SYSTEM maintenance message avoids hallucinated equipment advice from bad/zero Modbus data. OpenAI recommendations appear only when `ai_status=ACTIVE`.
 
 ## Telemetry keys written by AI
@@ -65,6 +72,7 @@ Detail sits in **AI Reason** / **AI Summary** (not inside the KPI value).
 | `predicted_coolant_1h` | °C when ACTIVE; `--` when PAUSED |
 | `maintenance_recommendation` | Operator action text |
 | `ai_mode` | Internal: `openai` or `sensor_fault_fallback` (alarms/debug) |
+| `dg_status` | Machine state: `RUNNING` or `OFF` (from RPM/power; separate from AI Status) |
 
 ## IDs (Delhivery)
 
@@ -74,6 +82,21 @@ Detail sits in **AI Reason** / **AI Summary** (not inside the KPI value).
 | Dashboard | `09c06030-81cc-11f1-a760-b3ba4cbe1b98` |
 | AI Model | `d78b28f0-810f-11f1-a760-b3ba4cbe1b98` |
 | Root Rule Chain | `1d524b90-6a70-11f1-87c3-df6f31aa9de9` |
+
+
+## Alarm descriptions (production)
+
+| Alarm type | Severity | When | Operator description |
+|------------|----------|------|----------------------|
+| `DG Offline` | MAJOR | `dg_status=OFF` | Genset not generating; auto-clears when RUNNING |
+| `AI Predictive Alert` | CRITICAL | OpenAI severity CRITICAL | AI risk summary + recommended action |
+| `Woodward High Coolant Temperature` | CRITICAL | RUNNING and coolant > 95°C | Overheating — check cooling system |
+| `Woodward High Coolant Warning` | MAJOR | RUNNING and coolant > 90°C | Elevated coolant — monitor |
+| `Woodward Low Oil Pressure` | CRITICAL | RUNNING and oil < 200 kPa | Low oil pressure — check oil system |
+| `Woodward High Engine RPM` | CRITICAL | RUNNING and RPM > 1800 | Overspeed — check governor/load |
+| `Woodward Low Battery Voltage` | MAJOR | battery < 24 V | Low battery — check charging system |
+
+Sensor alarms (coolant/oil/RPM) require **`dg_status=RUNNING`** so an OFF genset does not raise false oil/coolant faults.
 
 ## Security
 
