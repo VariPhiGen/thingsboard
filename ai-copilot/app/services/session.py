@@ -107,8 +107,15 @@ class CopilotOrchestrator:
         )
 
         if resolved.needs_clarification or resolved.device is None:
-            names = ", ".join(d.name for d in resolved.candidates[:8]) or "no accessible devices"
-            answer = f"{resolved.reason or 'Please choose a device.'} Available: {names}."
+            lines = []
+            for i, d in enumerate(resolved.candidates[:12], start=1):
+                lines.append(f"{i}. {d.name}")
+            listed = "\n".join(lines) if lines else "No accessible devices."
+            answer = (
+                f"{resolved.reason or 'Which device do you want to know about?'}\n\n"
+                f"Available devices:\n{listed}\n\n"
+                "Reply with the number or device name."
+            )
             self.memory.append(conversation_id, "USER", request.message)
             self.memory.append(conversation_id, "ASSISTANT", answer)
             return ChatResponse(
