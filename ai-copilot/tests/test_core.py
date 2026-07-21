@@ -1,5 +1,3 @@
-"""Smoke tests retained for quick sanity checks."""
-
 from uuid import uuid4
 from datetime import datetime
 from zoneinfo import ZoneInfo
