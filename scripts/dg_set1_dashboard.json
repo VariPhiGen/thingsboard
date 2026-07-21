@@ -3828,31 +3828,6 @@
               "filterId": null,
               "dataKeys": [
                 {
-                  "name": "oil_level",
-                  "type": "timeseries",
-                  "label": "Oil Level",
-                  "color": "#16A34A",
-                  "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return null; } return value;"
-                  },
-                  "decimals": 0,
-                  "units": "%",
-                  "aggregationType": null
-                }
-              ],
-              "alarmFilterConfig": {
-                "statusList": [
-                  "ACTIVE"
-                ]
-              }
-            },
-            {
-              "type": "entity",
-              "name": "",
-              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
-              "filterId": null,
-              "dataKeys": [
-                {
                   "name": "fuel_level",
                   "type": "timeseries",
                   "label": "Fuel Level",
@@ -5970,118 +5945,6 @@
         "id": "b06fda2f-081d-43ee-b2d4-64c3740bfd05",
         "typeFullFqn": "system.cards.value_card"
       },
-      "c4e7f892-1a2b-4c3d-9e8f-0a1b2c3d4e5f": {
-        "type": "latest",
-        "sizeX": 8,
-        "sizeY": 8,
-        "config": {
-          "datasources": [
-            {
-              "type": "entity",
-              "name": "",
-              "entityAliasId": "c75ed748-64ed-4b73-ab68-ec225d31f7f7",
-              "filterId": null,
-              "dataKeys": [
-                {
-                  "name": "oil_level",
-                  "type": "timeseries",
-                  "label": "Oil Level",
-                  "color": "#16A34A",
-                  "settings": {
-                    "postFuncBody": "if (value == null || value === '' || value === 32767 || value >= 30000) { return null; } var n = Number(value); if (!isFinite(n)) return null; if (n === 0) return null; return Math.max(0, Math.min(100, Math.round(n)));"
-                  },
-                  "decimals": 0,
-                  "units": "%",
-                  "aggregationType": null,
-                  "usePostProcessing": true
-                }
-              ],
-              "alarmFilterConfig": {
-                "statusList": [
-                  "ACTIVE"
-                ]
-              }
-            }
-          ],
-          "timewindow": {
-            "realtime": {
-              "timewindowMs": 60000
-            }
-          },
-          "showTitle": true,
-          "backgroundColor": "#FFFFFF",
-          "color": "rgba(0, 0, 0, 0.87)",
-          "padding": "0px",
-          "settings": {
-            "maxValue": 100,
-            "minValue": 0,
-            "donutStartAngle": 90,
-            "showValue": true,
-            "showMinMax": true,
-            "gaugeWidthScale": 0.72,
-            "levelColors": [
-              "#EF4444",
-              "#F59E0B",
-              "#22C55E"
-            ],
-            "titleFont": {
-              "family": "Roboto",
-              "size": 13,
-              "style": "normal",
-              "weight": "600",
-              "color": "#111827"
-            },
-            "labelFont": {
-              "family": "Roboto",
-              "size": 10,
-              "style": "normal",
-              "weight": "500",
-              "color": "#6B7280"
-            },
-            "valueFont": {
-              "family": "Roboto",
-              "style": "normal",
-              "weight": "700",
-              "size": 22,
-              "color": "#16A34A"
-            },
-            "minMaxFont": {
-              "family": "Roboto",
-              "size": 9,
-              "style": "normal",
-              "weight": "500",
-              "color": "#9CA3AF"
-            },
-            "neonGlowBrightness": 0,
-            "dashThickness": 2.0,
-            "unitTitle": "%",
-            "showUnitTitle": true,
-            "gaugeColor": "#E2E8F0",
-            "gaugeType": "arc",
-            "animation": true,
-            "animationDuration": 500,
-            "animationRule": "linear",
-            "title": "Oil Level",
-            "decimals": 0
-          },
-          "title": "Oil Level",
-          "dropShadow": true,
-          "enableFullscreen": true,
-          "titleStyle": {
-            "fontSize": "15px",
-            "fontWeight": 500
-          },
-          "widgetStyle": {},
-          "useDashboardTimewindow": true,
-          "showLegend": false,
-          "actions": {},
-          "configMode": "basic",
-          "noDataDisplayMessage": "--",
-          "widgetCss": "\n.tb-widget {\n  border-radius: 12px !important;\n  border: 1px solid #E5E7EB !important;\n  box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;\n}\n"
-        },
-        "id": "c4e7f892-1a2b-4c3d-9e8f-0a1b2c3d4e5f",
-        "typeFullFqn": "system.digital_gauges.digital_speedometer"
-      },
       "f8e7d6c5-b4a3-4291-8f6d-5e4d3c2b1a09": {
         "type": "latest",
         "sizeX": 6,
@@ -6572,22 +6435,22 @@
                 "col": 16
               },
               "a91bdd34-d779-4918-b47e-29d870dfbe76": {
-                "sizeX": 5,
+                "sizeX": 6,
                 "sizeY": 8,
                 "row": 27,
                 "col": 0
               },
               "53ce0530-e29f-4fac-a68a-71ac4f0dbefb": {
-                "sizeX": 5,
+                "sizeX": 6,
                 "sizeY": 8,
                 "row": 27,
-                "col": 15
+                "col": 12
               },
               "bb0be4ca-bfdd-4a90-a440-0765f0ab69e8": {
-                "sizeX": 4,
+                "sizeX": 6,
                 "sizeY": 8,
                 "row": 27,
-                "col": 20
+                "col": 18
               },
               "4c9cf23f-717b-4ce1-a183-dcb9abe7f49b": {
                 "sizeX": 6,
@@ -6727,12 +6590,6 @@
                 "row": 0,
                 "col": 0
               },
-              "c4e7f892-1a2b-4c3d-9e8f-0a1b2c3d4e5f": {
-                "sizeX": 5,
-                "sizeY": 8,
-                "row": 27,
-                "col": 5
-              },
               "f8e7d6c5-b4a3-4291-8f6d-5e4d3c2b1a09": {
                 "sizeX": 4,
                 "sizeY": 4,
@@ -6746,10 +6603,10 @@
                 "col": 8
               },
               "a1b2c3d4-e5f6-7890-abcd-ef1234567891": {
-                "sizeX": 5,
+                "sizeX": 6,
                 "sizeY": 8,
                 "row": 27,
-                "col": 10
+                "col": 6
               }
             },
             "gridSettings": {

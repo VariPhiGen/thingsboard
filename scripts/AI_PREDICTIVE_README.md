@@ -12,8 +12,7 @@ Branch: `ai`
    - **AI Status** + **AI Severity** + predictive KPIs (each shown once; not repeated inside Summary)
    - Maintenance recommendation (short action; does not repeat summary)
    - Sensor widgets map Modbus sentinel `32767` / `>=30000` to **N/A**
-   - **Oil Level** gauge (`oil_level`, %) beside Oil Pressure; included in engine trends chart
-   - Secondary sensor row uses matching **arc gauges** (Oil Pressure, Oil Level, Battery, Frequency) with red/amber/green bands; `0` / invalid reads show **`--`** when DG is off
+   - Secondary sensor row uses matching **arc gauges** (Oil Pressure, Fuel Level, Battery, Frequency) with red/amber/green bands; `0` / invalid reads show **`--`** when DG is off
 
 ## Production AI path (Root Rule Chain)
 
