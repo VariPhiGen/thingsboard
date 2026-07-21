@@ -65,39 +65,10 @@ def parse_time_window(message: str, now: datetime | None = None) -> TimeWindow:
         start = end - timedelta(hours=24)
         return TimeWindow(_ms(start), _ms(end), "last 24 hours", "time")
 
-    if "yesterday" in text:
-        day = (now - timedelta(days=1)).date()
-        start = datetime(day.year, day.month, day.day, 0, 0, tzinfo=IST)
-        end_d = start + timedelta(days=1)
-        return TimeWindow(_ms(start), _ms(end_d), f"yesterday ({day.isoformat()})", "date")
-
-    if "today" in text or "this date" in text:
-        day = now.date()
-        start = datetime(day.year, day.month, day.day, 0, 0, tzinfo=IST)
-        return TimeWindow(_ms(start), _ms(end), f"today ({day.isoformat()})", "date")
-
-    if "this week" in text:
-        day = now.date()
-        start_day = day - timedelta(days=day.weekday())
-        start = datetime(start_day.year, start_day.month, start_day.day, 0, 0, tzinfo=IST)
-        return TimeWindow(_ms(start), _ms(end), "this week", "date")
-
-    # Explicit date: 2026-07-20 or 20/07/2026 or 20-07-2026
-    if m := re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", text):
-        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        start = datetime(y, mo, d, 0, 0, tzinfo=IST)
-        end_d = start + timedelta(days=1)
-        return TimeWindow(_ms(start), _ms(end_d), f"date {start.date().isoformat()}", "date")
-    if m := re.search(r"\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b", text):
-        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
-        start = datetime(y, mo, d, 0, 0, tzinfo=IST)
-        end_d = start + timedelta(days=1)
-        return TimeWindow(_ms(start), _ms(end_d), f"date {start.date().isoformat()}", "date")
-
-    # Shift based
+    # Detect shift early so "yesterday morning shift" is shift-scoped, not a full day
     shift_name = None
     for key in ("morning", "afternoon", "evening", "night"):
-        if key in text:
+        if f"{key} shift" in text or (key in text and "shift" in text):
             shift_name = key
             break
     if shift_name is None:
@@ -108,7 +79,6 @@ def parse_time_window(message: str, now: datetime | None = None) -> TimeWindow:
         elif re.search(r"\bshift\s*c\b", text) or re.search(r"\bc\s*shift\b", text):
             shift_name = "c"
         elif "shift" in text:
-            # current shift by clock
             hour = now.hour
             if 6 <= hour < 14:
                 shift_name = "morning"
@@ -137,6 +107,35 @@ def parse_time_window(message: str, now: datetime | None = None) -> TimeWindow:
             end_s = now
         label = f"{shift_name} shift ({start.strftime('%Y-%m-%d %H:%M')} to {end_s.strftime('%Y-%m-%d %H:%M')} IST)"
         return TimeWindow(_ms(start), _ms(end_s), label, "shift")
+
+    if "yesterday" in text:
+        day = (now - timedelta(days=1)).date()
+        start = datetime(day.year, day.month, day.day, 0, 0, tzinfo=IST)
+        end_d = start + timedelta(days=1)
+        return TimeWindow(_ms(start), _ms(end_d), f"yesterday ({day.isoformat()})", "date")
+
+    if "today" in text or "this date" in text:
+        day = now.date()
+        start = datetime(day.year, day.month, day.day, 0, 0, tzinfo=IST)
+        return TimeWindow(_ms(start), _ms(end), f"today ({day.isoformat()})", "date")
+
+    if "this week" in text:
+        day = now.date()
+        start_day = day - timedelta(days=day.weekday())
+        start = datetime(start_day.year, start_day.month, start_day.day, 0, 0, tzinfo=IST)
+        return TimeWindow(_ms(start), _ms(end), "this week", "date")
+
+    # Explicit date: 2026-07-20 or 20/07/2026 or 20-07-2026
+    if m := re.search(r"\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", text):
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        start = datetime(y, mo, d, 0, 0, tzinfo=IST)
+        end_d = start + timedelta(days=1)
+        return TimeWindow(_ms(start), _ms(end_d), f"date {start.date().isoformat()}", "date")
+    if m := re.search(r"\b(\d{1,2})[-/](\d{1,2})[-/](20\d{2})\b", text):
+        d, mo, y = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        start = datetime(y, mo, d, 0, 0, tzinfo=IST)
+        end_d = start + timedelta(days=1)
+        return TimeWindow(_ms(start), _ms(end_d), f"date {start.date().isoformat()}", "date")
 
     # Default: last 24 hours
     start = end - timedelta(hours=24)

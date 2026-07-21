@@ -36,7 +36,11 @@ class IntentClassifier:
         if any(k in lower for k in ("trend", "trending", "rising", "falling", "increasing", "decreasing", "over time")):
             return Intent.TREND
 
-        if any(k in lower for k in ("average", "avg", "mean", "min", "max", "minimum", "maximum", "statistics", "stats", "median")):
+        # Word-boundary for short tokens so "min" does not match inside "minutes"
+        if re.search(
+            r"\b(average|avg|mean|min|max|minimum|maximum|statistics|stats|median)\b",
+            lower,
+        ):
             return Intent.STATISTICS
 
         if any(k in lower for k in ("how long", "duration", "running hours", "run hours", "uptime", "downtime", "time running")):
