@@ -106,7 +106,8 @@ Sensor alarms (coolant/oil/RPM) require **`dg_status=RUNNING`** so an OFF genset
 
 ## Operator chatbot
 
-- Dashboard now includes a **DG SET1 Operator Chatbot** panel implemented with the built-in `HTML Container` widget.
+- Dashboard now includes a **DG SET1 Operator Chatbot** panel implemented with the built-in `HTML Container` widget (`system.html_container`).
+- If the widget shows “associated widget type was removed”, install/update the system type from `application/src/main/data/json/system/widget_types/html_container.json` as sysadmin (`POST /api/widgetType?updateExistingByFqn=true`), then set the dashboard widget `typeFullFqn` to `system.html_container`.
 - Backend endpoint: `POST /api/chatbot/operator`
 - Request grounding: latest DG telemetry, active alarms, AI summary, and maintenance recommendation
 - The widget currently targets:
