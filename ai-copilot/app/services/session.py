@@ -23,7 +23,14 @@ from app.services.prompt_builder import build_messages
 from app.services.rag import RagService
 from app.services.tb_client import ThingsBoardClient
 from app.services.tools.reports import format_report_context, load_latest_report_summary
-from app.services.tools.telemetry import fetch_active_alarms, fetch_ai_scores, fetch_history, fetch_latest_snapshot
+from app.services.tools.telemetry import fetch_active_alarms, fetch_ai_scores, fetch_latest_snapshot
+from app.services.tools.analytics import (
+    analyze_window,
+    compare_devices,
+    compare_periods,
+    fetch_window_series,
+)
+from app.services.time_window import TimeWindow, parse_time_window
 
 log = logging.getLogger(__name__)
 
@@ -32,9 +39,21 @@ FALLBACK = (
     "Please retry, or check the device live readings and alarm widgets on the dashboard."
 )
 UNSUPPORTED = (
-    "I can help with live device status, alarms, AI guidance, history, and procedures, "
+    "I can help with live status, alarms, AI guidance, procedures, "
+    "and time/date/shift/duration/statistics/trend/comparison analysis, "
     "but I cannot share secrets or make configuration changes."
 )
+
+ANALYTICS_INTENTS = {
+    Intent.HISTORY,
+    Intent.TIME_BASED,
+    Intent.DATE_BASED,
+    Intent.SHIFT_BASED,
+    Intent.DURATION_BASED,
+    Intent.STATISTICS,
+    Intent.TREND,
+    Intent.COMPARISON,
+}
 
 
 class CopilotOrchestrator:
@@ -110,15 +129,15 @@ class CopilotOrchestrator:
         try:
             await self.perms.ensure_device_access(client, device.id)
 
-            if intent in {Intent.STATUS, Intent.GENERAL, Intent.AI_GUIDANCE, Intent.ALARMS, Intent.HISTORY, Intent.COMPARE_DEVICES}:
+            if intent in {Intent.STATUS, Intent.GENERAL, Intent.AI_GUIDANCE, Intent.ALARMS, Intent.COMPARE_DEVICES} | ANALYTICS_INTENTS:
                 snap = await fetch_latest_snapshot(client, device.id, device.name, device.type)
                 snapshot = DeviceSnapshot(
                     deviceName=snap["deviceName"],
                     lastTelemetryTs=snap.get("lastTelemetryTs"),
                     values=snap.get("values") or {},
                 )
-                grounding_parts.append("Latest telemetry:\n" + "\n".join(f"- {k}: {v}" for k, v in snapshot.values.items()))
-                sources.append("telemetry")
+                grounding_parts.append("Latest live readings:\n" + "\n".join(f"- {k}: {v}" for k, v in snapshot.values.items()))
+                sources.append("live readings")
 
             if intent in {Intent.ALARMS, Intent.STATUS, Intent.GENERAL, Intent.AI_GUIDANCE}:
                 raw_alarms = await fetch_active_alarms(client, device.id)
@@ -138,12 +157,63 @@ class CopilotOrchestrator:
                     grounding_parts.append("AI scores:\n" + "\n".join(f"- {k}: {v}" for k, v in scores.items()))
                     sources.append("AI scores")
 
-            if intent == Intent.HISTORY:
-                end_ts = int(time.time() * 1000)
-                start_ts = end_ts - 24 * 3600 * 1000
-                hist = await fetch_history(client, device.id, device.name, start_ts, end_ts)
-                grounding_parts.append("24h history summary:\n" + str(hist))
-                sources.append("history")
+            if intent in ANALYTICS_INTENTS:
+                window = parse_time_window(request.message)
+                mode = {
+                    Intent.TIME_BASED: "time",
+                    Intent.DATE_BASED: "date",
+                    Intent.SHIFT_BASED: "shift",
+                    Intent.DURATION_BASED: "duration",
+                    Intent.STATISTICS: "statistics",
+                    Intent.TREND: "trend",
+                    Intent.COMPARISON: "comparison",
+                    Intent.HISTORY: "time",
+                }.get(intent, "general")
+
+                if intent == Intent.COMPARISON:
+                    # Compare previous equivalent window vs current window when user says vs yesterday/last week
+                    lower = request.message.lower()
+                    if "yesterday" in lower and "today" in lower:
+                        today = parse_time_window("today")
+                        yday = parse_time_window("yesterday")
+                        grounding_parts.append(
+                            await compare_periods(
+                                client, device.id, device.name, request.message, yday, today, device.type
+                            )
+                        )
+                    else:
+                        # default: previous equal-length period vs current window
+                        span = max(1, window.end_ts - window.start_ts)
+                        prev = TimeWindow(
+                            start_ts=window.start_ts - span,
+                            end_ts=window.start_ts,
+                            label=f"previous period before {window.label}",
+                            kind="relative",
+                        )
+                        grounding_parts.append(
+                            await compare_periods(
+                                client, device.id, device.name, request.message, prev, window, device.type
+                            )
+                        )
+                else:
+                    series_payload = await fetch_window_series(
+                        client, device.id, device.name, window, request.message, device.type
+                    )
+                    grounding_parts.append(analyze_window(device.name, window, series_payload, mode))
+                sources.append("history analysis")
+
+            if intent == Intent.COMPARE_DEVICES:
+                window = parse_time_window(request.message)
+                # compare selected device with up to 2 peers
+                peers = [(device.id, device.name, device.type)]
+                for d in devices:
+                    if d.id == device.id:
+                        continue
+                    peers.append((d.id, d.name, d.type))
+                    if len(peers) >= 3:
+                        break
+                grounding_parts.append(await compare_devices(client, peers, request.message, window))
+                sources.append("device comparison")
 
             if intent in {Intent.COMPARE_DEVICES, Intent.GENERAL, Intent.MANUAL_HOWTO, Intent.AI_GUIDANCE}:
                 report = load_latest_report_summary(self.settings.reports_dir)

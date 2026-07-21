@@ -39,11 +39,13 @@ docker compose up -d --build
 curl -s http://127.0.0.1:8097/healthz
 ```
 
-Default port: **8097**.
+Default port: **8097** (local). Public URL:
+
+`https://viot.virtuosonetsoft.com/copilot/` → `http://127.0.0.1:8097/`
 
 ## Widget cutover
 
-The DG SET1 / Fleet Operator Chat widgets call this service (`copilotBaseUrl`, default `http://127.0.0.1:8097` or your public host).  
+Widgets use same-origin `window.location.origin + '/copilot'` (not raw `:809x` ports).  
 Legacy Java endpoint `POST /api/chatbot/operator` remains as fallback only and is deprecated for new dashboards.
 
 ## Knowledge / RAG

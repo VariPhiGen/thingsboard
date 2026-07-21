@@ -71,16 +71,24 @@ class ThingsBoardClient:
         start_ts: int,
         end_ts: int,
         limit: int = 50,
+        interval: int | None = None,
+        agg: str | None = None,
     ) -> dict[str, Any]:
+        params: dict[str, Any] = {
+            "keys": ",".join(keys),
+            "startTs": start_ts,
+            "endTs": end_ts,
+            "limit": limit,
+            "orderBy": "ASC",
+        }
+        if interval and agg:
+            params["interval"] = interval
+            params["agg"] = agg
+        else:
+            params["agg"] = "NONE"
         raw = await self._get(
             f"/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries",
-            {
-                "keys": ",".join(keys),
-                "startTs": start_ts,
-                "endTs": end_ts,
-                "limit": limit,
-                "agg": "NONE",
-            },
+            params,
         )
         return raw or {}
 

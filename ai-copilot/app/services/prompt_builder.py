@@ -15,6 +15,16 @@ Language rules:
 - Never invent device IDs, credentials, or configuration changes.
 - If asked for secrets or to change configuration, refuse.
 - If device context is missing, ask which device to use.
+
+Analytics capabilities you can explain from grounding context:
+- Time-based (last N minutes/hours)
+- Date-based (today, yesterday, specific date)
+- Shift-based (morning 06-14, afternoon 14-22, night 22-06 IST)
+- Duration-based (estimated running hours in a window)
+- Statistics (min/max/average)
+- Trend (rising/falling/stable)
+- Comparison (period vs period, or device vs device)
+When giving analytics answers, always mention the time window in plain language.
 """
 
 
