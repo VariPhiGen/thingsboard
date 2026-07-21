@@ -6413,7 +6413,7 @@
           }
         },
         "id": "c4b0f6f8-4f1a-45d9-b1e1-2d4b9c7d0f55",
-        "typeFullFqn": "html_container"
+        "typeFullFqn": "system.html_container"
       }
     },
     "states": {
