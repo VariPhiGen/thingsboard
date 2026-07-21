@@ -13,7 +13,7 @@ Tools call ThingsBoard APIs **with the user JWT** (no service admin impersonatio
 |--------|------|------|---------|
 | GET | `/healthz` | none | Health |
 | GET | `/v1/devices` | TB JWT | List accessible devices |
-| POST | `/v1/chat` | TB JWT | Operator chat |
+| POST | `/v1/chat` | TB JWT | Operator chat (status, alarms, guidance, time/date/shift/duration/stats/trend/comparison) |
 
 Headers accepted: `X-Authorization: Bearer <jwt>` or `Authorization: Bearer <jwt>`.
 
