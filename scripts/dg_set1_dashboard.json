@@ -6371,6 +6371,49 @@
         },
         "id": "b2c3d4e5-f6a7-8901-bcde-f12345678902",
         "typeFullFqn": "system.cards.value_card"
+      },
+      "c4b0f6f8-4f1a-45d9-b1e1-2d4b9c7d0f55": {
+        "type": "static",
+        "sizeX": 24,
+        "sizeY": 10,
+        "config": {
+          "datasources": [],
+          "timewindow": {
+            "realtime": {
+              "timewindowMs": 60000
+            }
+          },
+          "showTitle": true,
+          "backgroundColor": "#FFFFFF",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "0px",
+          "settings": {
+            "type": "PLAIN",
+            "html": "<div class='tb-operator-chat'><div class='tb-operator-chat__header'><div><div class='tb-operator-chat__eyebrow'>DG SET1 operator assistant</div><div class='tb-operator-chat__title'>Ask about live status, alarms, and AI guidance</div></div><div class='tb-operator-chat__badge' id='tb-operator-chat-badge'>Live</div></div><div class='tb-operator-chat__snapshot' id='tb-operator-chat-snapshot'>Waiting for first response...</div><div class='tb-operator-chat__messages' id='tb-operator-chat-messages'></div><div class='tb-operator-chat__suggestions'><button class='tb-operator-chat__chip' data-prompt='Is DG SET1 running right now?'>Current DG status</button><button class='tb-operator-chat__chip' data-prompt='What alarms are active right now?'>Active alarms</button><button class='tb-operator-chat__chip' data-prompt='What should the operator check next?'>Next checks</button><button class='tb-operator-chat__chip' data-prompt='Explain the AI summary and maintenance recommendation.'>Explain AI guidance</button></div><div class='tb-operator-chat__composer'><textarea id='tb-operator-chat-input' placeholder='Ask a question about DG SET1...' rows='2'></textarea><button id='tb-operator-chat-send'>Send</button></div><div class='tb-operator-chat__hint' id='tb-operator-chat-hint'>Grounded on latest telemetry, active alarms, and AI summary.</div></div>",
+            "css": ".tb-operator-chat{height:100%;display:flex;flex-direction:column;background:#fff;border:1px solid #E5E7EB;border-radius:18px;padding:18px;gap:14px;box-sizing:border-box;font-family:Roboto,Arial,sans-serif}.tb-operator-chat__header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.tb-operator-chat__eyebrow{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#6B7280}.tb-operator-chat__title{font-size:20px;font-weight:600;line-height:1.3;color:#111827;margin-top:4px}.tb-operator-chat__badge{padding:6px 10px;border-radius:999px;background:#ECFDF5;color:#047857;font-size:12px;font-weight:600;white-space:nowrap}.tb-operator-chat__snapshot{padding:10px 12px;border-radius:12px;background:#F8FAFC;color:#334155;font-size:13px;line-height:1.5}.tb-operator-chat__messages{flex:1;min-height:220px;max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px}.tb-operator-chat__msg{max-width:82%;padding:12px 14px;border-radius:16px;font-size:14px;line-height:1.55;white-space:pre-wrap;word-break:break-word;box-shadow:0 1px 2px rgba(15,23,42,.06)}.tb-operator-chat__msg--assistant{align-self:flex-start;background:#F8FAFC;color:#111827;border:1px solid #E2E8F0}.tb-operator-chat__msg--user{align-self:flex-end;background:#2563EB;color:#fff}.tb-operator-chat__meta{margin-top:6px;font-size:11px;opacity:.72}.tb-operator-chat__suggestions{display:flex;flex-wrap:wrap;gap:8px}.tb-operator-chat__chip{border:1px solid #CBD5E1;background:#fff;color:#1E293B;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:500;cursor:pointer}.tb-operator-chat__chip:hover{background:#F8FAFC}.tb-operator-chat__composer{display:flex;gap:10px;align-items:flex-end}.tb-operator-chat__composer textarea{flex:1;resize:none;min-height:64px;max-height:120px;padding:12px 14px;border:1px solid #CBD5E1;border-radius:14px;font-size:14px;line-height:1.5;outline:none;box-sizing:border-box}.tb-operator-chat__composer textarea:focus{border-color:#2563EB;box-shadow:0 0 0 3px rgba(37,99,235,.12)}.tb-operator-chat__composer button{min-width:96px;height:44px;border:none;border-radius:12px;background:#2563EB;color:#fff;font-size:14px;font-weight:600;cursor:pointer}.tb-operator-chat__composer button[disabled],.tb-operator-chat__chip[disabled]{opacity:.55;cursor:not-allowed}.tb-operator-chat__hint{font-size:12px;color:#64748B}",
+            "js": "const cfg={deviceId:'3877b730-81cb-11f1-a760-b3ba4cbe1b98',dashboardId:'09c06030-81cc-11f1-a760-b3ba4cbe1b98',aiModelId:'d78b28f0-810f-11f1-a760-b3ba4cbe1b98',storageKey:'tb-dg-set1-chatbot'};const root=container.querySelector('.tb-operator-chat');const messagesEl=root.querySelector('#tb-operator-chat-messages');const inputEl=root.querySelector('#tb-operator-chat-input');const sendEl=root.querySelector('#tb-operator-chat-send');const hintEl=root.querySelector('#tb-operator-chat-hint');const snapshotEl=root.querySelector('#tb-operator-chat-snapshot');const badgeEl=root.querySelector('#tb-operator-chat-badge');const chips=[...root.querySelectorAll('.tb-operator-chat__chip')];const stored=JSON.parse(localStorage.getItem(cfg.storageKey)||'{}');const state={busy:false,conversationId:stored.conversationId||null,messages:Array.isArray(stored.messages)?stored.messages:[]};function persist(){localStorage.setItem(cfg.storageKey,JSON.stringify({conversationId:state.conversationId,messages:state.messages.slice(-6)}));}function setBusy(busy){state.busy=busy;sendEl.disabled=busy;inputEl.disabled=busy;chips.forEach(chip=>chip.disabled=busy);sendEl.textContent=busy?'Sending...':'Send';badgeEl.textContent=busy?'Thinking':'Live';badgeEl.style.background=busy?'#DBEAFE':'#ECFDF5';badgeEl.style.color=busy?'#1D4ED8':'#047857';}function appendMessage(role,text,meta){const msg=document.createElement('div');msg.className='tb-operator-chat__msg tb-operator-chat__msg--'+(role==='USER'?'user':'assistant');msg.textContent=text;if(meta){const metaEl=document.createElement('div');metaEl.className='tb-operator-chat__meta';metaEl.textContent=meta;msg.appendChild(metaEl);}messagesEl.appendChild(msg);messagesEl.scrollTop=messagesEl.scrollHeight;}function hydrate(){if(!state.messages.length){appendMessage('ASSISTANT','Ask about DG status, active alarms, AI summary, or recommended next checks.','Ready');return;}state.messages.forEach(msg=>appendMessage(msg.role,msg.content));}function remember(role,content){state.messages.push({role:role,content:content});if(state.messages.length>6){state.messages=state.messages.slice(-6);}persist();}function snapshotText(snapshot,alarms){if(!snapshot||!snapshot.values){return 'Waiting for grounded telemetry from the chatbot response.';}const vals=snapshot.values;const parts=[snapshot.deviceName||'DG SET1'];if(vals['DG Status']) parts.push('Status: '+vals['DG Status']);if(vals['Engine RPM']) parts.push('RPM: '+vals['Engine RPM']);if(vals['Power (kW)']) parts.push('Power: '+vals['Power (kW)']);if(vals['Oil Pressure']) parts.push('Oil: '+vals['Oil Pressure']);if(vals['Coolant Temperature']) parts.push('Coolant: '+vals['Coolant Temperature']);if(typeof alarms?.length==='number') parts.push('Active alarms: '+alarms.length);return parts.join(' | ');}function authHeader(){const token=localStorage.getItem('jwt_token');return token?{'X-Authorization':'Bearer '+token}:{ };}async function sendPrompt(prompt){const text=(prompt||inputEl.value||'').trim();if(!text||state.busy){return;}appendMessage('USER',text,new Date().toLocaleTimeString());remember('USER',text);inputEl.value='';setBusy(true);hintEl.textContent='Requesting grounded answer from live telemetry and alarms...';try{const response=await fetch('/api/chatbot/operator',{method:'POST',headers:Object.assign({'Content-Type':'application/json'},authHeader()),body:JSON.stringify({deviceId:cfg.deviceId,dashboardId:cfg.dashboardId,aiModelId:cfg.aiModelId,conversationId:state.conversationId,message:text,messages:state.messages})});if(!response.ok){throw new Error('HTTP '+response.status);}const data=await response.json();state.conversationId=data.conversationId||state.conversationId;persist();appendMessage('ASSISTANT',data.answer,new Date(data.timestamp||Date.now()).toLocaleTimeString());remember('ASSISTANT',data.answer);snapshotEl.textContent=snapshotText(data.deviceSnapshot,data.activeAlarms);hintEl.textContent='Sources: '+((data.sources||[]).join(', ')||'latest telemetry');}catch(err){appendMessage('ASSISTANT','The chatbot request failed. Please retry in a moment or check the dashboard telemetry and alarm widgets.','Error');hintEl.textContent='Last error: '+err.message;}finally{setBusy(false);}}sendEl.addEventListener('click',()=>sendPrompt());inputEl.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendPrompt();}});chips.forEach(chip=>chip.addEventListener('click',()=>sendPrompt(chip.getAttribute('data-prompt')||'')));hydrate();",
+            "resources": []
+          },
+          "title": "DG SET1 Operator Chatbot",
+          "dropShadow": true,
+          "enableFullscreen": true,
+          "widgetStyle": {},
+          "showLegend": false,
+          "actions": {},
+          "configMode": "advanced",
+          "widgetCss": "",
+          "showTitleIcon": false,
+          "titleFont": {
+            "size": 16,
+            "sizeUnit": "px",
+            "family": "Roboto",
+            "weight": "500",
+            "style": "normal",
+            "lineHeight": "1.3"
+          }
+        },
+        "id": "c4b0f6f8-4f1a-45d9-b1e1-2d4b9c7d0f55",
+        "typeFullFqn": "html_container"
       }
     },
     "states": {
@@ -6582,6 +6625,12 @@
                 "sizeX": 24,
                 "sizeY": 5,
                 "row": 89,
+                "col": 0
+              },
+              "c4b0f6f8-4f1a-45d9-b1e1-2d4b9c7d0f55": {
+                "sizeX": 24,
+                "sizeY": 10,
+                "row": 94,
                 "col": 0
               },
               "b06fda2f-081d-43ee-b2d4-64c3740bfd05": {

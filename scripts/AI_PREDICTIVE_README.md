@@ -1,6 +1,6 @@
 # DG SET1 AI Summary + Predictive Maintenance
 
-Branch: `ai`
+Branch: `chatbot`
 
 ## What was configured (Delhivery tenant on Virtuoso TB)
 
@@ -103,3 +103,26 @@ Sensor alarms (coolant/oil/RPM) require **`dg_status=RUNNING`** so an OFF genset
 - Rotate any key that was pasted in chat
 - Set/update key in TB UI: **Settings → AI Models**
 - Do not commit `docker/*-sso*.env` or MQTT private keys
+
+## Operator chatbot
+
+- Dashboard now includes a **DG SET1 Operator Chatbot** panel implemented with the built-in `HTML Container` widget.
+- Backend endpoint: `POST /api/chatbot/operator`
+- Request grounding: latest DG telemetry, active alarms, AI summary, and maintenance recommendation
+- The widget currently targets:
+  - Device `3877b730-81cb-11f1-a760-b3ba4cbe1b98`
+  - Dashboard `09c06030-81cc-11f1-a760-b3ba4cbe1b98`
+  - AI Model `d78b28f0-810f-11f1-a760-b3ba4cbe1b98`
+
+### Chatbot behavior
+
+- Tenant-authenticated, dashboard-scoped operator assistant
+- Short server-side conversation memory with TTL and bounded history
+- Per-user/device request throttling
+- Refuses requests for secrets or configuration-changing actions
+- Falls back to a safe operator message if the model is unavailable
+
+### Recommended follow-up
+
+- Create a **dedicated chatbot AI model** in ThingsBoard AI Models for cleaner prompt/rate-limit separation from predictive scoring
+- After creating that model, update the widget `aiModelId` in `scripts/dg_set1_dashboard.json`
