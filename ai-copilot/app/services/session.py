@@ -28,12 +28,12 @@ from app.services.tools.telemetry import fetch_active_alarms, fetch_ai_scores, f
 log = logging.getLogger(__name__)
 
 FALLBACK = (
-    "I could not complete the AI response, but I checked live context where possible. "
-    "Please retry, or review the device telemetry and alarm widgets."
+    "I could not finish that answer just now. "
+    "Please retry, or check the device live readings and alarm widgets on the dashboard."
 )
 UNSUPPORTED = (
-    "I can help with live device status, alarms, AI summary, history, and manuals, "
-    "but I cannot provide secrets or make configuration changes."
+    "I can help with live device status, alarms, AI guidance, history, and procedures, "
+    "but I cannot share secrets or make configuration changes."
 )
 
 
