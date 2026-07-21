@@ -104,38 +104,26 @@ Sensor alarms (coolant/oil/RPM) require **`dg_status=RUNNING`** so an OFF genset
 - Set/update key in TB UI: **Settings → AI Models**
 - Do not commit `docker/*-sso*.env` or MQTT private keys
 
-## Operator chatbot (production FastAPI copilot)
+## Operator chatbot
 
-Primary backend: **`thingsboard/ai-copilot`** FastAPI service on port **8097**
-(`8095` is already used by face-attendance on this host).
-
-| Surface | Details |
-|---------|---------|
-| Service | `GET /healthz`, `GET /v1/devices`, `POST /v1/chat` |
-| Auth | ThingsBoard JWT via `X-Authorization: Bearer …` |
-| DG SET1 dashboard widget | Device picker + chat → FastAPI (no hardcoded device ID) |
-| Fleet dashboard | `Fleet Operator Copilot` (`scripts/fleet_operator_copilot_dashboard.json`) |
-| Legacy Java API | `POST /api/chatbot/operator` — **deprecated** fallback only |
-
-### Run / deploy
-
-```bash
-cd thingsboard/ai-copilot
-cp .env.example .env   # set OPENAI_API_KEY, TB_BASE_URL
-python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8097
-# or: docker compose up -d --build
-```
+- Dashboard now includes a **DG SET1 Operator Chatbot** panel implemented with the built-in `HTML Container` widget (`system.html_container`).
+- If the widget shows “associated widget type was removed”, install/update the system type from `application/src/main/data/json/system/widget_types/html_container.json` as sysadmin (`POST /api/widgetType?updateExistingByFqn=true`), then set the dashboard widget `typeFullFqn` to `system.html_container`.
+- Backend endpoint: `POST /api/chatbot/operator`
+- Request grounding: latest DG telemetry, active alarms, AI summary, and maintenance recommendation
+- The widget currently targets:
+  - Device `3877b730-81cb-11f1-a760-b3ba4cbe1b98`
+  - Dashboard `09c06030-81cc-11f1-a760-b3ba4cbe1b98`
+  - AI Model `d78b28f0-810f-11f1-a760-b3ba4cbe1b98`
 
 ### Chatbot behavior
 
-- Multi-device resolver + intent routing (status, alarms, history, AI guidance, manuals)
-- Grounding: telemetry, alarms, AI scores, daily reports, RAG manuals/SOPs
-- Conversation memory + rate limits + secret/config guardrails
-- Permissions always enforced with the **user JWT** against ThingsBoard APIs
+- Tenant-authenticated, dashboard-scoped operator assistant
+- Short server-side conversation memory with TTL and bounded history
+- Per-user/device request throttling
+- Refuses requests for secrets or configuration-changing actions
+- Falls back to a safe operator message if the model is unavailable
 
 ### Recommended follow-up
 
-- Put nginx/`/copilot/` reverse proxy in front of `:8097` for same-origin HTTPS from `viot.virtuosonetsoft.com`
-- Expand `ai-copilot/knowledge/` with full Delhivery user manuals when available
+- Create a **dedicated chatbot AI model** in ThingsBoard AI Models for cleaner prompt/rate-limit separation from predictive scoring
+- After creating that model, update the widget `aiModelId` in `scripts/dg_set1_dashboard.json`

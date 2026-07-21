@@ -1,0 +1,26 @@
+services:
+  tb-ai-copilot:
+    build: .
+    image: tb-ai-copilot:latest
+    container_name: tb-ai-copilot
+    restart: unless-stopped
+    ports:
+      - "8097:8097"
+    env_file:
+      - .env
+    environment:
+      TB_BASE_URL: ${TB_BASE_URL:-http://host.docker.internal:9091}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      RAG_PERSIST_DIR: /app/data/chroma
+      KNOWLEDGE_DIR: /app/knowledge
+      REPORTS_DIR: /var/tmp/delhivery-reports
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - copilot-chroma:/app/data/chroma
+      - /var/tmp/delhivery-reports:/var/tmp/delhivery-reports:ro
+
+volumes:
+  copilot-chroma:

@@ -1,0 +1,16 @@
+{
+  "tenant": "Delhivery Pvt / Virtuoso NetSoft",
+  "report_date": "2026-07-21",
+  "timezone": "Asia/Kolkata",
+  "window": "2026-07-20 08:00 \u2192 2026-07-21 08:00 Asia/Kolkata",
+  "hours": 24,
+  "alarm_count": 11,
+  "active_count": 2,
+  "critical_count": 3,
+  "major_count": 8,
+  "device_count": 1,
+  "telemetry_points": 13,
+  "devices": [
+    "gateway001"
+  ]
+}
