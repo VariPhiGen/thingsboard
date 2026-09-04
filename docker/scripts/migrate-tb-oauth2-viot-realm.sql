@@ -1,5 +1,5 @@
 -- Point Virtuoso TB OAuth2 client at Keycloak realm viot + client viot.
--- Run: PGPASSWORD=... psql -h 3.110.77.148 -U variphi -d tb_virtuoso -f migrate-tb-oauth2-viot-realm.sql
+-- Run: PGPASSWORD=... psql -h 13.206.196.162 -U variphi -d tb_virtuoso -f migrate-tb-oauth2-viot-realm.sql
 
 \set issuer_base 'https://auth.virtuosonetsoft.variphi.com/realms/viot'
 \set client_id 'viot'

@@ -25,9 +25,9 @@ done
 SSH_OPTS=(-i "${SSH_KEY}" -o StrictHostKeyChecking=no -o ConnectTimeout=15)
 
 echo "==> Creating Postgres database keycloak_virtuoso (if missing)"
-PGPASSWORD="${KC_DB_PASSWORD:-vgi@2026}" psql -h "${KC_DB_HOST:-3.110.77.148}" -U "${KC_DB_USER:-variphi}" -d postgres -tc \
+PGPASSWORD="${KC_DB_PASSWORD:-vgi@2026}" psql -h "${KC_DB_HOST:-13.206.196.162}" -U "${KC_DB_USER:-variphi}" -d postgres -tc \
   "SELECT 1 FROM pg_database WHERE datname = 'keycloak_virtuoso'" | grep -q 1 || \
-PGPASSWORD="${KC_DB_PASSWORD:-vgi@2026}" psql -h "${KC_DB_HOST:-3.110.77.148}" -U "${KC_DB_USER:-variphi}" -d postgres -c \
+PGPASSWORD="${KC_DB_PASSWORD:-vgi@2026}" psql -h "${KC_DB_HOST:-13.206.196.162}" -U "${KC_DB_USER:-variphi}" -d postgres -c \
   "CREATE DATABASE keycloak_virtuoso OWNER variphi;"
 
 echo "==> Syncing keycloak-virtuoso compose + theme to gateway"

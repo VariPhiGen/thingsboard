@@ -5,7 +5,7 @@
 #     confidential client "thingsboard"). KC_HOSTNAME=http://localhost:8081 +
 #     KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true let this container reach it via host.docker.internal:8081
 #     while tokens keep iss=http://localhost:8081/realms/things.
-#   - Shared external PostgreSQL at 3.110.77.148:5432, database "tb" (same server that hosts the
+#   - Shared external PostgreSQL at 13.206.196.162:5432, database "tb" (same server that hosts the
 #     "keycloak" database). No DB container is started here.
 #
 # This compose only runs Variphi IoT (monolithic ThingsBoard: TB_SERVICE_TYPE=monolith,
@@ -33,7 +33,7 @@
 # set SECURITY_OAUTH2_KEYCLOAK_ISSUER_URI to it and drop SECURITY_OAUTH2_KEYCLOAK_AUTH_ISSUER_URI.
 
 x-tb-db-env: &tb-db-env
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-3.110.77.148}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb}"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-13.206.196.162}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb}"
   SPRING_DATASOURCE_USERNAME: "${DATABASE_USER:-variphi}"
   SPRING_DATASOURCE_PASSWORD: "${DATABASE_PASSWORD:-vgi@2026}"
   DATABASE_TS_TYPE: "${DATABASE_TS_TYPE:-sql}"
@@ -43,12 +43,12 @@ x-tb-db-env: &tb-db-env
   TB_QUEUE_TYPE: "in-memory"
   TB_SERVICE_TYPE: "monolith"
 
-# Shared external Redis cache (3.110.77.148:6379). Recommended when running >1 TB node
+# Shared external Redis cache (13.206.196.162:6379). Recommended when running >1 TB node
 # (shared, survives restarts). For a single node you can switch to local cache with CACHE_TYPE=caffeine.
 x-tb-cache-env: &tb-cache-env
   CACHE_TYPE: "${CACHE_TYPE:-redis}"
   REDIS_CONNECTION_TYPE: "${REDIS_CONNECTION_TYPE:-standalone}"
-  REDIS_HOST: "${REDIS_HOST:-3.110.77.148}"
+  REDIS_HOST: "${REDIS_HOST:-13.206.196.162}"
   REDIS_PORT: "${REDIS_PORT:-6379}"
   REDIS_DB: "${REDIS_DB:-0}"
   REDIS_PASSWORD: "${REDIS_PASSWORD:-}"

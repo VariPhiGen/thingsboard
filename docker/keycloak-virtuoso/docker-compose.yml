@@ -10,7 +10,7 @@ services:
       - "8082:8080"
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://${KC_DB_HOST:-3.110.77.148}:5432/${KC_DB_NAME:-keycloak_virtuoso}
+      KC_DB_URL: jdbc:postgresql://${KC_DB_HOST:-13.206.196.162}:5432/${KC_DB_NAME:-keycloak_virtuoso}
       KC_DB_USERNAME: ${KC_DB_USER:-variphi}
       KC_DB_PASSWORD: ${KC_DB_PASSWORD:-vgi@2026}
       KC_DB_SCHEMA: public

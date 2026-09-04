@@ -9,7 +9,7 @@
 # First-time DB: clone from tb + migrate-cloned-tb-domain.sql (skip tb-install).
 
 x-tb-db-env: &tb-db-env
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-3.110.77.148}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb_virtuoso}"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DATABASE_HOST:-13.206.196.162}:${DATABASE_PORT:-5432}/${DATABASE_NAME:-tb_virtuoso}"
   SPRING_DATASOURCE_USERNAME: "${DATABASE_USER:-variphi}"
   SPRING_DATASOURCE_PASSWORD: "${DATABASE_PASSWORD:-vgi@2026}"
   DATABASE_TS_TYPE: "${DATABASE_TS_TYPE:-sql}"
@@ -22,7 +22,7 @@ x-tb-db-env: &tb-db-env
 x-tb-cache-env: &tb-cache-env
   CACHE_TYPE: "${CACHE_TYPE:-redis}"
   REDIS_CONNECTION_TYPE: "${REDIS_CONNECTION_TYPE:-standalone}"
-  REDIS_HOST: "${REDIS_HOST:-3.110.77.148}"
+  REDIS_HOST: "${REDIS_HOST:-13.206.196.162}"
   REDIS_PORT: "${REDIS_PORT:-6379}"
   REDIS_DB: "${REDIS_DB:-1}"
   REDIS_PASSWORD: "${REDIS_PASSWORD:-}"

@@ -1,5 +1,5 @@
 -- Point Variphi TB OAuth2 client at gateway Keycloak realm viot + client viot.
--- Run: PGPASSWORD=... psql -h 3.110.77.148 -U variphi -d tb -f migrate-tb-oauth2-variphi-viot-realm.sql
+-- Run: PGPASSWORD=... psql -h 13.206.196.162 -U variphi -d tb -f migrate-tb-oauth2-variphi-viot-realm.sql
 
 \set issuer_base 'https://api.edge.variphi.com/auth/realms/viot'
 \set client_id 'viot'

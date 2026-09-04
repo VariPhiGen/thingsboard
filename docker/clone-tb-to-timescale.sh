@@ -4,7 +4,7 @@ set -euo pipefail
 
 SOURCE_DB="${1:?source database name (e.g. tb)}"
 TARGET_DB="${2:?target database name (e.g. tb_timescale)}"
-PGHOST="${DATABASE_HOST:-3.110.77.148}"
+PGHOST="${DATABASE_HOST:-13.206.196.162}"
 PGPORT="${DATABASE_PORT:-5432}"
 PGUSER="${DATABASE_USER:-variphi}"
 export PGPASSWORD="${DATABASE_PASSWORD:-vgi@2026}"
