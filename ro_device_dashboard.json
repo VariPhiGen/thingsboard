@@ -1,0 +1,119 @@
+{
+  "title": "RO Device Dashboard",
+  "image": null,
+  "mobileHide": false,
+  "mobileOrder": null,
+  "configuration": {
+    "description": "Dashboard for RO Water Purifier",
+    "widgets": {
+      "93b16954-4a4b-4b13-8b77-dcb3725b822d": {
+        "isSystemWidget": true,
+        "bundleAlias": "digital_gauges",
+        "typeAlias": "gauge_justgage",
+        "typeFullFqn": "digital_gauges.gauge_justgage",
+        "type": "latest",
+        "title": "TDS Reading",
+        "image": null,
+        "description": null,
+        "sizeX": 4,
+        "sizeY": 4,
+        "config": {
+          "datasources": [
+            {
+              "type": "entity",
+              "entityAliasId": "416b2a00-1c32-11ec-9621-0242ac130002",
+              "dataKeys": [
+                {
+                  "name": "tds",
+                  "type": "telemetry",
+                  "label": "TDS",
+                  "color": "#2196f3",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "timewindowMs": 60000
+            }
+          },
+          "showTitle": true,
+          "backgroundColor": "#ffffff",
+          "color": "rgba(0, 0, 0, 0.87)",
+          "padding": "8px",
+          "settings": {
+            "minValue": 0,
+            "maxValue": 500,
+            "gaugeType": "arc",
+            "donutStartAngle": 90,
+            "title": "TDS Level",
+            "showUnitTitle": true,
+            "unitTitle": "ppm"
+          },
+          "title": "TDS Level",
+          "dropShadow": true
+        },
+        "row": 0,
+        "col": 0,
+        "id": "93b16954-4a4b-4b13-8b77-dcb3725b822d"
+      }
+    },
+    "states": {
+      "default": {
+        "name": "RO System Overview",
+        "root": true,
+        "layouts": {
+          "main": {
+            "widgets": {
+              "93b16954-4a4b-4b13-8b77-dcb3725b822d": {
+                "sizeX": 5,
+                "sizeY": 5,
+                "row": 0,
+                "col": 0
+              }
+            },
+            "gridSettings": {
+              "backgroundColor": "#eeeeee",
+              "columns": 24,
+              "margin": 10,
+              "backgroundSizeMode": "100%"
+            }
+          }
+        }
+      }
+    },
+    "entityAliases": {
+      "416b2a00-1c32-11ec-9621-0242ac130002": {
+        "id": "416b2a00-1c32-11ec-9621-0242ac130002",
+        "alias": "RO System",
+        "filter": {
+          "type": "deviceType",
+          "resolveMultiple": true,
+          "deviceType": "RO Device"
+        }
+      }
+    },
+    "filters": {},
+    "timewindow": {
+      "displayValue": "",
+      "selectedTab": 0,
+      "realtime": {
+        "realtimeType": 0,
+        "interval": 1000,
+        "timewindowMs": 60000,
+        "quickInterval": "CURRENT_DAY"
+      }
+    },
+    "settings": {
+      "stateControllerId": "entity",
+      "showTitle": true,
+      "showDashboardsSelect": true,
+      "showEntitiesSelect": true,
+      "showDashboardTimewindow": true,
+      "showDashboardExport": true,
+      "toolbarAlwaysOpen": true
+    }
+  },
+  "name": "RO Device Dashboard"
+}
