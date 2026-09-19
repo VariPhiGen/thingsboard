@@ -56,8 +56,8 @@ def setup_all():
         
     # Bind the entity alias to the newly created device ID!
     aliases = dashboard_config.get("configuration", {}).get("entityAliases", {})
-    if "ro-device-alias-uuid" in aliases:
-        aliases["ro-device-alias-uuid"]["filter"]["singleEntity"]["id"] = device_id
+    if "12ae98c7-1ea2-52cf-64d5-763e9d993547" in aliases:
+        aliases["12ae98c7-1ea2-52cf-64d5-763e9d993547"]["filter"]["singleEntity"]["id"] = device_id
         
     dashboard_payload = {
         "title": dashboard_config.get("title", "RO Live Data Dashboard"),
@@ -125,14 +125,26 @@ client.loop_start()
 
 try:
     while True:
+        chlorophyll = round(random.uniform(20, 50), 1)
+        conductivity = round(random.uniform(800, 1000), 1)
+        ec = round(conductivity / 1000.0, 2)
+        flow_lpm = round(random.uniform(10, 15), 2)
+        flow_simulated = True
+        flow_total_l = round(random.uniform(100, 200), 1)
+        ph = round(random.uniform(7.0, 10.0), 2)
+        salinity = round(random.uniform(0.5, 2.0), 2)
         tds = random.randint(100, 500)
-        temperature = round(random.uniform(24, 32), 2)
-        conductivity = round(random.uniform(100, 800), 2)
 
         payload = {{
-            "tds": tds,
-            "temperature": temperature,
-            "conductivity": conductivity
+            "chlorophyll": chlorophyll,
+            "conductivity": conductivity,
+            "ec": ec,
+            "flow_lpm": flow_lpm,
+            "flow_simulated": flow_simulated,
+            "flow_total_l": flow_total_l,
+            "ph": ph,
+            "salinity": salinity,
+            "tds": tds
         }}
 
         message = json.dumps(payload)
@@ -145,10 +157,9 @@ try:
 
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
             print(
-                f"TDS={{tds}} ppm | "
-                f"Temperature={{temperature}} C | "
-                f"Conductivity={{conductivity}} | "
-                f"SENT"
+                f"Chlo={{chlorophyll}} | Cond={{conductivity}} | EC={{ec}} | "
+                f"FlowLPM={{flow_lpm}} | FlowTotal={{flow_total_l}} | "
+                f"pH={{ph}} | Sal={{salinity}} | TDS={{tds}} | SENT"
             )
         else:
             print(f"Publish failed: {{result.rc}}")
@@ -165,7 +176,7 @@ finally:
     with open('/home/ubuntu/thingsboard/run_ro_simulation.py', 'w') as f:
         f.write(script_content)
     
-    print("\nSetup complete! The python script is ready at /home/ubuntu/thingsboard/run_ro_simulation.py")
+    print("\\nSetup complete! The python script is ready at /home/ubuntu/thingsboard/run_ro_simulation.py")
 
 if __name__ == "__main__":
     setup_all()
