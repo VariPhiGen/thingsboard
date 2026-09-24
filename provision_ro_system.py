@@ -60,16 +60,23 @@ def setup():
     profiles = res.json()['data']
     profile_id = next((p['id'] for p in profiles if p['name'] == 'default'), profiles[0]['id'])
 
-    print("Creating RO Device...")
+    print("Creating or Fetching RO Device...")
     device_payload = {
         "name": "Smart RO Purifier",
         "type": "RO Device",
         "deviceProfileId": profile_id
     }
     res = requests.post(f"{BASE_URL}/api/device", json=device_payload, headers=tenant_headers)
-    res.raise_for_status()
-    device = res.json()
-    device_id = device['id']['id']
+    if res.status_code == 400:
+        # Device might already exist, try to fetch it
+        res = requests.get(f"{BASE_URL}/api/tenant/devices?deviceName=Smart RO Purifier", headers=tenant_headers)
+        res.raise_for_status()
+        device = res.json()
+        device_id = device['id']['id']
+    else:
+        res.raise_for_status()
+        device = res.json()
+        device_id = device['id']['id']
     
     print("Getting Device Token...")
     res = requests.get(f"{BASE_URL}/api/device/{device_id}/credentials", headers=tenant_headers)
@@ -101,12 +108,27 @@ def setup():
     print("\nSending mock telemetry in background (Ctrl+C to stop)...")
     try:
         while True:
+            tds = random.randint(180, 200)
             telemetry = {
-                "tds": random.randint(30, 80),
+                "tds": tds,
                 "water_flow": random.uniform(1.0, 2.5),
                 "pressure": random.uniform(40.0, 60.0),
                 "status": "ON"
             }
+            
+            if tds > 175:
+                telemetry["alarm"] = "High TDS Alert"
+                print(f"ALARM TRIGGERED: TDS is {tds} (Threshold: 175)")
+                # Trigger alarm natively in ThingsBoard via REST API
+                alarm_payload = {
+                    "type": "High TDS Alert",
+                    "originator": {"entityType": "DEVICE", "id": device_id},
+                    "severity": "CRITICAL",
+                    "status": "ACTIVE_UNACK",
+                    "details": {"message": f"TDS level is {tds}, above 175"}
+                }
+                requests.post(f"{BASE_URL}/api/alarm", json=alarm_payload, headers=tenant_headers)
+                
             requests.post(f"{BASE_URL}/api/v1/{access_token}/telemetry", json=telemetry)
             print(f"Sent telemetry: {telemetry}")
             time.sleep(5)

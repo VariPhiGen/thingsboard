@@ -146,6 +146,11 @@ try:
             "salinity": salinity,
             "tds": tds
         }}
+        
+        # Trigger alarm notification if TDS > 175
+        if tds > 175:
+            payload["alarm"] = "High TDS Alert"
+            print(f"ALARM TRIGGERED: TDS is {{tds}} (Threshold: 175)")
 
         message = json.dumps(payload)
 
