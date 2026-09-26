@@ -1,0 +1,837 @@
+{
+  "ruleChainId": {
+    "entityType": "RULE_CHAIN",
+    "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+  },
+  "version": 67,
+  "firstNodeIndex": 2,
+  "nodes": [
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5be880-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518664,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+      "name": "Save Timeseries",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "defaultTTL": 0,
+        "useServerTs": false,
+        "processingSettings": {
+          "type": "ON_EVERY_MESSAGE"
+        }
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 824,
+        "layoutY": 156
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5c36a0-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518666,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.telemetry.TbMsgAttributesNode",
+      "name": "Save Client Attributes",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 3,
+      "configuration": {
+        "processingSettings": {
+          "type": "ON_EVERY_MESSAGE"
+        },
+        "scope": "CLIENT_SCOPE",
+        "notifyDevice": false,
+        "sendAttributesUpdatedNotification": false,
+        "updateAttributesOnlyOnValueChange": true
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 825,
+        "layoutY": 52
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5c5db0-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518667,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbMsgTypeSwitchNode",
+      "name": "Message Type Switch",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "version": 0
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 347,
+        "layoutY": 149
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5c84c0-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518668,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbLogNode",
+      "name": "Log RPC from Device",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "TBEL",
+        "jsScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);",
+        "tbelScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 825,
+        "layoutY": 266
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5cabd0-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518669,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbLogNode",
+      "name": "Log Other",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "TBEL",
+        "jsScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);",
+        "tbelScript": "return '\\nIncoming message:\\n' + JSON.stringify(msg) + '\\nIncoming metadata:\\n' + JSON.stringify(metadata);"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 825,
+        "layoutY": 379
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "1d5cd2e0-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "createdTime": 1781716518670,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.rpc.TbSendRPCRequestNode",
+      "name": "RPC Call Request",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "timeoutInSeconds": 60
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 825,
+        "layoutY": 468
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a6018710-6a72-11f1-0000-000000000000"
+      },
+      "createdTime": 1781717606911,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbOriginatorTypeSwitchNode",
+      "name": "Variphi Viewer Entity Type Switch",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "version": 0
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 144,
+        "layoutY": 363
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a602e6a0-6a72-11f1-0000-000000000000"
+      },
+      "createdTime": 1781717606922,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbAssignToCustomerNode",
+      "name": "Variphi Assign Dashboard to Public",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "customerNamePattern": "Public",
+        "createCustomerIfNotExists": false
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 761,
+        "layoutY": 220
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a60334c0-6a72-11f1-0000-000000000000"
+      },
+      "createdTime": 1781717606924,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbAssignToCustomerNode",
+      "name": "Variphi Assign Device to Public",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "customerNamePattern": "Public",
+        "createCustomerIfNotExists": false
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 760,
+        "layoutY": 340
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "3a2231f0-8112-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784205070991,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+      "name": "Save AI Predictive Telemetry",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "defaultTTL": 0,
+        "useServerTs": false,
+        "processingSettings": {
+          "type": "ON_EVERY_MESSAGE"
+        }
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "",
+        "layoutX": 1111,
+        "layoutY": 443
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c418070-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791223,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.deduplication.TbMsgDeduplicationNode",
+      "name": "DG AI Dedup 1m",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "interval": 60,
+        "strategy": "LAST",
+        "maxPendingMsgs": 100,
+        "maxRetries": 3
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 300,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c41a780-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791224,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+      "name": "Only DG Telemetry",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "return (typeof msg.engine_rpm !== 'undefined') || (typeof msg.coolant_temp !== 'undefined') || (typeof msg.power_kw !== 'undefined');",
+        "tbelScript": "return true;"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 520,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c41a781-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791224,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.ai.TbAiNode",
+      "name": "DG SET1 AI Predictive",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "modelId": {
+          "entityType": "AI_MODEL",
+          "id": "d78b28f0-810f-11f1-a760-b3ba4cbe1b98"
+        },
+        "systemPrompt": "You are a production diesel-generator (Woodward KG1500) monitoring assistant for industrial operators.\nUse ONLY the metrics provided. Never invent sensor values.\nRespond with one JSON object only (no markdown) with keys:\nanomaly (boolean),\nsummary (REQUIRED: 1-2 operator sentences. Include the most important live readings when present \u2014 e.g. RPM, coolant \u00b0C, oil pressure kPa, power kW, battery V. State whether running normal / idle / elevated risk and why. Do NOT only say 'all parameters normal' \u2014 always cite numbers.),\nseverity (OK|WARNING|CRITICAL),\nhealth_score (0-100),\nfailure_risk_pct (0-100),\nrul_hours (>=0),\npredicted_coolant_1h (number \u00b0C \u2014 REQUIRED whenever coolant_temp is present; else omit),\nmaintenance_recommendation (one short concrete action).\nNormal guides when present: RPM~1500, coolant<95C, oil_pressure>250 kPa, battery 24-28V, frequency~50Hz, PF>0.8.\nBe conservative: CRITICAL only for clear equipment risk from valid readings.\nKeep summary under 220 characters.",
+        "userPrompt": "DG SET1 cleaned telemetry JSON: $[*]. valid_metric_count=${valid_metric_count}. Produce predictive JSON now.",
+        "responseFormat": {
+          "type": "JSON"
+        },
+        "timeoutSeconds": 90,
+        "forceAck": true
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 760,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c41a782-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791224,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+      "name": "Clamp AI Outputs",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "\nvar out = {};\nfunction num(v, d) {\n  if (v === null || v === undefined || v === '') return d;\n  if (typeof v === 'string' && (v === '--' || v === 'N/A' || v === 'Unavailable' || v.indexOf('Waiting') === 0)) return d;\n  var n = Number(v);\n  if (!isFinite(n) || n === 32767 || n >= 30000) return d;\n  return n;\n}\nfunction clamp(n, lo, hi) {\n  if (n === null || n === undefined) return null;\n  return Math.max(lo, Math.min(hi, n));\n}\nout.anomaly = (msg.anomaly === true || msg.anomaly === 'true');\nout.summary = (msg.summary != null && (''+msg.summary).trim() !== '') ? (''+msg.summary).substring(0, 240) : 'No AI summary';\nvar sev = (msg.severity != null) ? (''+msg.severity).toUpperCase() : 'OK';\nif (sev === 'SENSOR FAULT' || sev === 'SENSOR_FAULT') sev = 'WARNING';\nif (['OK','WARNING','CRITICAL'].indexOf(sev) < 0) sev = 'OK';\nout.severity = sev;\nout.health_score = clamp(num(msg.health_score, 50), 0, 100);\nout.failure_risk_pct = clamp(num(msg.failure_risk_pct, 0), 0, 100);\nout.rul_hours = Math.max(0, num(msg.rul_hours, 0));\n// Always overwrite predicted_coolant_1h on ACTIVE path (avoid stale '--' from pause)\nvar pc = num(msg.predicted_coolant_1h, null);\nif (pc === null && metadata) pc = num(metadata.coolant_temp, null);\nif (pc === null) pc = num(msg.coolant_temp, null);\nif (pc !== null) out.predicted_coolant_1h = clamp(pc, -20, 150);\nelse out.predicted_coolant_1h = '--';\nout.maintenance_recommendation = (msg.maintenance_recommendation != null)\n  ? (''+msg.maintenance_recommendation).substring(0, 300)\n  : 'Continue monitoring';\nout.ai_mode = 'openai';\nout.ai_status = 'ACTIVE';\nout.ai_reason = 'Predictive analysis running';\nreturn {msg: out, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};\n",
+        "tbelScript": "return {msg: msg, metadata: metadata, msgType: msgType};"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 1000,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c41ce90-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791225,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+      "name": "If CRITICAL Equipment",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "return (msg.severity === 'CRITICAL' || msg.severity === 'critical') && msg.ai_mode === 'openai';",
+        "tbelScript": "return false;"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 1400,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "0c41ce91-8206-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784309791225,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+      "name": "AI Predictive Alert",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "alarmDetailsBuildJs": "\nreturn {\n  description: 'AI predictive CRITICAL risk detected on DG SET1. Review summary and take recommended action.',\n  summary: msg.summary,\n  severity: msg.severity,\n  health_score: msg.health_score,\n  failure_risk_pct: msg.failure_risk_pct,\n  recommendation: msg.maintenance_recommendation,\n  ai_mode: msg.ai_mode,\n  message: (msg.summary != null ? (''+msg.summary) : 'AI CRITICAL alert') +\n           (msg.maintenance_recommendation != null ? (' | Action: ' + msg.maintenance_recommendation) : '')\n};\n",
+        "alarmDetailsBuildTbel": "return {};",
+        "alarmType": "AI Predictive Alert",
+        "severity": "CRITICAL",
+        "propagate": false,
+        "propagateToOwner": false,
+        "propagateToTenant": false,
+        "useMessageAlarmData": false,
+        "overwriteAlarmDetails": true,
+        "dynamicSeverity": false,
+        "relationTypes": []
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 1620,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "fe5c8a40-8278-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784359160036,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+      "name": "Sanitize DG Sensors",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "\nfunction bad(k, v) {\n  if (v === null || typeof v === 'undefined' || v === '') return true;\n  var n = Number(v);\n  if (!isFinite(n)) return true;\n  if (n === 32767 || n >= 30000) return true;\n  if (k === 'engine_rpm' && (n < 0 || n > 2500)) return true;\n  if (k === 'coolant_temp' && (n < -20 || n > 150)) return true;\n  if (k === 'oil_pressure' && (n < 0 || n > 1000)) return true;\n  if ((k === 'frequency' || k === 'voltage' || k === 'voltage_delta') && n === 0) return true;\n  return false;\n}\nvar out = {};\nvar keys = ['power_kw','energy_kwh','engine_rpm','coolant_temp','oil_pressure','battery_voltage','voltage','voltage_delta','current','frequency','power_factor','run_hours','engine_starts','status'];\nvar count = 0;\nfor (var i=0;i<keys.length;i++) {\n  var k = keys[i];\n  if (typeof msg[k] === 'undefined') continue;\n  if (bad(k, msg[k])) continue;\n  out[k] = msg[k];\n  count++;\n}\nvar md = metadata || {};\nmd.valid_metric_count = '' + count;\nif (typeof out.coolant_temp !== 'undefined') md.coolant_temp = '' + out.coolant_temp;\nelse md.coolant_temp = '';\nreturn {msg: out, metadata: md, msgType: msgType};\n",
+        "tbelScript": "return {msg: msg, metadata: metadata, msgType: msgType};"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 600,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "fe5cb150-8278-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784359160037,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+      "name": "Core Sensors Valid",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "\nfunction bad(k, v) {\n  if (v === null || typeof v === 'undefined' || v === '') return true;\n  var n = Number(v);\n  if (!isFinite(n)) return true;\n  if (n === 32767 || n >= 30000) return true;\n  if (k === 'engine_rpm' && (n < 0 || n > 2500)) return true;\n  if (k === 'coolant_temp' && (n < 20 || n > 130)) return true;\n  if (k === 'oil_pressure' && (n < 50 || n > 800)) return true;\n  return false;\n}\nvar core = 0;\nif (!bad('engine_rpm', msg.engine_rpm)) core++;\nif (!bad('coolant_temp', msg.coolant_temp)) core++;\nif (!bad('oil_pressure', msg.oil_pressure)) core++;\nreturn core >= 2;\n",
+        "tbelScript": "return false;"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 720,
+        "layoutY": 560
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "fe5cb151-8278-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784359160037,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+      "name": "Sensor Fault Fallback",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "\nvar out = {};\nout.anomaly = true;\nout.summary = 'Generator health scoring is paused because required engine sensors are missing or invalid. Live monitoring continues; predictive scores will return when sensor data is healthy.';\nout.severity = 'Sensors Unavailable';\nout.health_score = '--';\nout.failure_risk_pct = '--';\nout.rul_hours = '--';\nout.predicted_coolant_1h = '--';\nout.maintenance_recommendation = 'Please verify engine sensor connections (RPM, coolant temperature, and oil pressure) and confirm the gateway is sending valid readings. Predictive maintenance scoring will resume automatically once data is restored.';\nout.ai_mode = 'sensor_fault_fallback';\nout.ai_status = 'PAUSED';\nout.ai_reason = 'Required engine sensors unavailable';\nreturn {msg: out, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};\n",
+        "tbelScript": "return {msg: msg, metadata: metadata, msgType: msgType};"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "layoutX": 900,
+        "layoutY": 700
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a22be920-83fc-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784525650098,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.transform.TbTransformMsgNode",
+      "name": "Compute DG Status",
+      "debugSettings": {
+        "failuresEnabled": false,
+        "allEnabled": false,
+        "allEnabledUntil": 0
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "\nvar hasRpm = (typeof msg.engine_rpm !== 'undefined' && msg.engine_rpm !== null && msg.engine_rpm !== '');\nvar hasPwr = (typeof msg.power_kw !== 'undefined' && msg.power_kw !== null && msg.power_kw !== '');\nif (!hasRpm && !hasPwr) { return null; }\nvar rpm = Number(msg.engine_rpm);\nvar pwr = Number(msg.power_kw);\nvar running = (hasRpm && isFinite(rpm) && rpm > 100) || (hasPwr && isFinite(pwr) && pwr > 5);\nreturn {msg: {dg_status: running ? 'RUNNING' : 'OFF'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};\n",
+        "tbelScript": "return {msg: msg, metadata: metadata, msgType: msgType};"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "RUNNING if RPM>100 or power>5 else OFF",
+        "layoutX": 200,
+        "layoutY": 580
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a22c1030-83fc-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784525650099,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode",
+      "name": "Save DG Status",
+      "debugSettings": {
+        "failuresEnabled": false,
+        "allEnabled": false,
+        "allEnabledUntil": 0
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "defaultTTL": 0,
+        "useServerTs": false,
+        "processingSettings": {
+          "type": "ON_EVERY_MESSAGE"
+        }
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Persist dg_status",
+        "layoutX": 420,
+        "layoutY": 580
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "5cbe8e40-83fe-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784526392612,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+      "name": "If DG OFF",
+      "debugSettings": {
+        "failuresEnabled": false,
+        "allEnabled": false,
+        "allEnabledUntil": 0
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "return (''+msg.dg_status).toUpperCase() === 'OFF';",
+        "tbelScript": "return false;"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "True when genset is OFF",
+        "layoutX": 620,
+        "layoutY": 580
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "5cbedc60-83fe-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784526392614,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbCreateAlarmNode",
+      "name": "DG Offline Alarm",
+      "debugSettings": {
+        "failuresEnabled": false,
+        "allEnabled": false,
+        "allEnabledUntil": 0
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "alarmDetailsBuildJs": "\nreturn {\n  description: 'DG SET1 is OFF. Genset RPM/power are below the running threshold (RPM \u2264 100 and power \u2264 5 kW).',\n  dg_status: msg.dg_status,\n  message: 'DG SET1 is OFF \u2014 not generating. Verify if shutdown was intentional; check start circuit if unexpected.',\n  recommended_action: 'Confirm intentional stop, or investigate start failure / fuel / breaker / emergency stop.'\n};\n",
+        "alarmDetailsBuildTbel": "return {};",
+        "alarmType": "DG Offline",
+        "severity": "MAJOR",
+        "propagate": false,
+        "propagateToOwner": false,
+        "propagateToTenant": false,
+        "useMessageAlarmData": false,
+        "overwriteAlarmDetails": true,
+        "dynamicSeverity": false,
+        "relationTypes": []
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Raise MAJOR alarm while DG is OFF",
+        "layoutX": 840,
+        "layoutY": 520
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "5cc14d60-83fe-11f1-a760-b3ba4cbe1b98"
+      },
+      "createdTime": 1784526392630,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.action.TbClearAlarmNode",
+      "name": "Clear DG Offline Alarm",
+      "debugSettings": {
+        "failuresEnabled": false,
+        "allEnabled": false,
+        "allEnabledUntil": 0
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "alarmDetailsBuildJs": "\nreturn {\n  description: 'DG SET1 is RUNNING again. Offline alarm cleared.',\n  dg_status: msg.dg_status,\n  message: 'DG SET1 returned to RUNNING (RPM/power above threshold).'\n};\n",
+        "alarmDetailsBuildTbel": "return {};",
+        "alarmType": "DG Offline"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Clear DG Offline when RUNNING",
+        "layoutX": 840,
+        "layoutY": 640
+      }
+    }
+  ],
+  "connections": [
+    {
+      "fromIndex": 0,
+      "toIndex": 10,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 0,
+      "toIndex": 19,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 0,
+      "type": "Post telemetry"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 1,
+      "type": "Post attributes"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 3,
+      "type": "RPC Request from Device"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 4,
+      "type": "Other"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 5,
+      "type": "RPC Request to Device"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 6,
+      "type": "Entity Created"
+    },
+    {
+      "fromIndex": 6,
+      "toIndex": 7,
+      "type": "Dashboard"
+    },
+    {
+      "fromIndex": 6,
+      "toIndex": 8,
+      "type": "Device"
+    },
+    {
+      "fromIndex": 9,
+      "toIndex": 14,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 10,
+      "toIndex": 11,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 11,
+      "toIndex": 17,
+      "type": "True"
+    },
+    {
+      "fromIndex": 12,
+      "toIndex": 13,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 13,
+      "toIndex": 9,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 14,
+      "toIndex": 15,
+      "type": "True"
+    },
+    {
+      "fromIndex": 16,
+      "toIndex": 12,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 17,
+      "toIndex": 16,
+      "type": "True"
+    },
+    {
+      "fromIndex": 17,
+      "toIndex": 18,
+      "type": "False"
+    },
+    {
+      "fromIndex": 18,
+      "toIndex": 9,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 19,
+      "toIndex": 20,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 20,
+      "toIndex": 21,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 21,
+      "toIndex": 22,
+      "type": "True"
+    },
+    {
+      "fromIndex": 21,
+      "toIndex": 23,
+      "type": "False"
+    }
+  ],
+  "ruleChainConnections": null
+}
