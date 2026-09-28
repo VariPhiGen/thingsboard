@@ -65,8 +65,9 @@ def format_alarm_message(alarm_data: dict, action: str) -> str:
     status = alarm_data.get("status", "UNKNOWN")
     
     device_name = alarm_data.get("originatorName") or alarm_data.get("name") or alarm_data.get("deviceName") or "Unknown Device"
-    if isinstance(alarm_data.get("originator"), dict):
-        device_name = alarm_data.get("originator", {}).get("name") or device_name
+    orig = alarm_data.get("originator")
+    if isinstance(orig, dict):
+        device_name = orig.get("name") or device_name
 
     details = alarm_data.get("details")
     
@@ -128,8 +129,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
             
             alarm_type = alarm_data.get("type", "Unknown")
             device_name = alarm_data.get("originatorName") or alarm_data.get("name") or "Unknown Device"
-            if isinstance(alarm_data.get("originator"), dict):
-                device_name = alarm_data.get("originator", {}).get("name") or device_name
+            orig = alarm_data.get("originator")
+            if isinstance(orig, dict):
+                device_name = orig.get("name") or device_name
 
             # Check Deduplication Cache
             cache_key = (device_name, alarm_type)
