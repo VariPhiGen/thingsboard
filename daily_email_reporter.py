@@ -54,6 +54,7 @@ def fetch_master_devices_summary():
     
     summary = []
     now_ts = int(time.time() * 1000)
+    start_24h_ts = now_ts - (24 * 3600 * 1000)
 
     for dev in devices:
         dev_id = dev['id']['id']
@@ -74,6 +75,8 @@ def fetch_master_devices_summary():
         keys = keys_res.json() if keys_res.ok else []
         
         tel_data = {}
+        agg_24h = {}
+
         if keys:
             k_str = ",".join(keys)
             vals_res = requests.get(f"{BASE_URL}/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries?keys={k_str}", headers=headers)
@@ -82,6 +85,24 @@ def fetch_master_devices_summary():
                 for k, v in raw_vals.items():
                     if v:
                         tel_data[k] = v[0]['value']
+
+            # 24-Hour Aggregations (AVG, MAX, MIN)
+            try:
+                avg_res = requests.get(f"{BASE_URL}/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries?keys={k_str}&startTs={start_24h_ts}&endTs={now_ts}&interval=86400000&agg=AVG", headers=headers)
+                if avg_res.ok:
+                    for k, v in avg_res.json().items():
+                        if v and v[0].get('value') is not None:
+                            try: agg_24h[f"{k}_24h_avg"] = round(float(v[0]['value']), 1)
+                            except: pass
+
+                max_res = requests.get(f"{BASE_URL}/api/plugins/telemetry/DEVICE/{dev_id}/values/timeseries?keys={k_str}&startTs={start_24h_ts}&endTs={now_ts}&interval=86400000&agg=MAX", headers=headers)
+                if max_res.ok:
+                    for k, v in max_res.json().items():
+                        if v and v[0].get('value') is not None:
+                            try: agg_24h[f"{k}_24h_max"] = round(float(v[0]['value']), 1)
+                            except: pass
+            except Exception as e:
+                print(f"Aggregation error for {name}: {e}")
 
         # Alarms
         alarms_res = requests.get(f"{BASE_URL}/api/alarm/DEVICE/{dev_id}?pageSize=50&page=0&status=ACTIVE_UNACK,ACTIVE_ACK", headers=headers)
@@ -94,6 +115,7 @@ def fetch_master_devices_summary():
             "is_active": is_active,
             "last_activity": last_act_str,
             "telemetry": tel_data,
+            "agg_24h": agg_24h,
             "alarms_count": len(active_alarms),
             "active_alarms": [a.get('type') for a in active_alarms]
         })
@@ -114,16 +136,49 @@ def generate_html_report(devices_summary):
         status_badge = f'<span style="background-color:#4caf50;color:#fff;padding:4px 8px;border-radius:12px;font-size:12px;font-weight:bold;">ACTIVE</span>' if d['is_active'] else f'<span style="background-color:#f44336;color:#fff;padding:4px 8px;border-radius:12px;font-size:12px;font-weight:bold;">INACTIVE</span>'
         
         tel = d['telemetry']
-        key_metrics = []
-        if 'power_kw' in tel: key_metrics.append(f"<b>Power:</b> {tel['power_kw']} kW")
-        if 'voltage' in tel: key_metrics.append(f"<b>Voltage:</b> {tel['voltage']} V")
-        if 'fuel_level' in tel: key_metrics.append(f"<b>Fuel:</b> {tel['fuel_level']}%")
-        if 'tds' in tel: key_metrics.append(f"<b>TDS:</b> {tel['tds']} ppm")
-        if 'water_flow' in tel: key_metrics.append(f"<b>Flow:</b> {tel['water_flow']} L/min")
-        if 'pressure' in tel: key_metrics.append(f"<b>Pressure:</b> {tel['pressure']} psi")
-        if 'status' in tel: key_metrics.append(f"<b>Status:</b> {tel['status']}")
+        agg = d['agg_24h']
+        
+        kpi_list = []
+        
+        # 1. DG Sets KPIs
+        if 'power_kw' in tel or 'power_kw_24h_avg' in agg:
+            pwr_curr = f"{tel.get('power_kw', 'N/A')} kW"
+            pwr_avg = f"{agg.get('power_kw_24h_avg', 'N/A')} kW"
+            pwr_max = f"{agg.get('power_kw_24h_max', 'N/A')} kW"
+            kpi_list.append(f"⚡ <b>Power:</b> {pwr_curr} (24h Avg: {pwr_avg}, Max: {pwr_max})")
 
-        metrics_str = ", ".join(key_metrics) if key_metrics else "No telemetry data recorded"
+        if 'energy_kwh' in tel:
+            kpi_list.append(f"🔋 <b>Total Energy:</b> {tel['energy_kwh']} kWh")
+
+        if 'run_hours' in tel:
+            kpi_list.append(f"⏱️ <b>Run Hours:</b> {tel['run_hours']} h")
+
+        if 'fuel_level' in tel or 'fuel_level_24h_avg' in agg:
+            fuel_curr = f"{tel.get('fuel_level', 'N/A')}%"
+            fuel_avg = f"{agg.get('fuel_level_24h_avg', 'N/A')}%"
+            kpi_list.append(f"⛽ <b>Fuel Level:</b> {fuel_curr} (24h Avg: {fuel_avg})")
+
+        # 2. RO Plant System KPIs
+        if 'tds' in tel or 'tds_24h_avg' in agg:
+            tds_curr = f"{tel.get('tds', 'N/A')} ppm"
+            tds_avg = f"{agg.get('tds_24h_avg', 'N/A')} ppm"
+            tds_max = f"{agg.get('tds_24h_max', 'N/A')} ppm"
+            kpi_list.append(f"💧 <b>TDS Level:</b> {tds_curr} (24h Avg: {tds_avg}, Max: {tds_max})")
+
+        if 'water_flow' in tel or 'water_flow_24h_avg' in agg:
+            flow_curr = f"{tel.get('water_flow', 'N/A')} L/min"
+            flow_avg = f"{agg.get('water_flow_24h_avg', 'N/A')} L/min"
+            kpi_list.append(f"🌊 <b>Permeate Flow:</b> {flow_curr} (24h Avg: {flow_avg})")
+
+        if 'pressure' in tel or 'pressure_24h_avg' in agg:
+            press_curr = f"{tel.get('pressure', 'N/A')} psi"
+            press_avg = f"{agg.get('pressure_24h_avg', 'N/A')} psi"
+            kpi_list.append(f"⚙️ <b>RO Pressure:</b> {press_curr} (24h Avg: {press_avg})")
+
+        if 'status' in tel:
+            kpi_list.append(f"📊 <b>Status:</b> {tel['status']}")
+
+        metrics_str = "<br/>".join(kpi_list) if kpi_list else "<i style='color:#888;'>No 24h telemetry recorded</i>"
         alarms_str = f'<b style="color:#f44336;">{d["alarms_count"]} Active Alerts</b>' if d['alarms_count'] > 0 else '<span style="color:#4caf50;">Normal</span>'
 
         rows_html += f"""
@@ -131,7 +186,7 @@ def generate_html_report(devices_summary):
             <td style="padding:12px;font-weight:bold;color:#1a237e;">{d['name']}</td>
             <td style="padding:12px;">{d['type']}</td>
             <td style="padding:12px;text-align:center;">{status_badge}</td>
-            <td style="padding:12px;">{metrics_str}</td>
+            <td style="padding:12px;line-height:1.5;">{metrics_str}</td>
             <td style="padding:12px;text-align:center;">{alarms_str}</td>
             <td style="padding:12px;color:#757575;font-size:12px;">{d['last_activity']}</td>
         </tr>
