@@ -8,6 +8,18 @@ from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+def load_env_file():
+    env_path = os.path.join(os.path.dirname(__file__), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ[k.strip()] = v.strip()
+
+load_env_file()
+
 BASE_URL = os.getenv("TB_BASE_URL", "http://localhost:9091")
 SYSADMIN_USER = os.getenv("TB_USER", "sysadmin@thingsboard.org")
 SYSADMIN_PASS = os.getenv("TB_PASS", "sysadmin")
@@ -17,7 +29,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-REPORT_RECIPIENTS = os.getenv("REPORT_RECIPIENTS", "")
+REPORT_RECIPIENTS = os.getenv("REPORT_RECIPIENTS", "shivamskr151@gmail.com")
 
 def login(username, password):
     url = f"{BASE_URL}/api/auth/login"
