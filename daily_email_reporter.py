@@ -25,10 +25,11 @@ SYSADMIN_USER = os.getenv("TB_USER", "sysadmin@thingsboard.org")
 SYSADMIN_PASS = os.getenv("TB_PASS", "sysadmin")
 
 # Email SMTP Settings
-SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_SERVER = os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER", "smtpout.secureserver.net")
+SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
+SMTP_USER = os.getenv("SMTP_USER", "information@variphi.com")
+SMTP_PASSWORD = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER
 REPORT_RECIPIENTS = os.getenv("REPORT_RECIPIENTS", "shivamskr151@gmail.com")
 
 def login(username, password):
@@ -217,20 +218,25 @@ def send_email_report(html_content, recipients_override=None):
         print("⚠️ SMTP credentials missing! Set SMTP_USER and SMTP_PASSWORD in .env file.")
         return False
 
+    sender_from = SMTP_FROM or SMTP_USER
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"📊 Daily Infrastructure Report — {datetime.now().strftime('%d %b %Y')}"
-    msg["From"] = f"ThingsBoard IoT Monitor <{SMTP_USER}>"
+    msg["From"] = f"ThingsBoard IoT Monitor <{sender_from}>"
     msg["To"] = ", ".join(recipients)
 
     msg.attach(MIMEText(html_content, "html"))
 
     try:
         print(f"Connecting to SMTP server {SMTP_SERVER}:{SMTP_PORT}...")
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15)
-        server.ehlo()
-        server.starttls()
+        if SMTP_PORT == 465:
+            server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=20)
+        else:
+            server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=20)
+            server.ehlo()
+            server.starttls()
+            
         server.login(SMTP_USER, SMTP_PASSWORD)
-        server.sendmail(SMTP_USER, recipients, msg.as_string())
+        server.sendmail(sender_from, recipients, msg.as_string())
         server.quit()
         print(f"✅ Daily Email Report successfully sent to {len(recipients)} recipient(s): {', '.join(recipients)}")
         return True
