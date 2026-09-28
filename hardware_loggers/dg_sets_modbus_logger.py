@@ -44,9 +44,9 @@ def read_dg_controller_modbus(client, slave_id):
 
     try:
         # Standard Woodward / DeepSea Modbus holding registers starting at 0
-        rr = client.read_holding_registers(0, 10, slave=slave_id)
+        rr = client.read_holding_registers(0, 11, slave=slave_id)
         if rr.isError():
-            rr = client.read_input_registers(0, 10, slave=slave_id)
+            rr = client.read_input_registers(0, 11, slave=slave_id)
 
         if not rr.isError() and len(rr.registers) >= 8:
             coolant_temp = round(rr.registers[0] / 10.0, 1)
