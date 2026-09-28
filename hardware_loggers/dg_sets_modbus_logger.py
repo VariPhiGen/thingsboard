@@ -58,7 +58,7 @@ def read_dg_controller_modbus(client, slave_id):
             current = round(rr.registers[6] / 10.0, 1)
             frequency = round(rr.registers[7] / 10.0, 1)
 
-            return {
+            payload = {
                 "coolant_temp": coolant_temp,
                 "oil_pressure": oil_pressure,
                 "engine_rpm": engine_rpm,
@@ -69,6 +69,13 @@ def read_dg_controller_modbus(client, slave_id):
                 "frequency": frequency,
                 "status": "RUNNING" if engine_rpm > 100 else "STOPPED"
             }
+
+            if len(rr.registers) >= 11:
+                payload["energy_kwh"] = round(float(rr.registers[8]), 1)
+                payload["run_hours"] = round(rr.registers[9] / 10.0, 2)
+                payload["engine_starts"] = int(rr.registers[10])
+
+            return payload
     except Exception as e:
         print(f"Modbus error for DG Controller Slave ID {slave_id}: {e}")
 
