@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import time
 import requests
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from dotenv import load_dotenv
@@ -10,10 +11,14 @@ load_dotenv()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-PORT = int(os.getenv("PORT", 5050))
+PORT = int(os.getenv("PORT", 5051))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - [Telegram] %(levelname)s - %(message)s')
+
+# Cache for deduplication: (device_name, alarm_type) -> (status, timestamp)
+LAST_SENT_CACHE = {}
+DEDUP_COOLDOWN_SECONDS = 600  # 10 minutes cooldown for active duplicate alarms
 
 def send_telegram_message(message: str) -> bool:
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
@@ -37,42 +42,34 @@ def send_telegram_message(message: str) -> bool:
             response.raise_for_status()
             logging.info(f"Alarm notification sent successfully to {chat_id}")
         except requests.exceptions.RequestException as e:
-            # Mask the token in error messages just in case
             safe_error = str(e).replace(TELEGRAM_BOT_TOKEN, "HIDDEN_TOKEN")
             logging.error(f"Failed to send notification to {chat_id}: {safe_error}")
             all_success = False
             
     return all_success
 
+def clean_sensor_value(val):
+    if val is None:
+        return "N/A"
+    try:
+        num = float(str(val).replace('°C', '').replace('RPM', '').replace('kPa', '').strip())
+        if num == 32767 or num >= 30000:
+            return "Sensor Fault / Disconnected (32767)"
+    except Exception:
+        pass
+    return str(val)
+
 def format_alarm_message(alarm_data: dict, action: str) -> str:
-    """
-    Format the alarm data into a readable Telegram message.
-    """
     alarm_type = alarm_data.get("type", "Unknown Alarm")
     severity = alarm_data.get("severity", "UNKNOWN")
     status = alarm_data.get("status", "UNKNOWN")
-    device_name = alarm_data.get("originatorName", "Unknown Device")
     
-    # Try to get device name from metadata if not in originatorName
-    if device_name == "Unknown Device" and "name" in alarm_data:
-        device_name = alarm_data.get("name")
-        
-    details = alarm_data.get("details", {})
+    device_name = alarm_data.get("originatorName") or alarm_data.get("name") or alarm_data.get("deviceName") or "Unknown Device"
+    if isinstance(alarm_data.get("originator"), dict):
+        device_name = alarm_data.get("originator", {}).get("name") or device_name
+
+    details = alarm_data.get("details")
     
-    # Extract telemetry like TDS if available
-    tds = details.get("tds", None)
-    if not tds and "tds" in alarm_data:
-        tds = alarm_data.get("tds")
-        
-    # Build the message
-    if action == "CLEARED":
-        msg = f"✅ <b>{alarm_type.upper()} CLEARED</b>\n\n"
-    else:
-        msg = f"🚨 <b>{alarm_type.upper()}</b>\n\n"
-        
-    msg += f"<b>Device:</b> {device_name}\n"
-    msg += f"<b>Alarm:</b> {alarm_type}\n"
-    # Map ThingsBoard internal status to user-friendly dashboard status
     status_mapping = {
         "ACTIVE_UNACK": "Active (Unacknowledged)",
         "ACTIVE_ACK": "Active (Acknowledged)",
@@ -81,20 +78,37 @@ def format_alarm_message(alarm_data: dict, action: str) -> str:
     }
     display_status = status_mapping.get(status, status)
     
+    # Header Emoji
+    if action == "CLEARED" or "CLEARED" in status:
+        msg = f"✅ <b>ALARM CLEARED: {alarm_type.upper()}</b>\n\n"
+    elif severity in ["CRITICAL", "HIGH"]:
+        msg = f"🚨 <b>CRITICAL ALARM: {alarm_type.upper()}</b>\n\n"
+    else:
+        msg = f"⚠️ <b>ALARM ALERT: {alarm_type.upper()}</b>\n\n"
+        
+    msg += f"<b>Device:</b> {device_name}\n"
+    msg += f"<b>Alarm Type:</b> {alarm_type}\n"
     msg += f"<b>Severity:</b> {severity}\n"
     msg += f"<b>Status:</b> {display_status}\n"
     
-    if tds is not None:
-        msg += f"<b>TDS:</b> {tds}\n"
-        
-    condition = details.get("data", None)
-    if condition:
-        msg += f"<b>Condition:</b> {condition}\n"
-        
-    # Append any specific message from details
-    if "message" in details:
-        msg += f"\n<i>{details['message']}</i>"
-        
+    # Render Details if present
+    if details:
+        if isinstance(details, dict):
+            detail_msg = details.get("message") or details.get("description") or details.get("summary")
+            if detail_msg:
+                # Sanitize 32767 in text
+                detail_msg = str(detail_msg).replace("32767", "Sensor Fault (32767)")
+                msg += f"<b>Details:</b> {detail_msg}\n"
+            if "recommendation" in details:
+                msg += f"<b>Action:</b> {details['recommendation']}\n"
+            # Render key values if present
+            for k, v in details.items():
+                if k not in ["message", "description", "summary", "recommendation", "ai_mode"]:
+                    msg += f"<b>{k.replace('_', ' ').title()}:</b> {clean_sensor_value(v)}\n"
+        elif isinstance(details, str) and details.strip():
+            clean_dt = details.replace("32767", "Sensor Fault (32767)").strip()
+            msg += f"<b>Details:</b> {clean_dt}\n"
+            
     return msg
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -104,24 +118,36 @@ class WebhookHandler(BaseHTTPRequestHandler):
         
         try:
             payload = json.loads(post_data.decode('utf-8'))
-            logging.info(f"Received payload")
-            
-            # ThingsBoard rule chain REST API node sends the message as JSON.
-            # In TB, the 'msg' is usually the payload itself.
             alarm_data = payload
             
-            # Determine action (CREATED, UPDATED, CLEARED). 
-            # This can be passed in metadata or inferred from status
             status = alarm_data.get("status", "")
             if status in ["CLEARED_UNACK", "CLEARED_ACK"]:
                 action = "CLEARED"
-            elif status in ["ACTIVE_UNACK", "ACTIVE_ACK"]:
-                action = "CREATED"
             else:
                 action = "CREATED"
             
+            alarm_type = alarm_data.get("type", "Unknown")
+            device_name = alarm_data.get("originatorName") or alarm_data.get("name") or "Unknown Device"
+            if isinstance(alarm_data.get("originator"), dict):
+                device_name = alarm_data.get("originator", {}).get("name") or device_name
+
+            # Check Deduplication Cache
+            cache_key = (device_name, alarm_type)
+            now = time.time()
+            if cache_key in LAST_SENT_CACHE:
+                last_status, last_time = LAST_SENT_CACHE[cache_key]
+                # If same status and within cooldown window, suppress duplicate spam
+                if last_status == action and (now - last_time) < DEDUP_COOLDOWN_SECONDS:
+                    logging.info(f"Skipping duplicate alarm notification for '{device_name}' - '{alarm_type}' ({action})")
+                    self.send_response(200)
+                    self.end_headers()
+                    self.wfile.write(b"DEDUPLICATED")
+                    return
+
             message = format_alarm_message(alarm_data, action)
-            send_telegram_message(message)
+            sent = send_telegram_message(message)
+            if sent:
+                LAST_SENT_CACHE[cache_key] = (action, now)
             
             self.send_response(200)
             self.end_headers()
@@ -135,7 +161,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.end_headers()
 
-def run_server(port=5050):
+def run_server(port=5051):
     server_address = ('', port)
     httpd = HTTPServer(server_address, WebhookHandler)
     logging.info(f"Starting Telegram notification service on port {port}...")
