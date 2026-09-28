@@ -26,7 +26,7 @@ def trigger_alarms():
     tenant_token = res.json()['token']
     tenant_headers = {"X-Authorization": f"Bearer {tenant_token}", "Content-Type": "application/json", "Accept": "application/json"}
 
-    devices_to_alert = ["DG SET 1", "DG SET 2", "DG SET 3", "DG SET1", "DG SET2", "DG SET3", "DG Set 2", "DG Set 3"]
+    devices_to_alert = ["DG SET1", "DG SET2", "DG SET3"]
     
     for device_name in devices_to_alert:
         res = requests.get(f"{BASE_URL}/api/tenant/devices?deviceName={device_name}", headers=tenant_headers)

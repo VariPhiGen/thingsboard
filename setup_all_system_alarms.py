@@ -194,13 +194,9 @@ def setup_all():
     device_assignments = {
         "LT Panel Fire": "LT Panel Fire Profile",
         "LT Panels Gateway": "LT Panels Profile",
-        "Raspberry Pi LT Panels": "LT Panels Profile",
         "DG SET1": "woodward_kg1500",
-        "DG Set 1": "woodward_kg1500",
         "DG SET2": "woodward_kg1500",
-        "DG Set 2": "woodward_kg1500",
-        "DG SET3": "woodward_kg150",
-        "DG Set 3": "woodward_kg150"
+        "DG SET3": "woodward_kg150"
     }
 
     all_profiles = requests.get(f"{BASE_URL}/api/deviceProfiles?pageSize=100&page=0", headers=tenant_headers).json()['data']
