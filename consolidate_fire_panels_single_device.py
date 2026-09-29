@@ -63,9 +63,9 @@ def create_simple_alarm_rule(alarm_id, alarm_type, key, operation, clear_operati
         "propagateToTenant": True
     }
 
-def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, alias_id, unit="psi"):
+def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, alias_id, unit="", typeFullFqn="system.cards.value_card"):
     return {
-      "typeFullFqn": "system.cards.value_card",
+      "typeFullFqn": typeFullFqn,
       "type": "latest",
       "sizeX": size_x,
       "sizeY": size_y,
@@ -88,7 +88,7 @@ def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, ali
                 "label": label,
                 "color": color,
                 "units": unit,
-                "decimals": 2,
+                "decimals": 0,
                 "settings": {}
               }
             ]
@@ -101,7 +101,16 @@ def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, ali
             "timewindowMs": 60000
           }
         },
-        "settings": {}
+        "settings": {
+            "minValue": 0,
+            "maxValue": 1,
+            "majorTicksCount": 1,
+            "minorTicks": 0,
+            "highlights": [
+                {"from": 0, "to": 0.5, "color": "rgba(0, 255, 0, .3)"},
+                {"from": 0.5, "to": 1, "color": "rgba(255, 0, 0, .3)"}
+            ]
+        }
       }
     }
 
@@ -115,22 +124,10 @@ def consolidate():
     tenant_token = requests.get(f"{BASE_URL}/api/user/{admin_user_id}/token", headers=sys_headers).json()['token']
     tenant_headers = {"X-Authorization": f"Bearer {tenant_token}", "Content-Type": "application/json"}
 
-    # 1. Delete individual devices (LT Panel Fire 01 .. 10)
-    print("Cleaning up individual devices from Devices list...")
-    devices = requests.get(f"{BASE_URL}/api/tenant/devices?pageSize=100&page=0", headers=tenant_headers).json()['data']
-    for d in devices:
-        name = d['name']
-        if name.startswith("LT Panel Fire ") and name != "LT Panel Fire":
-            d_id = d['id']['id']
-            res_del = requests.delete(f"{BASE_URL}/api/device/{d_id}", headers=tenant_headers)
-            print(f"Deleted individual device '{name}': {res_del.status_code}")
-
-    # 2. Get/Create Single Master Device: "LT Panel Fire"
     res_single = requests.get(f"{BASE_URL}/api/tenant/devices?deviceName=LT Panel Fire", headers=tenant_headers)
     if res_single.ok and res_single.json():
         single_device = res_single.json()
     else:
-        # Create single master device
         dev_payload = {"name": "LT Panel Fire", "type": "LT Panel Fire Profile"}
         single_device = requests.post(f"{BASE_URL}/api/device", json=dev_payload, headers=tenant_headers).json()
 
@@ -138,31 +135,19 @@ def consolidate():
     creds = requests.get(f"{BASE_URL}/api/device/{single_device_id}/credentials", headers=tenant_headers).json()
     master_token = creds['credentialsId']
 
-    print(f"\nMaster Device 'LT Panel Fire' ID: {single_device_id}")
-    print(f"Master Device Access Token: {master_token}\n")
-
-    # Save token to file
     with open('/home/ubuntu/lt_panel_data_logger/fire_panel_token.txt', 'w') as f:
         f.write(master_token)
 
-    # 3. Create/Update Profile with 10 Panel Alarm Rules
-    print("Updating LT Panel Fire Profile with 10 Panel Alarm Rules...")
+    print("Updating LT Panel Fire Profile with 9 Panel Alarm Rules...")
     profiles = requests.get(f"{BASE_URL}/api/deviceProfiles?pageSize=100&page=0", headers=tenant_headers).json()['data']
     fire_profile = next((p for p in profiles if p['name'] == 'LT Panel Fire Profile'), None)
 
     fire_alarms = []
-    for i in range(1, 11):
-        # High Pressure > 100 bar
+    for i in range(1, 10):
         fire_alarms.append(create_simple_alarm_rule(
-            f"fire_panel_{i}_high_pressure_alarm", f"Fire Panel {i:02d} High Pressure",
-            f"fire_panel_{i}_pressure_high", "GREATER", "LESS_OR_EQUAL", 100.0, "CRITICAL",
-            f"High Pressure detected on Fire Panel {i:02d}: ${{ fire_panel_{i}_pressure_high }} psi (Threshold > 100 psi)"
-        ))
-        # Low Pressure < 7 bar
-        fire_alarms.append(create_simple_alarm_rule(
-            f"fire_panel_{i}_low_pressure_alarm", f"Fire Panel {i:02d} Low Pressure",
-            f"fire_panel_{i}_pressure_low", "LESS", "GREATER_OR_EQUAL", 7.0, "WARNING",
-            f"Low Pressure warning detected on Fire Panel {i:02d}: ${{ fire_panel_{i}_pressure_low }} psi (Threshold < 7 psi)"
+            f"fire_panel_{i}_pressure_alarm", f"Fire Separation {i} High Pressure",
+            f"fire_panel_{i}_pressure", "EQUAL", "NOT_EQUAL", 1.0, "CRITICAL",
+            f"High Pressure detected on Fire Separation {i}!"
         ))
 
     if not fire_profile:
@@ -182,8 +167,7 @@ def consolidate():
     single_device['deviceProfileId'] = {"id": p_id, "entityType": "DEVICE_PROFILE"}
     requests.post(f"{BASE_URL}/api/device", json=single_device, headers=tenant_headers)
 
-    # 4. Update LT Panel Fire Dashboard to display 10 Panels mapped to the Single Device
-    print("Building Single Device 10-Panel Dashboard...")
+    print("Building Single Device 9-Panel Dashboard...")
     alias_id = "single-fire-device-alias"
     entity_aliases = {
         alias_id: {
@@ -203,32 +187,24 @@ def consolidate():
     widgets = {}
     main_widgets_layout = {}
 
-    for i in range(1, 11):
+    for i in range(1, 10):
         idx = i - 1
-        row_num = (idx // 2) * 4
-        col_offset = (idx % 2) * 12
+        row_num = (idx // 3) * 6
+        col_offset = (idx % 3) * 8
 
-        w_low_id = f"w_low_{i}"
-        w_high_id = f"w_high_{i}"
+        w_id = f"w_gauge_{i}"
 
-        # Low pressure widget
-        widgets[w_low_id] = create_widget(
-            w_low_id, row_num, col_offset, 6, 4,
-            f"fire_panel_{i}_pressure_low", "Low Pressure", "#03a9f4",
-            f"LT Panel Fire {i:02d} - Low Pressure", alias_id, "psi"
+        # Single pressure gauge
+        widgets[w_id] = create_widget(
+            w_id, row_num, col_offset, 8, 6,
+            f"fire_panel_{i}_pressure", "0=Low, 1=High", "#03a9f4",
+            f"Fire Separation {i}", alias_id, "",
+            "system.analogue_gauges.radial_gauge_canvas_gauges"
         )
-        main_widgets_layout[w_low_id] = {"sizeX": 6, "sizeY": 4, "row": row_num, "col": col_offset}
-
-        # High pressure widget
-        widgets[w_high_id] = create_widget(
-            w_high_id, row_num, col_offset + 6, 6, 4,
-            f"fire_panel_{i}_pressure_high", "High Pressure", "#f44336",
-            f"LT Panel Fire {i:02d} - High Pressure", alias_id, "psi"
-        )
-        main_widgets_layout[w_high_id] = {"sizeX": 6, "sizeY": 4, "row": row_num, "col": col_offset + 6}
+        main_widgets_layout[w_id] = {"sizeX": 8, "sizeY": 6, "row": row_num, "col": col_offset}
 
     dashboard_config = {
-        "description": "Unified Single-Device 10-Panel LT Panel Fire Dashboard",
+        "description": "Unified Single-Device 9-Panel Fire Separation Dashboard",
         "widgets": widgets,
         "states": {
             "default": {

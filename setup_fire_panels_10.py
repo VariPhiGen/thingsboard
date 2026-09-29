@@ -6,7 +6,7 @@ BASE_URL = 'http://localhost:9091'
 SYSADMIN_USER = 'sysadmin@thingsboard.org'
 SYSADMIN_PASS = 'sysadmin'
 
-PANEL_NAMES = [f"LT Panel Fire {i:02d}" for i in range(1, 11)]
+PANEL_NAMES = [f"Fire Separation {i}" for i in range(1, 10)]
 
 def login(username, password):
     url = f"{BASE_URL}/api/auth/login"
@@ -76,7 +76,7 @@ def setup_fire_panels_and_dashboard():
     device_map = {}
     tokens = {}
 
-    print("Provisioning 10 LT Panel Fire Devices...")
+    print("Provisioning 9 Fire Separation Devices...")
     for dev_name in PANEL_NAMES:
         device_payload = {
             "name": dev_name,
@@ -109,8 +109,8 @@ def setup_fire_panels_and_dashboard():
         json.dump(tokens, f, indent=2)
     print(f"Saved device tokens to {token_file}")
 
-    # Build Dashboard for all 10 Fire Panels
-    print("Building 10-Panel LT Panel Fire Dashboard...")
+    # Build Dashboard for all 9 Fire Panels
+    print("Building 9-Panel Fire Separation Dashboard...")
     widgets = {}
     main_widgets_layout = {}
     entity_aliases = {}
@@ -214,7 +214,7 @@ def setup_fire_panels_and_dashboard():
 
     res = requests.post(f"{BASE_URL}/api/dashboard", json=dashboard_payload, headers=tenant_headers)
     if res.ok:
-        print("LT Panel Fire Dashboard updated successfully with 10 panels!")
+        print("LT Panel Fire Dashboard updated successfully with 9 panels!")
     else:
         print(f"Failed to update dashboard: {res.text}")
 
