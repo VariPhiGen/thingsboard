@@ -65,7 +65,7 @@ def main():
         return
 
     print("==========================================================")
-    print("  SINGLE-DEVICE 10-PANEL REAL MODBUS HARDWARE COLLECTOR  ")
+    print("  SINGLE-DEVICE 3-PANEL REAL MODBUS HARDWARE COLLECTOR  ")
     print("==========================================================")
 
     client = get_modbus_client()
@@ -79,13 +79,13 @@ def main():
             telemetry = {}
             live_panels_count = 0
 
-            for i in range(1, 11):
+            for i in range(1, 4):
                 slave_id = i
                 reading = read_panel_modbus_sensor(client, slave_id)
                 if reading:
                     p_low, p_high = reading
-                    telemetry[f"fire_panel_{i}_pressure_low"] = p_low
-                    telemetry[f"fire_panel_{i}_pressure_high"] = p_high
+                    telemetry[f"fire_panel_{i}_low_pressure"] = p_low
+                    telemetry[f"fire_panel_{i}_high_pressure"] = p_high
                     live_panels_count += 1
 
             if live_panels_count > 0:

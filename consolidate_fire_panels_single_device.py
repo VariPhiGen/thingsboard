@@ -63,9 +63,9 @@ def create_simple_alarm_rule(alarm_id, alarm_type, key, operation, clear_operati
         "propagateToTenant": True
     }
 
-def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, alias_id, unit="", typeFullFqn="system.cards.value_card"):
+def create_card_widget(w_id, row, col, size_x, size_y, name, label, color, title, alias_id, unit=""):
     return {
-      "typeFullFqn": typeFullFqn,
+      "typeFullFqn": "system.cards.value_card",
       "type": "latest",
       "sizeX": size_x,
       "sizeY": size_y,
@@ -74,7 +74,7 @@ def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, ali
       "id": w_id,
       "config": {
         "title": title,
-        "showTitle": True,
+        "showTitle": False,
         "showTitleIcon": False,
         "datasources": [
           {
@@ -88,7 +88,9 @@ def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, ali
                 "label": label,
                 "color": color,
                 "units": unit,
-                "decimals": 0,
+                "decimals": 1,
+                "usePostProcessing": True,
+                "postFuncBody": "return (value === true || value === 'true') ? 'High Pressure' : 'Low Pressure';",
                 "settings": {}
               }
             ]
@@ -102,14 +104,14 @@ def create_widget(w_id, row, col, size_x, size_y, name, label, color, title, ali
           }
         },
         "settings": {
-            "minValue": 0,
-            "maxValue": 1,
-            "majorTicksCount": 1,
-            "minorTicks": 0,
-            "highlights": [
-                {"from": 0, "to": 0.5, "color": "rgba(0, 255, 0, .3)"},
-                {"from": 0.5, "to": 1, "color": "rgba(255, 0, 0, .3)"}
-            ]
+            "autoScale": False,
+            "valueFont": {
+                "size": 36,
+                "sizeUnit": "px",
+                "family": "Roboto",
+                "weight": "500",
+                "style": "normal"
+            }
         }
       }
     }
@@ -127,9 +129,15 @@ def consolidate():
     res_single = requests.get(f"{BASE_URL}/api/tenant/devices?deviceName=LT Panel Fire", headers=tenant_headers)
     if res_single.ok and res_single.json():
         single_device = res_single.json()
+        single_device['name'] = "Fire Suppression"
+        single_device = requests.post(f"{BASE_URL}/api/device", json=single_device, headers=tenant_headers).json()
     else:
-        dev_payload = {"name": "LT Panel Fire", "type": "LT Panel Fire Profile"}
-        single_device = requests.post(f"{BASE_URL}/api/device", json=dev_payload, headers=tenant_headers).json()
+        res_single = requests.get(f"{BASE_URL}/api/tenant/devices?deviceName=Fire Suppression", headers=tenant_headers)
+        if res_single.ok and res_single.json():
+            single_device = res_single.json()
+        else:
+            dev_payload = {"name": "Fire Suppression", "type": "LT Panel Fire Profile"}
+            single_device = requests.post(f"{BASE_URL}/api/device", json=dev_payload, headers=tenant_headers).json()
 
     single_device_id = single_device['id']['id']
     creds = requests.get(f"{BASE_URL}/api/device/{single_device_id}/credentials", headers=tenant_headers).json()
@@ -138,16 +146,22 @@ def consolidate():
     with open('/home/ubuntu/lt_panel_data_logger/fire_panel_token.txt', 'w') as f:
         f.write(master_token)
 
-    print("Updating LT Panel Fire Profile with 9 Panel Alarm Rules...")
+    print("Updating LT Panel Fire Profile with 3 Panel Alarm Rules...")
     profiles = requests.get(f"{BASE_URL}/api/deviceProfiles?pageSize=100&page=0", headers=tenant_headers).json()['data']
     fire_profile = next((p for p in profiles if p['name'] == 'LT Panel Fire Profile'), None)
 
     fire_alarms = []
-    for i in range(1, 10):
+    for i in range(1, 4):
+        # We can add alarms for low and high if we want. For simplicity, just high pressure alarm.
         fire_alarms.append(create_simple_alarm_rule(
-            f"fire_panel_{i}_pressure_alarm", f"Fire Separation {i} High Pressure",
-            f"fire_panel_{i}_pressure", "EQUAL", "NOT_EQUAL", 1.0, "CRITICAL",
-            f"High Pressure detected on Fire Separation {i}!"
+            f"fire_panel_{i}_high_pressure_alarm", f"Fire Suppression {i} High Pressure",
+            f"fire_panel_{i}_high_pressure", "GREATER_OR_EQUAL", "LESS", 100.0, "CRITICAL",
+            f"High Pressure detected on Fire Suppression {i}!"
+        ))
+        fire_alarms.append(create_simple_alarm_rule(
+            f"fire_panel_{i}_low_pressure_alarm", f"Fire Suppression {i} Low Pressure",
+            f"fire_panel_{i}_low_pressure", "LESS", "GREATER_OR_EQUAL", 7.0, "WARNING",
+            f"Low Pressure detected on Fire Suppression {i}!"
         ))
 
     if not fire_profile:
@@ -167,7 +181,7 @@ def consolidate():
     single_device['deviceProfileId'] = {"id": p_id, "entityType": "DEVICE_PROFILE"}
     requests.post(f"{BASE_URL}/api/device", json=single_device, headers=tenant_headers)
 
-    print("Building Single Device 9-Panel Dashboard...")
+    print("Building Single Device 3-Panel Dashboard...")
     alias_id = "single-fire-device-alias"
     entity_aliases = {
         alias_id: {
@@ -187,28 +201,26 @@ def consolidate():
     widgets = {}
     main_widgets_layout = {}
 
-    for i in range(1, 10):
-        idx = i - 1
-        row_num = (idx // 3) * 6
-        col_offset = (idx % 3) * 8
-
-        w_id = f"w_gauge_{i}"
-
-        # Single pressure gauge
-        widgets[w_id] = create_widget(
-            w_id, row_num, col_offset, 8, 6,
-            f"fire_panel_{i}_pressure", "0=Low, 1=High", "#03a9f4",
-            f"Fire Separation {i}", alias_id, "",
-            "system.analogue_gauges.radial_gauge_canvas_gauges"
+    current_row = 0
+    # Create 3 sets of cards
+    for i in range(1, 4):
+        # Fire Suppression i
+        w_id = f"w_pressure_{i}"
+        widgets[w_id] = create_card_widget(
+            w_id, current_row, 0, 24, 4,
+            f"cylinder_pressure_{i}", f"Fire Suppression {i}", "#03a9f4",
+            "", alias_id, ""
         )
-        main_widgets_layout[w_id] = {"sizeX": 8, "sizeY": 6, "row": row_num, "col": col_offset}
+        main_widgets_layout[w_id] = {"sizeX": 24, "sizeY": 4, "row": current_row, "col": 0}
+        
+        current_row += 4
 
     dashboard_config = {
-        "description": "Unified Single-Device 9-Panel Fire Separation Dashboard",
+        "description": "Unified Single-Device 3-Panel Fire Suppression Dashboard",
         "widgets": widgets,
         "states": {
             "default": {
-                "name": "Live Fire Panel Overview",
+                "name": "Live Fire Suppression Overview",
                 "root": True,
                 "layouts": {
                     "main": {
@@ -247,10 +259,10 @@ def consolidate():
     }
 
     dashboards = requests.get(f"{BASE_URL}/api/tenant/dashboards?pageSize=100&page=0", headers=tenant_headers).json()['data']
-    target_dashboard = next((d for d in dashboards if d['name'] == 'LT Panel Fire Dashboard'), None)
+    target_dashboard = next((d for d in dashboards if d['title'] == 'Fire Suppression'), None)
 
     dashboard_payload = {
-        "title": "LT Panel Fire Dashboard",
+        "title": "Fire Suppression",
         "configuration": dashboard_config
     }
 
@@ -260,7 +272,7 @@ def consolidate():
 
     res = requests.post(f"{BASE_URL}/api/dashboard", json=dashboard_payload, headers=tenant_headers)
     if res.ok:
-        print("LT Panel Fire Dashboard successfully consolidated into 1 Master Device!")
+        print("LT Panel Fire Dashboard successfully updated to 3 Fire Suppressions with value cards!")
     else:
         print(f"Failed to update dashboard: {res.text}")
 

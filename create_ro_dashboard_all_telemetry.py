@@ -154,7 +154,6 @@ def main():
     numeric_keys = [
         {"key": "pressure", "label": "Pressure", "unit": "psi"},
         {"key": "salinity_ppm", "label": "Salinity", "unit": "ppm"},
-        {"key": "tds", "label": "TDS", "unit": ""},
         {"key": "tds_ppm", "label": "TDS", "unit": "ppm"},
         {"key": "temperature_c", "label": "Temperature", "unit": "°C"},
         {"key": "water_flow", "label": "Water Flow", "unit": "L/min"},
