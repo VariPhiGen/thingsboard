@@ -11,7 +11,6 @@ PANELS = [
     "UPS Room 1",
     "Transformer 1",
     "Transformer 2",
-    "UPS Panel 2",
     "Transformer 3",
     "Fire fighting wall"
 ]

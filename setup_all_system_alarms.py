@@ -125,7 +125,6 @@ def setup_all():
         ("UPS Room 1", "UPS_Room_1"),
         ("Transformer 1", "Transformer_1"),
         ("Transformer 2", "Transformer_2"),
-        ("UPS Panel 2", "UPS_Panel_2"),
         ("Transformer 3", "Transformer_3"),
         ("Fire Fighting Wall", "Fire_fighting_wall")
     ]

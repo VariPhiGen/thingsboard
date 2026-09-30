@@ -25,7 +25,6 @@ PANELS = [
     ("UPS Room 1", "UPS_Room_1", 3),
     ("Transformer 1", "Transformer_1", 4),
     ("Transformer 2", "Transformer_2", 5),
-    ("UPS Panel 2", "UPS_Panel_2", 6),
     ("Transformer 3", "Transformer_3", 7),
     ("Fire fighting wall", "Fire_fighting_wall", 8)
 ]
