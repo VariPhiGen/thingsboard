@@ -292,12 +292,12 @@ def generate_combined_24h_report(devices_summary):
     relay_online = str(fire_tel.get('relay_online', 'true')).lower() == 'true'
     low_press_ok = str(fire_tel.get('low_pressure', 'true')).lower() == 'true'
     high_press_ok = str(fire_tel.get('high_pressure', 'true')).lower() == 'true'
-    cyl1_ok = str(fire_tel.get('cylinder_pressure_1', 'true')).lower() == 'true'
-    cyl2_ok = str(fire_tel.get('cylinder_pressure_2', 'true')).lower() == 'true'
-    cyl3_ok = str(fire_tel.get('cylinder_pressure_3', 'true')).lower() == 'true'
+    cyl_statuses = [str(fire_tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true' for i in range(1, 10)]
+    cyl_all_ok = all(cyl_statuses)
+    cyl_ok_count = sum(1 for s in cyl_statuses if s)
 
     fire_rows = ""
-    for i in range(1, 4):
+    for i in range(1, 10):
         cyl_val = str(fire_tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true'
         cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE NORMAL</span>' if cyl_val else '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE LOW</span>'
 
@@ -306,7 +306,7 @@ def generate_combined_24h_report(devices_summary):
 
         fire_rows += f"""
         <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding:10px;font-weight:bold;color:#c62828;">Fire Separation Zone {i}</td>
+            <td style="padding:10px;font-weight:bold;color:#c62828;">Fire Suppression {i}</td>
             <td style="padding:10px;text-align:center;">{cyl_badge}</td>
             <td style="padding:10px;text-align:center;">{di_badge}</td>
             <td style="padding:10px;">Gas Pressure Sensor & Alarm Loop</td>
@@ -430,7 +430,7 @@ def generate_combined_24h_report(devices_summary):
             <div style="padding: 24px; border-bottom: 2px solid #e2e8f0;">
                 <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #dc2626; padding-bottom: 8px; margin-bottom: 16px;">
                     <h2 style="margin: 0; color: #7f1d1d; font-size: 18px;">🧯 3. Fire Suppression System & 24h Safety Status</h2>
-                    <span style="font-size: 12px; color: #64748b; font-weight: bold;">Relay: {'ONLINE' if relay_online else 'OFFLINE'} | Cylinders: {'3/3 OK' if (cyl1_ok and cyl2_ok and cyl3_ok) else 'CHECK'}</span>
+                    <span style="font-size: 12px; color: #64748b; font-weight: bold;">Relay: {'ONLINE' if relay_online else 'OFFLINE'} | Cylinders: {f'{cyl_ok_count}/9 OK' if cyl_all_ok else f'{cyl_ok_count}/9 CHECK'}</span>
                 </div>
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                     <thead>

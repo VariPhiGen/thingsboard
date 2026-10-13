@@ -451,14 +451,14 @@ def generate_fire_suppression_html(devices_summary):
     relay_online = str(tel.get('relay_online', 'true')).lower() == 'true'
     low_press_ok = str(tel.get('low_pressure', 'true')).lower() == 'true'
     high_press_ok = str(tel.get('high_pressure', 'true')).lower() == 'true'
-    cyl1_ok = str(tel.get('cylinder_pressure_1', 'true')).lower() == 'true'
-    cyl2_ok = str(tel.get('cylinder_pressure_2', 'true')).lower() == 'true'
-    cyl3_ok = str(tel.get('cylinder_pressure_3', 'true')).lower() == 'true'
+    cyl_statuses = [str(tel.get(f'cylinder_pressure_{i}', 'true')).lower() == 'true' for i in range(1, 10)]
+    cyl_all_ok = all(cyl_statuses)
+    cyl_ok_count = sum(1 for s in cyl_statuses if s)
 
     sys_status_badge = '<span style="background-color:#4caf50;color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;">SYSTEM NORMAL</span>' if not (alarms_count > 0) else '<span style="background-color:#f44336;color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;">ALARM TRIGGERED</span>'
 
     panels_rows = ""
-    for i in range(1, 4):
+    for i in range(1, 10):
         cyl_val = str(tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true'
         cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">PRESSURE OK</span>' if cyl_val else '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">PRESSURE LOW</span>'
 
@@ -467,7 +467,7 @@ def generate_fire_suppression_html(devices_summary):
 
         panels_rows += f"""
         <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding:12px;font-weight:bold;color:#c62828;">Fire Separation Panel {i}</td>
+            <td style="padding:12px;font-weight:bold;color:#c62828;">Fire Suppression {i}</td>
             <td style="padding:12px;text-align:center;">{cyl_badge}</td>
             <td style="padding:12px;text-align:center;">{di_badge}</td>
             <td style="padding:12px;">Cylinder {i} Gas Pressure Sensor</td>
@@ -502,7 +502,7 @@ def generate_fire_suppression_html(devices_summary):
                     <div style="font-size: 11px; color: #666; text-transform: uppercase;">High Pressure Line</div>
                 </div>
                 <div style="flex: 1; text-align: center; padding: 12px; background: #ffffff; margin: 4px; border-radius: 6px; border: 1px solid #e0e0e0;">
-                    <div style="font-size: 24px; font-weight: bold; color: {'#4caf50' if (cyl1_ok and cyl2_ok and cyl3_ok) else '#f44336'};">{'3 / 3 OK' if (cyl1_ok and cyl2_ok and cyl3_ok) else 'FAULT'}</div>
+                    <div style="font-size: 24px; font-weight: bold; color: {'#4caf50' if cyl_all_ok else '#f44336'};">{f'{cyl_ok_count} / 9 OK' if cyl_all_ok else f'{cyl_ok_count} / 9 FAULT'}</div>
                     <div style="font-size: 11px; color: #666; text-transform: uppercase;">Cylinders Pressure</div>
                 </div>
             </div>

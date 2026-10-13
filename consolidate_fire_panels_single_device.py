@@ -104,6 +104,7 @@ def create_card_widget(w_id, row, col, size_x, size_y, name, label, color, title
           }
         },
         "settings": {
+            "showIcon": False,
             "autoScale": False,
             "valueFont": {
                 "size": 36,
@@ -146,12 +147,12 @@ def consolidate():
     with open('/home/ubuntu/lt_panel_data_logger/fire_panel_token.txt', 'w') as f:
         f.write(master_token)
 
-    print("Updating LT Panel Fire Profile with 3 Panel Alarm Rules...")
+    print("Updating LT Panel Fire Profile with 9 Panel Alarm Rules...")
     profiles = requests.get(f"{BASE_URL}/api/deviceProfiles?pageSize=100&page=0", headers=tenant_headers).json()['data']
     fire_profile = next((p for p in profiles if p['name'] == 'LT Panel Fire Profile'), None)
 
     fire_alarms = []
-    for i in range(1, 4):
+    for i in range(1, 10):
         # We can add alarms for low and high if we want. For simplicity, just high pressure alarm.
         fire_alarms.append(create_simple_alarm_rule(
             f"fire_panel_{i}_high_pressure_alarm", f"Fire Suppression {i} High Pressure",
@@ -181,7 +182,7 @@ def consolidate():
     single_device['deviceProfileId'] = {"id": p_id, "entityType": "DEVICE_PROFILE"}
     requests.post(f"{BASE_URL}/api/device", json=single_device, headers=tenant_headers)
 
-    print("Building Single Device 3-Panel Dashboard...")
+    print("Building Single Device 9-Panel Dashboard...")
     alias_id = "single-fire-device-alias"
     entity_aliases = {
         alias_id: {
@@ -202,8 +203,8 @@ def consolidate():
     main_widgets_layout = {}
 
     current_row = 0
-    # Create 3 sets of cards
-    for i in range(1, 4):
+    # Create 9 sets of cards
+    for i in range(1, 10):
         # Fire Suppression i
         w_id = f"w_pressure_{i}"
         widgets[w_id] = create_card_widget(
@@ -216,7 +217,7 @@ def consolidate():
         current_row += 4
 
     dashboard_config = {
-        "description": "Unified Single-Device 3-Panel Fire Suppression Dashboard",
+        "description": "Unified Single-Device 9-Panel Fire Suppression Dashboard",
         "widgets": widgets,
         "states": {
             "default": {
@@ -272,9 +273,18 @@ def consolidate():
 
     res = requests.post(f"{BASE_URL}/api/dashboard", json=dashboard_payload, headers=tenant_headers)
     if res.ok:
-        print("LT Panel Fire Dashboard successfully updated to 3 Fire Suppressions with value cards!")
+        print("LT Panel Fire Dashboard successfully updated to 9 Fire Suppressions with value cards!")
     else:
         print(f"Failed to update dashboard: {res.text}")
 
+    # Send initial telemetry for all 9 Fire Suppressions so that all 9 cards show High Pressure immediately
+    initial_tel = {f"cylinder_pressure_{i}": True for i in range(1, 10)}
+    tel_res = requests.post(f"{BASE_URL}/api/v1/{master_token}/telemetry", json=initial_tel)
+    if tel_res.ok:
+        print("Initial telemetry for Fire Suppression 1-9 successfully posted!")
+    else:
+        print(f"Failed to post initial telemetry: {tel_res.text}")
+
 if __name__ == "__main__":
     consolidate()
+

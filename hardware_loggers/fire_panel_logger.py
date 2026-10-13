@@ -65,7 +65,7 @@ def main():
         return
 
     print("==========================================================")
-    print("  SINGLE-DEVICE 3-PANEL REAL MODBUS HARDWARE COLLECTOR  ")
+    print("  SINGLE-DEVICE 9-PANEL REAL MODBUS HARDWARE COLLECTOR  ")
     print("==========================================================")
 
     client = get_modbus_client()
@@ -79,7 +79,7 @@ def main():
             telemetry = {}
             live_panels_count = 0
 
-            for i in range(1, 4):
+            for i in range(1, 10):
                 slave_id = i
                 reading = read_panel_modbus_sensor(client, slave_id)
                 if reading:
