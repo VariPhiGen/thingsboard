@@ -35,7 +35,8 @@ The process environment is never modified (the package runs inside the shared n8
 - Devices are selected by **device profile**, not by name (`config.DEFAULT_PROFILES`).
 - Raw telemetry for the window is fetched once per device; sensor-offline codes (32767/65535), `error` and
   text values are dropped; booleans become 1/0.
-- Graphs: 30-minute bucket averages (gaps stay gaps). Fire signals: share of OK samples per bucket.
+- Graphs (DG, LT, RO): 30-minute bucket averages; gaps stay gaps. The Fire report has no graph; its
+  24h Pressure Health column is the share of OK cylinder-pressure samples.
 - 24h avg/min/max are computed from the raw samples, not ThingsBoard's server-side aggregates
   (those include the 32767 codes).
 - **DG 24h Energy** integrates `power_kw` over time (trapezoidal; gaps > 5 min are not counted). The

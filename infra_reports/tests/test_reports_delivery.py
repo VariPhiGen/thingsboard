@@ -3,7 +3,7 @@ import unittest
 from unittest import mock
 
 from infra_reports import delivery, pipeline
-from infra_reports.charts import nice_ticks, status_of, svg_line_chart
+from infra_reports.charts import nice_ticks, svg_line_chart
 from infra_reports.collect import DeviceSummary, classify
 from infra_reports.config import DEFAULT_PROFILES, ConfigError, Settings
 from infra_reports.delivery import ReportError, render_pdf, send_email
@@ -69,8 +69,7 @@ class ChartsTest(unittest.TestCase):
         self.assertGreaterEqual(ticks[-1], 100.0)
         self.assertEqual(nice_ticks(0, 0)[0] < 0 < nice_ticks(0, 0)[-1], True)
 
-    def test_status_and_empty_chart(self):
-        self.assertEqual([status_of(v) for v in (None, 1.0, 0.0, 0.5)], ["none", "good", "critical", "serious"])
+    def test_empty_chart(self):
         self.assertIn("No valid readings", svg_line_chart([("a", "#000", [None, None])], START))
         self.assertIn("<path", svg_line_chart([("a", "#000", [1.0, 2.0, None, 3.0])], START))
 
@@ -92,6 +91,11 @@ class ReportsTest(unittest.TestCase):
                 html = render(summary)
                 self.assertIn("</html>", html)
                 self.assertNotIn("📊", html)
+
+    def test_fire_report_has_no_trend_graph(self):
+        html = REPORTS[2][3](self.summary([device("Fire", "fire", {"cylinder_pressure_1": "true"})]))
+        self.assertNotIn("Time Series Trends", html)
+        self.assertNotIn("<svg", html)
 
     def test_dg_energy_and_meter_mismatch(self):
         html = generate_dg_set_html(self.summary([

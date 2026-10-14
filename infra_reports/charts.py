@@ -8,7 +8,6 @@ from .metrics import BUCKET_MS
 
 # Categorical order validated for colour-vision deficiency; colour follows the device, never its rank
 SERIES_COLORS = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
-STATUS_COLORS = {"good": "#0ca30c", "serious": "#ec835a", "critical": "#d03b3b", "none": "#e1e0d9"}
 INK, INK_2, INK_MUTED, GRID, AXIS = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 
 NO_DATA_TEXT = "No valid readings in the report period"
@@ -122,45 +121,3 @@ def chart_card(title, unit, series, start_ts, width=900, height=210):
         {svg_line_chart(series, start_ts, width, height)}
     </div>
     """
-
-
-def status_of(share):
-    """Share of OK samples in a bucket -> status key."""
-    if share is None:
-        return "none"
-    if share >= 0.999:
-        return "good"
-    if share <= 0.001:
-        return "critical"
-    return "serious"
-
-
-def svg_status_strip(rows, start_ts, width=900):
-    """rows: list of (label, values) where a value is the share of OK samples in the bucket (0..1) or None."""
-    n = max((len(vals) for _, vals in rows), default=0)
-    if not n or all(v is None for _, vals in rows for v in vals):
-        return no_data()
-    ml, mr, row_h, gap, mb = 170, 14, 20, 2, 28
-    pw = width - ml - mr
-    cw = pw / n
-    height = len(rows) * (row_h + gap) + mb
-    parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" xmlns="http://www.w3.org/2000/svg" '
-             f'style="display:block;font-family:Arial,sans-serif;">']
-    for r, (label, vals) in enumerate(rows):
-        y = r * (row_h + gap)
-        parts.append(f'<text x="{ml - 8}" y="{y + row_h - 5}" text-anchor="end" font-size="13" fill="{INK_2}">{escape(label)}</text>')
-        for i in range(n):
-            state = status_of(vals[i] if i < len(vals) else None)
-            parts.append(f'<rect x="{ml + i * cw:.1f}" y="{y}" width="{max(cw - gap, 1):.1f}" height="{row_h}" rx="2" fill="{STATUS_COLORS[state]}"/>')
-    base_y = len(rows) * (row_h + gap)
-    for ts, label in x_ticks(start_ts, n):
-        x = ml + (ts - start_ts) / (n * BUCKET_MS) * pw
-        parts.append(f'<text x="{x:.1f}" y="{base_y + 18}" text-anchor="middle" font-size="13" fill="{INK_MUTED}">{label}</text>')
-    parts.append("</svg>")
-    legend = "".join(
-        f'<span style="margin-right:16px;white-space:nowrap;"><span style="display:inline-block;width:10px;height:10px;'
-        f'border-radius:2px;background:{STATUS_COLORS[k]};margin-right:5px;vertical-align:-1px;"></span>{icon} {text}</span>'
-        for k, icon, text in [("good", "✔", "OK for full 30 min"), ("serious", "⚠", "Intermittent fault"),
-                              ("critical", "✖", "Fault for full 30 min"), ("none", "–", "No data")]
-    )
-    return f'<div style="font-size:11px;color:{INK_2};margin:6px 0 10px;">{legend}</div>' + "".join(parts)

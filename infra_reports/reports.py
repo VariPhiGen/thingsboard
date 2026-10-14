@@ -1,7 +1,7 @@
 """HTML for the four infrastructure PDF reports."""
 from html import escape
 
-from .charts import INK, INK_MUTED, SERIES_COLORS, chart_card, no_data, svg_status_strip
+from .charts import SERIES_COLORS, chart_card, no_data
 from .collect import LT_PANELS, period_of
 from .layout import (
     BADGE_COLORS, alarm_section, badge, fmt_latest, fmt_sync, fmt_val, is_fresh, is_historical, kpi, kv,
@@ -326,17 +326,6 @@ def generate_fire_suppression_html(devices_summary):
         </tr>
         """
 
-    fire_series = fire_dev["series_24h"] if fire_dev else {}
-    fire_rows = [("Relay Gateway Online", fire_series.get("relay_online", []))] + [
-        (f"Cylinder {i} Pressure", fire_series.get(f"cylinder_pressure_{i}", [])) for i in range(1, 10)
-    ]
-    fire_charts = f"""
-    <div style="page-break-inside:avoid;break-inside:avoid;border:1px solid #e0e0e0;border-radius:6px;padding:12px 14px;background:#fcfcfb;">
-        <div style="font-size:13px;font-weight:bold;color:{INK};">Safety Signal Status Timeline <span style="font-weight:normal;color:{INK_MUTED};">(30-min buckets)</span></div>
-        {svg_status_strip(fire_rows, _period_start(devices_summary))}
-    </div>
-    """
-
     body_html = f"""
     <div class="section">
         <h3>Fire Panels &amp; Cylinder Safety Status</h3>
@@ -354,7 +343,6 @@ def generate_fire_suppression_html(devices_summary):
         </table>
     </div>
     {alarm_section([fire_dev], historical) if fire_dev else ""}
-    {trends_section(fire_charts)}
     """
 
     return report_page(
