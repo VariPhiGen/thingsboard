@@ -1,11 +1,14 @@
 import smtplib
+import tempfile
 import unittest
+from datetime import datetime
+from pathlib import Path
 from unittest import mock
 
-from infra_reports import delivery, pipeline
+from infra_reports import delivery, healthcheck, pipeline, state
 from infra_reports.charts import nice_ticks, svg_line_chart
 from infra_reports.collect import DeviceSummary, classify
-from infra_reports.config import DEFAULT_PROFILES, ConfigError, Settings
+from infra_reports.config import DEFAULT_PROFILES, REPORT_TZ, ConfigError, Settings
 from infra_reports.delivery import ReportError, render_pdf, send_email
 from infra_reports.layout import fmt_latest, fmt_val, is_fresh
 from infra_reports.metrics import BUCKET_MS
@@ -130,13 +133,22 @@ class DeliveryTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             send_email(settings(), self.reports, [])
 
+    def setUp(self):
+        patcher = mock.patch.object(delivery, "record_success")
+        self.record_success = patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_sends_once_with_all_attachments(self):
+        day = datetime(2026, 10, 12, tzinfo=REPORT_TZ)
+        reports = [dict(self.reports[0], report_day=day)]
         with mock.patch.object(smtplib, "SMTP_SSL") as smtp:
             server = smtp.return_value.__enter__.return_value = smtp.return_value
-            server.send_message.return_value = {}
-            self.assertTrue(send_email(settings(), self.reports, ["a@x.com"]))
+            server.send_message.return_value = {"b@x.com": (550, b"no")}
+            self.assertTrue(send_email(settings(), reports, ["a@x.com", "b@x.com"]))
             msg = server.send_message.call_args.args[0]
             self.assertEqual([p.get_filename() for p in msg.iter_attachments()], ["r.pdf"])
+            self.assertIn("12 Oct 2026", msg["Subject"])  # subject carries the report day, not today
+        self.record_success.assert_called_once_with(day, ["a@x.com"], ["r.pdf"])
 
     def test_auth_failure_is_not_retried(self):
         with mock.patch.object(smtplib, "SMTP_SSL") as smtp, mock.patch.object(delivery.time, "sleep"):
@@ -162,6 +174,22 @@ class DeliveryTest(unittest.TestCase):
     def test_alert_without_telegram_config_does_not_raise(self):
         delivery.send_failure_alert(settings(), "stage", RuntimeError("x"))
         delivery.send_failure_alert(None, "stage", RuntimeError("x"))
+
+
+class HealthCheckTest(unittest.TestCase):
+    def setUp(self):
+        self.path = Path(tempfile.mkdtemp()) / "last_success.json"
+        self.now = datetime(2026, 10, 15, 9, 0, tzinfo=REPORT_TZ)
+
+    def test_record_roundtrip_and_check(self):
+        cfg = settings(recipients=["a@x.com", "b@x.com"])
+        self.assertIn("no successful", healthcheck.check(cfg, self.now, self.path))
+        state.record_success(datetime(2026, 10, 13, tzinfo=REPORT_TZ), ["a@x.com", "b@x.com"], ["r.pdf"], self.path)
+        self.assertIn("2026-10-14 was not emailed", healthcheck.check(cfg, self.now, self.path))
+        state.record_success(datetime(2026, 10, 14, tzinfo=REPORT_TZ), ["a@x.com"], ["r.pdf"], self.path)
+        self.assertIn("not to: b@x.com", healthcheck.check(cfg, self.now, self.path))
+        state.record_success(datetime(2026, 10, 14, tzinfo=REPORT_TZ), ["b@x.com", "a@x.com"], ["r.pdf"], self.path)
+        self.assertIsNone(healthcheck.check(cfg, self.now, self.path))
 
 
 class CliTest(unittest.TestCase):

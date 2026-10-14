@@ -4,7 +4,7 @@ from collections import Counter
 from datetime import datetime
 
 from .config import REPORT_TZ
-from .metrics import bucket_series, integrate_energy_kwh, report_window, sample_stats, valid_samples
+from .metrics import bucket_series, integrate_energy_kwh, report_window, resolve_report_date, sample_stats, valid_samples
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +111,7 @@ def period_of(summary):
 
 def collect_summary(client, profiles, report_date=None):
     """Summary dicts for every device that belongs to one of the reports."""
+    report_date = resolve_report_date(report_date)
     start_ts, end_ts = report_window(report_date)
     historical = bool(report_date)
     summary = DeviceSummary(start_ts=start_ts, end_ts=end_ts, historical=historical)

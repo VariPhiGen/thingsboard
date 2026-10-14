@@ -12,6 +12,7 @@ from pathlib import Path
 
 from infra_reports.config import ConfigError, load_settings, parse_recipients
 from infra_reports.delivery import send_email, send_failure_alert
+from infra_reports.metrics import resolve_report_date
 from infra_reports.pipeline import build_reports, fetch_summary, report_day
 
 log = logging.getLogger("infra_reports")
@@ -33,7 +34,10 @@ def _alerting(stage, func, *args, **kwargs):
 
 
 def fetch_master_devices_summary(report_date=None):
-    """Per-device telemetry, 24h statistics, graph series and alarms. report_date: 'YYYY-MM-DD' (IST) or None."""
+    """Per-device telemetry, 24h statistics, graph series and alarms.
+    report_date: 'yesterday', 'YYYY-MM-DD' (IST day) or None (last 24 hours)."""
+    # A malformed date is a caller error (ValueError), not an operational failure: no alert
+    report_date = resolve_report_date(report_date)
     return _alerting("fetch ThingsBoard data", fetch_summary, report_date)
 
 
@@ -67,7 +71,7 @@ def parse_args(argv):
     parser.add_argument("--preview", action="store_true", help="write HTML + PDF previews to --out-dir")
     parser.add_argument("--send", "--send-now", dest="send", action="store_true", help="email the PDFs")
     parser.add_argument("--to", help="comma-separated recipients (default: REPORT_RECIPIENTS)")
-    parser.add_argument("--date", help="report on one past IST day, YYYY-MM-DD (default: last 24 hours)")
+    parser.add_argument("--date", help="report on one past IST day: YYYY-MM-DD or 'yesterday' (default: last 24 hours)")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_PREVIEW_DIR, help="preview directory")
     parser.add_argument("--alert", action="store_true", help="send a Telegram alert on failure (scheduled runs)")
     parser.add_argument("-v", "--verbose", action="store_true")

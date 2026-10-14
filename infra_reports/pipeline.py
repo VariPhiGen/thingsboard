@@ -29,7 +29,8 @@ def build_reports(summary, settings=None, session=None):
     """Render all four reports to PDF. Raises ReportError if any report fails."""
     settings = settings or load_settings()
     session = session or build_session(settings.http_retries)
-    date_fn = report_day(summary).strftime("%Y%m%d")
+    day = report_day(summary)
+    date_fn = day.strftime("%Y%m%d")
     service_url = resolve_pdf_service(settings.pdf_urls)
 
     reports = []
@@ -38,7 +39,7 @@ def build_reports(summary, settings=None, session=None):
         html = render_html(summary)
         log.info("Generating PDF %s", filename)
         reports.append({
-            "id": report_id, "name": name, "filename": filename, "html": html,
+            "id": report_id, "name": name, "filename": filename, "html": html, "report_day": day,
             "pdf_bytes": render_pdf(session, service_url, html, filename),
         })
     return reports

@@ -10,6 +10,7 @@ from email.utils import formataddr, make_msgid
 import requests
 
 from .config import REPORT_TZ, ConfigError
+from .state import record_success
 
 log = logging.getLogger(__name__)
 
@@ -96,7 +97,8 @@ def send_email(settings, reports, recipients, report_day=None):
     if missing:
         raise ReportError(f"Refusing to send: PDF missing for {', '.join(missing)}")
 
-    msg = build_message(settings, reports, recipients, report_day or datetime.now(REPORT_TZ))
+    report_day = report_day or reports[0].get("report_day") or datetime.now(REPORT_TZ)
+    msg = build_message(settings, reports, recipients, report_day)
     context = ssl.create_default_context()
     for attempt in range(1, SMTP_ATTEMPTS + 1):
         try:
@@ -110,7 +112,12 @@ def send_email(settings, reports, recipients, report_day=None):
                 refused = server.send_message(msg, from_addr=settings.smtp_from, to_addrs=recipients)
             if refused:
                 log.warning("SMTP refused some recipients: %s", ", ".join(refused))
-            log.info("Email with %d PDF(s) sent to %s", len(reports), ", ".join(r for r in recipients if r not in refused))
+            delivered = [r for r in recipients if r not in refused]
+            log.info("Email with %d PDF(s) sent to %s", len(reports), ", ".join(delivered))
+            try:
+                record_success(report_day, delivered, [r["filename"] for r in reports])
+            except OSError as exc:
+                log.warning("Could not record the successful send for the health check: %s", exc)
             return True
         except smtplib.SMTPException as exc:
             if not _transient(exc) or attempt == SMTP_ATTEMPTS:
@@ -124,17 +131,27 @@ def send_email(settings, reports, recipients, report_day=None):
 
 
 # ------------------------------------------------------------------ alerts
-def send_failure_alert(settings, stage, error):
-    """Best-effort Telegram alert when the scheduled report fails; never raises."""
+def send_telegram(settings, text):
+    """Best-effort Telegram message to every configured chat; True if all were accepted. Never raises."""
     if not (settings and settings.telegram_bot_token and settings.telegram_chat_ids):
-        log.error("Infra report failed at %s and no Telegram alert is configured: %s", stage, error)
-        return
-    text = (f"⚠️ Daily Infrastructure PDF Report FAILED\nStage: {stage}\n"
-            f"Time: {datetime.now(REPORT_TZ):%d %b %Y %H:%M IST}\nError: {str(error)[:500]}\n"
-            "No (partial) email was sent.")
+        log.error("No Telegram alert configured (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID); message: %s", text)
+        return False
+    ok = True
     for chat_id in settings.telegram_chat_ids:
         try:
-            requests.post(f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
-                          json={"chat_id": chat_id, "text": text}, timeout=10)
+            res = requests.post(f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage",
+                                json={"chat_id": chat_id, "text": text}, timeout=10)
+            if res.status_code != 200:
+                ok = False
+                log.error("Telegram alert to %s rejected: HTTP %s", chat_id, res.status_code)
         except requests.RequestException as exc:
+            ok = False
             log.error("Telegram alert to %s failed: %s", chat_id, exc.__class__.__name__)
+    return ok
+
+
+def send_failure_alert(settings, stage, error):
+    """Telegram alert when the scheduled report fails; never raises."""
+    send_telegram(settings, f"⚠️ Daily Infrastructure PDF Report FAILED\nStage: {stage}\n"
+                            f"Time: {datetime.now(REPORT_TZ):%d %b %Y %H:%M IST}\nError: {str(error)[:500]}\n"
+                            "No (partial) email was sent.")

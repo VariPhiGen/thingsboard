@@ -1,14 +1,22 @@
 # Daily infrastructure PDF reports
 
-Four PDFs (DG Sets, LT Panels, Fire Suppression, RO Plant) with 24-hour statistics and time series graphs,
-emailed daily at 08:00 IST by the n8n workflow *Infrastructure 4 Separate PDFs Daily Report*
-(→ `n8n-report-api` → `generate_separate_pdfs_report.py`).
+Four PDFs (DG Sets, LT Panels, Fire Suppression, RO Plant) with 24-hour statistics and time series graphs.
+
+**Schedule:** n8n workflow *Infrastructure 4 Separate PDFs Daily Report* (timezone Asia/Kolkata, cron
+`0 8 * * *`) calls `POST n8n-report-api:5055/v1/generate-infrastructure-separate-pdfs-report` with
+`{"send_email": true, "report_date": "yesterday"}` at **08:00 IST**, emailing the report for the previous
+IST calendar day (00:00-24:00). The HTTP node retries 3 times; the API never sends a partial email.
+
+**Health check:** host crontab runs `python3 -m infra_reports.healthcheck` at **09:00 IST** (03:30 UTC). It
+reads `.infra_report_state/last_success.json` (written after every successful send) and sends a Telegram
+alert unless yesterday's report reached every address in `REPORT_RECIPIENTS`.
+Log: `.infra_report_state/healthcheck.log`.
 
 ## Run
 
 ```bash
 python3 generate_separate_pdfs_report.py --preview                     # last 24 h → report_previews/
-python3 generate_separate_pdfs_report.py --preview --date=2026-10-12   # one past IST day
+python3 generate_separate_pdfs_report.py --preview --date=yesterday    # one IST day (or YYYY-MM-DD)
 python3 generate_separate_pdfs_report.py --send --to=a@x.com           # email (default: REPORT_RECIPIENTS)
 python3 -m unittest discover -s infra_reports/tests -t .               # tests
 ```

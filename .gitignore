@@ -43,3 +43,4 @@ __pycache__/
 
 # Daily infrastructure PDF report previews (generated)
 report_previews/
+.infra_report_state/

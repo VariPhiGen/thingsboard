@@ -11,8 +11,20 @@ SENSOR_OFFLINE_VALUES = {32767.0, 65535.0}
 MAX_POWER_GAP_MS = 5 * 60 * 1000
 
 
+def resolve_report_date(report_date, now=None):
+    """'yesterday' -> the previous IST date as 'YYYY-MM-DD'; other values are validated and returned."""
+    if not report_date:
+        return None
+    if report_date.strip().lower() == "yesterday":
+        now = now or datetime.now(REPORT_TZ)
+        return (now.astimezone(REPORT_TZ).date() - timedelta(days=1)).isoformat()
+    datetime.strptime(report_date, "%Y-%m-%d")  # raises ValueError on a bad date
+    return report_date
+
+
 def report_window(report_date=None, now_ms=None):
-    """(start_ms, end_ms): the last 24 hours, or the IST calendar day 'YYYY-MM-DD'."""
+    """(start_ms, end_ms): the last 24 hours, or the IST calendar day 'YYYY-MM-DD' / 'yesterday'."""
+    report_date = resolve_report_date(report_date)
     if not report_date:
         end_ts = now_ms if now_ms is not None else int(time.time() * 1000)
         return end_ts - 24 * 3600 * 1000, end_ts

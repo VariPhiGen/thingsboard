@@ -1,8 +1,11 @@
 import unittest
 from datetime import datetime, timezone
 
+from infra_reports.config import REPORT_TZ
+
 from infra_reports.metrics import (
-    BUCKET_MS, bucket_series, integrate_energy_kwh, parse_value, report_window, sample_stats, valid_samples,
+    BUCKET_MS, bucket_series, integrate_energy_kwh, parse_value, report_window, resolve_report_date, sample_stats,
+    valid_samples,
 )
 
 HOUR = 3_600_000
@@ -64,6 +67,13 @@ class ReportWindowTest(unittest.TestCase):
 
     def test_rolling_window(self):
         self.assertEqual(report_window(None, now_ms=100 * HOUR), (76 * HOUR, 100 * HOUR))
+
+    def test_yesterday_is_resolved_in_ist(self):
+        # 15 Oct 01:00 IST is still 14 Oct in UTC; "yesterday" must be 14 Oct (IST), not 13 Oct
+        now = datetime(2026, 10, 15, 1, 0, tzinfo=REPORT_TZ)
+        self.assertEqual(resolve_report_date("yesterday", now), "2026-10-14")
+        self.assertEqual(resolve_report_date("2026-10-03"), "2026-10-03")
+        self.assertIsNone(resolve_report_date(None))
 
     def test_bad_date(self):
         with self.assertRaises(ValueError):
