@@ -1,0 +1,74 @@
+import unittest
+from datetime import datetime, timezone
+
+from infra_reports.metrics import (
+    BUCKET_MS, bucket_series, integrate_energy_kwh, parse_value, report_window, sample_stats, valid_samples,
+)
+
+HOUR = 3_600_000
+
+
+class ParseValueTest(unittest.TestCase):
+    def test_numbers_and_booleans(self):
+        self.assertEqual(parse_value("12.5"), 12.5)
+        self.assertEqual(parse_value(7), 7.0)
+        self.assertEqual(parse_value("true"), 1.0)
+        self.assertEqual(parse_value("FALSE"), 0.0)
+        self.assertEqual(parse_value(True), 1.0)
+
+    def test_invalid_values_are_dropped(self):
+        for value in ("error", "N/A", "", None, "--", "32767", 32767, "65535.0", "nan"):
+            self.assertIsNone(parse_value(value), value)
+
+
+class SamplesTest(unittest.TestCase):
+    def test_valid_samples_sorted_and_filtered(self):
+        points = [{"ts": 3, "value": "3"}, {"ts": 1, "value": "error"}, {"ts": 2, "value": "32767"}, {"ts": 0, "value": "1"}]
+        self.assertEqual(valid_samples(points), [(0, 1.0), (3, 3.0)])
+
+    def test_bucket_series_averages_and_gaps(self):
+        start = 0
+        samples = [(0, 10.0), (BUCKET_MS - 1, 20.0), (2 * BUCKET_MS, 5.0), (4 * BUCKET_MS, 99.0)]
+        series = bucket_series(samples, start, start + 4 * BUCKET_MS)
+        self.assertEqual(series, [15.0, None, 5.0, None])  # sample at the end boundary is outside the window
+
+    def test_sample_stats(self):
+        stats = sample_stats([(0, 5.0), (1, 1.0), (2, 9.0)])
+        self.assertEqual(stats, {"avg": 5.0, "min": 1.0, "max": 9.0, "delta": 4.0, "count": 3})
+        self.assertEqual(sample_stats([]), {})
+
+
+class EnergyTest(unittest.TestCase):
+    def test_constant_load_for_one_hour(self):
+        samples = [(t * 10_000, 100.0) for t in range(361)]  # 100 kW every 10 s for 1 h
+        energy, coverage = integrate_energy_kwh(samples, 0, HOUR + 1)  # window is [start, end)
+        self.assertAlmostEqual(energy, 100.0, places=6)
+        self.assertAlmostEqual(coverage, 1.0, places=3)
+
+    def test_gaps_are_not_integrated(self):
+        samples = [(0, 100.0), (60_000, 100.0), (60_000 + 30 * 60_000, 100.0)]  # 1 min, then a 30 min gap
+        energy, coverage = integrate_energy_kwh(samples, 0, HOUR)
+        self.assertAlmostEqual(energy, 100.0 / 60)
+        self.assertAlmostEqual(coverage, 1 / 60)
+
+    def test_trapezoid_and_negative_samples(self):
+        energy, _ = integrate_energy_kwh([(0, 0.0), (60_000, 60.0), (90_000, -5.0)], 0, HOUR)
+        self.assertAlmostEqual(energy, 0.5)  # (0+60)/2 kW for 1 min; negative sample ignored
+
+
+class ReportWindowTest(unittest.TestCase):
+    def test_past_day_is_the_ist_calendar_day(self):
+        start, end = report_window("2026-10-03")
+        self.assertEqual(datetime.fromtimestamp(start / 1000, timezone.utc).isoformat(), "2026-10-02T18:30:00+00:00")
+        self.assertEqual(end - start, 24 * HOUR)
+
+    def test_rolling_window(self):
+        self.assertEqual(report_window(None, now_ms=100 * HOUR), (76 * HOUR, 100 * HOUR))
+
+    def test_bad_date(self):
+        with self.assertRaises(ValueError):
+            report_window("03-10-2026")
+
+
+if __name__ == "__main__":
+    unittest.main()

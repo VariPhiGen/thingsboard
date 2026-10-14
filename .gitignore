@@ -40,3 +40,6 @@ rebuild-docker.sh
 .claude
 .planning
 __pycache__/
+
+# Daily infrastructure PDF report previews (generated)
+report_previews/
