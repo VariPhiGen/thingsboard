@@ -8,14 +8,14 @@
     "entityType": "TENANT",
     "id": "1d4b1fa0-6a70-11f1-87c3-df6f31aa9de9"
   },
-  "title": "Woodward KG1500 \u2014 Live",
-  "name": "Woodward KG1500 \u2014 Live",
+  "title": "Woodward KG1500 — Live",
+  "name": "Woodward KG1500 — Live",
   "image": null,
   "mobileHide": false,
   "mobileOrder": null,
   "assignedCustomers": null,
   "configuration": {
-    "description": "Real-time dashboard for woodward_kg1500_1 \u2014 live Modbus/telemetry only (no demo data)",
+    "description": "Real-time dashboard for woodward_kg1500_1 — live Modbus/telemetry only (no demo data)",
     "widgets": {
       "4c1439e8-55ec-48b8-a4aa-9e435a4fb096": {
         "type": "latest",
@@ -68,7 +68,7 @@
             "fontSize": "16px",
             "fontWeight": 400
           },
-          "units": "\u00b0C",
+          "units": "°C",
           "decimals": 0,
           "useDashboardTimewindow": true,
           "showLegend": false,
@@ -251,7 +251,7 @@
                   "label": "Generator Power",
                   "color": "#059669",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 0,
                   "units": "W",
@@ -559,7 +559,7 @@
                   "label": "Engine RPM",
                   "color": "#2563EB",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "RPM",
@@ -714,10 +714,10 @@
                   "label": "Coolant Temp",
                   "color": "#DC2626",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
-                  "units": "\u00b0C",
+                  "units": "°C",
                   "aggregationType": null
                 }
               ],
@@ -806,7 +806,7 @@
             "fontSize": "16px",
             "fontWeight": 400
           },
-          "units": "\u00b0C",
+          "units": "°C",
           "decimals": 1,
           "useDashboardTimewindow": true,
           "showLegend": false,
@@ -869,7 +869,7 @@
                   "label": "Oil Pressure",
                   "color": "#EA580C",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "kPa",
@@ -1024,7 +1024,7 @@
                   "label": "Run Hours",
                   "color": "#7C3AED",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "h",
@@ -1179,7 +1179,7 @@
                   "label": "Engine RPM",
                   "color": "#2563EB",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": null,
                   "units": "RPM",
@@ -1284,10 +1284,10 @@
                   "label": "Coolant",
                   "color": "#DC2626",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": null,
-                  "units": "\u00b0C",
+                  "units": "°C",
                   "aggregationType": null
                 }
               ],
@@ -1327,7 +1327,7 @@
             },
             "numbersColor": "#263238",
             "showUnitTitle": true,
-            "unitTitle": "\u00b0C",
+            "unitTitle": "°C",
             "titleFont": {
               "family": "Roboto",
               "size": 24,
@@ -1447,7 +1447,7 @@
           "decimals": 0,
           "noDataDisplayMessage": "",
           "configMode": "basic",
-          "units": "\u00b0C"
+          "units": "°C"
         },
         "id": "95f09eda-1140-4cd5-9cae-d58d3646208d",
         "typeFullFqn": "system.analogue_gauges.temperature_radial_gauge_canvas_gauges"
@@ -1470,7 +1470,7 @@
                   "label": "Oil Pressure",
                   "color": "#EA580C",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": null,
                   "units": "kPa",
@@ -1568,7 +1568,7 @@
                   "label": "Voltage Wye",
                   "color": "#334155",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "V",
@@ -1723,7 +1723,7 @@
                   "label": "Voltage Delta",
                   "color": "#334155",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "V",
@@ -1878,7 +1878,7 @@
                   "label": "Frequency",
                   "color": "#334155",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "Hz",
@@ -2188,7 +2188,7 @@
                   "label": "Battery",
                   "color": "#0284C7",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Industry-standard quality handling: a \"not available\" code is shown as a state, never as a number; a real 0 is a value.\nif (value === null || value === undefined || value === '') { return 'N/A'; }\nvar t = String(value).trim();\nif (t.toLowerCase() === 'error') { return 'Sensor Error'; }\nvar n = Number(t);\nif (!isFinite(n)) { return value; }\nif (n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return 'Sensor Offline'; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "V",
@@ -2615,7 +2615,7 @@
                   "label": "Power",
                   "color": "#059669",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 0,
                   "units": "W",
@@ -2909,7 +2909,7 @@
                   "label": "RPM",
                   "color": "#2563EB",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 0,
                   "units": "RPM",
@@ -2934,10 +2934,10 @@
                   "label": "Coolant",
                   "color": "#DC2626",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 1,
-                  "units": "\u00b0C",
+                  "units": "°C",
                   "aggregationType": null
                 }
               ],
@@ -2959,7 +2959,7 @@
                   "label": "Oil Pressure",
                   "color": "#EA580C",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "kPa",
@@ -3253,7 +3253,7 @@
                   "label": "Voltage Wye",
                   "color": "#2563EB",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 1,
                   "units": "V",
@@ -3278,7 +3278,7 @@
                   "label": "Frequency",
                   "color": "#D97706",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 2,
                   "units": "Hz",
@@ -3912,7 +3912,7 @@
                   "label": "Battery",
                   "color": "#0284C7",
                   "settings": {
-                    "postFuncBody": "if (value == null || value === 32767 || value >= 30000 || value === 0) { return 'N/A'; } return value;"
+                    "postFuncBody": "// Charts/gauges: no valid reading -> null (gap / empty needle); a real 0 stays 0.\nif (value === null || value === undefined || value === '') { return null; }\nvar n = Number(value);\nif (!isFinite(n) || n === 32767 || n === 65535 || n === 3276.7 || n === 6553.5 || Math.abs(n) >= 30000) { return null; }\nreturn n;"
                   },
                   "decimals": 2,
                   "units": "V",
@@ -4382,7 +4382,7 @@
       "showDashboardTimewindow": true,
       "showDashboardExport": true,
       "toolbarAlwaysOpen": true,
-      "dashboardTitle": "Woodward KG1500 \u2014 Live"
+      "dashboardTitle": "Woodward KG1500 — Live"
     }
   },
   "resources": null,

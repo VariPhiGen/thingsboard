@@ -3,7 +3,7 @@
     "entityType": "RULE_CHAIN",
     "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
   },
-  "version": 67,
+  "version": 73,
   "firstNodeIndex": 2,
   "nodes": [
     {
@@ -353,7 +353,7 @@
           "entityType": "AI_MODEL",
           "id": "d78b28f0-810f-11f1-a760-b3ba4cbe1b98"
         },
-        "systemPrompt": "You are a production diesel-generator (Woodward KG1500) monitoring assistant for industrial operators.\nUse ONLY the metrics provided. Never invent sensor values.\nRespond with one JSON object only (no markdown) with keys:\nanomaly (boolean),\nsummary (REQUIRED: 1-2 operator sentences. Include the most important live readings when present \u2014 e.g. RPM, coolant \u00b0C, oil pressure kPa, power kW, battery V. State whether running normal / idle / elevated risk and why. Do NOT only say 'all parameters normal' \u2014 always cite numbers.),\nseverity (OK|WARNING|CRITICAL),\nhealth_score (0-100),\nfailure_risk_pct (0-100),\nrul_hours (>=0),\npredicted_coolant_1h (number \u00b0C \u2014 REQUIRED whenever coolant_temp is present; else omit),\nmaintenance_recommendation (one short concrete action).\nNormal guides when present: RPM~1500, coolant<95C, oil_pressure>250 kPa, battery 24-28V, frequency~50Hz, PF>0.8.\nBe conservative: CRITICAL only for clear equipment risk from valid readings.\nKeep summary under 220 characters.",
+        "systemPrompt": "You are a production diesel-generator (Woodward KG1500) monitoring assistant for industrial operators.\nUse ONLY the metrics provided. Never invent sensor values.\nRespond with one JSON object only (no markdown) with keys:\nanomaly (boolean),\nsummary (REQUIRED: 1-2 operator sentences. Include the most important live readings when present — e.g. RPM, coolant °C, oil pressure kPa, power kW, battery V. State whether running normal / idle / elevated risk and why. Do NOT only say 'all parameters normal' — always cite numbers.),\nseverity (OK|WARNING|CRITICAL),\nhealth_score (0-100),\nfailure_risk_pct (0-100),\nrul_hours (>=0),\npredicted_coolant_1h (number °C — REQUIRED whenever coolant_temp is present; else omit),\nmaintenance_recommendation (one short concrete action).\nNormal guides when present: RPM~1500, coolant<95C, oil_pressure>250 kPa, battery 24-28V, frequency~50Hz, PF>0.8.\nBe conservative: CRITICAL only for clear equipment risk from valid readings.\nKeep summary under 220 characters.",
         "userPrompt": "DG SET1 cleaned telemetry JSON: $[*]. valid_metric_count=${valid_metric_count}. Produce predictive JSON now.",
         "responseFormat": {
           "type": "JSON"
@@ -560,7 +560,7 @@
       "configurationVersion": 0,
       "configuration": {
         "scriptLang": "JS",
-        "jsScript": "\nvar hasRpm = (typeof msg.engine_rpm !== 'undefined' && msg.engine_rpm !== null && msg.engine_rpm !== '');\nvar hasPwr = (typeof msg.power_kw !== 'undefined' && msg.power_kw !== null && msg.power_kw !== '');\nif (!hasRpm && !hasPwr) { return null; }\nvar rpm = Number(msg.engine_rpm);\nvar pwr = Number(msg.power_kw);\nvar running = (hasRpm && isFinite(rpm) && rpm > 100) || (hasPwr && isFinite(pwr) && pwr > 5);\nreturn {msg: {dg_status: running ? 'RUNNING' : 'OFF'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};\n",
+        "jsScript": "// Runs only after 'Has Valid DG Reading': RPM decides when valid, otherwise power.\nfunction valid(v, lo, hi) {\n  if (v === null || typeof v === 'undefined' || v === '') return null;\n  var n = Number(v);\n  if (!isFinite(n) || n === 32767 || n === 65535 || n < lo || n > hi) return null;\n  return n;\n}\n\nvar rpm = valid(msg.engine_rpm, 0, 3000);\nvar pwr = valid(msg.power_kw, 0, 5000);\nvar running = rpm !== null ? (rpm > 100 || (pwr !== null && pwr > 5)) : pwr > 5;\nreturn {msg: {dg_status: running ? 'RUNNING' : 'OFF'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};\n",
         "tbelScript": "return {msg: msg, metadata: metadata, msgType: msgType};"
       },
       "externalId": null,
@@ -658,7 +658,7 @@
       "configurationVersion": 0,
       "configuration": {
         "scriptLang": "JS",
-        "alarmDetailsBuildJs": "\nreturn {\n  description: 'DG SET1 is OFF. Genset RPM/power are below the running threshold (RPM \u2264 100 and power \u2264 5 kW).',\n  dg_status: msg.dg_status,\n  message: 'DG SET1 is OFF \u2014 not generating. Verify if shutdown was intentional; check start circuit if unexpected.',\n  recommended_action: 'Confirm intentional stop, or investigate start failure / fuel / breaker / emergency stop.'\n};\n",
+        "alarmDetailsBuildJs": "\nvar dg = metadata.deviceName || 'DG Set';\nreturn {\n  description: dg + ' is OFF. Valid readings show RPM <= 100 and power <= 5 kW.',\n  dg_status: msg.dg_status,\n  message: dg + ' is OFF (not generating). Verify if the shutdown was intentional; check the start circuit if unexpected.',\n  recommended_action: 'Confirm intentional stop, or investigate start failure / fuel / breaker / emergency stop.'\n};\n",
         "alarmDetailsBuildTbel": "return {};",
         "alarmType": "DG Offline",
         "severity": "MAJOR",
@@ -699,7 +699,7 @@
       "configurationVersion": 0,
       "configuration": {
         "scriptLang": "JS",
-        "alarmDetailsBuildJs": "\nreturn {\n  description: 'DG SET1 is RUNNING again. Offline alarm cleared.',\n  dg_status: msg.dg_status,\n  message: 'DG SET1 returned to RUNNING (RPM/power above threshold).'\n};\n",
+        "alarmDetailsBuildJs": "\nvar dg = metadata.deviceName || 'DG Set';\nreturn {\n  description: dg + ' is RUNNING again. DG OFF alarm cleared.',\n  dg_status: msg.dg_status,\n  message: dg + ' returned to RUNNING (valid RPM/power above threshold).'\n};\n",
         "alarmDetailsBuildTbel": "return {};",
         "alarmType": "DG Offline"
       },
@@ -708,6 +708,103 @@
         "description": "Clear DG Offline when RUNNING",
         "layoutX": 840,
         "layoutY": 640
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "db398110-b81c-11f1-ab9c-c1f9998e0221"
+      },
+      "createdTime": 1790256950176,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.rest.TbRestApiCallNode",
+      "name": "Telegram Webhook REST API",
+      "debugSettings": {
+        "failuresEnabled": true,
+        "allEnabled": false,
+        "allEnabledUntil": 1790257850138
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 4,
+      "configuration": {
+        "restEndpointUrlPattern": "http://172.24.0.1:5051",
+        "requestMethod": "POST",
+        "maxParallelRequestsCount": 0,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "readTimeoutMs": 0,
+        "maxInMemoryBufferSizeInKb": 256,
+        "requestBodyTemplate": null
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Send Alarm to Telegram",
+        "layoutX": 825,
+        "layoutY": 750
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "3c1736c0-b81e-11f1-ab9c-c1f9998e0221"
+      },
+      "createdTime": 1790257542188,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.profile.TbDeviceProfileNode",
+      "name": "Device Profile Node",
+      "debugSettings": {
+        "failuresEnabled": true,
+        "allEnabled": false,
+        "allEnabledUntil": 1790258442182
+      },
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 1,
+      "configuration": {
+        "persistAlarmRulesState": false,
+        "fetchAlarmRulesStateOnStart": false
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Process Device Profile Alarms",
+        "layoutX": 550,
+        "layoutY": 150
+      }
+    },
+    {
+      "id": {
+        "entityType": "RULE_NODE",
+        "id": "a303f470-c86a-11f1-92c4-c1f9998e0221"
+      },
+      "createdTime": 1792049575223,
+      "ruleChainId": {
+        "entityType": "RULE_CHAIN",
+        "id": "1d524b90-6a70-11f1-87c3-df6f31aa9de9"
+      },
+      "type": "org.thingsboard.rule.engine.filter.TbJsFilterNode",
+      "name": "Has Valid DG Reading",
+      "debugSettings": null,
+      "singletonMode": false,
+      "queueName": null,
+      "configurationVersion": 0,
+      "configuration": {
+        "scriptLang": "JS",
+        "jsScript": "// Pass only DG telemetry with a trustworthy RPM or power reading ('error', 32767/65535 and\n// out-of-range values are not readings). Other messages leave the DG status untouched.\nfunction valid(v, lo, hi) {\n  if (v === null || typeof v === 'undefined' || v === '') return null;\n  var n = Number(v);\n  if (!isFinite(n) || n === 32767 || n === 65535 || n < lo || n > hi) return null;\n  return n;\n}\nreturn valid(msg.engine_rpm, 0, 3000) !== null || valid(msg.power_kw, 0, 5000) !== null;\n",
+        "tbelScript": "return true;"
+      },
+      "externalId": null,
+      "additionalInfo": {
+        "description": "Drops DG messages without a valid RPM/power reading",
+        "layoutX": 200,
+        "layoutY": 460
       }
     }
   ],
@@ -719,13 +816,8 @@
     },
     {
       "fromIndex": 0,
-      "toIndex": 19,
+      "toIndex": 26,
       "type": "Success"
-    },
-    {
-      "fromIndex": 2,
-      "toIndex": 0,
-      "type": "Post telemetry"
     },
     {
       "fromIndex": 2,
@@ -751,6 +843,26 @@
       "fromIndex": 2,
       "toIndex": 6,
       "type": "Entity Created"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 24,
+      "type": "Alarm Cleared"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 24,
+      "type": "Alarm Created"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 25,
+      "type": "Post attributes"
+    },
+    {
+      "fromIndex": 2,
+      "toIndex": 25,
+      "type": "Post telemetry"
     },
     {
       "fromIndex": 6,
@@ -793,6 +905,11 @@
       "type": "True"
     },
     {
+      "fromIndex": 15,
+      "toIndex": 24,
+      "type": "Created"
+    },
+    {
       "fromIndex": 16,
       "toIndex": 12,
       "type": "Success"
@@ -831,6 +948,36 @@
       "fromIndex": 21,
       "toIndex": 23,
       "type": "False"
+    },
+    {
+      "fromIndex": 22,
+      "toIndex": 24,
+      "type": "Created"
+    },
+    {
+      "fromIndex": 23,
+      "toIndex": 24,
+      "type": "Cleared"
+    },
+    {
+      "fromIndex": 25,
+      "toIndex": 0,
+      "type": "Success"
+    },
+    {
+      "fromIndex": 25,
+      "toIndex": 24,
+      "type": "Alarm Cleared"
+    },
+    {
+      "fromIndex": 25,
+      "toIndex": 24,
+      "type": "Alarm Created"
+    },
+    {
+      "fromIndex": 26,
+      "toIndex": 19,
+      "type": "True"
     }
   ],
   "ruleChainConnections": null
