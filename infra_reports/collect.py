@@ -67,6 +67,9 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
         is_active = bool(attrs.get("active", False))
         last_activity = _fmt_ts(attrs.get("lastActivityTime", 0))
         alarms = client.alarms(dev_id, active_only=True)
+    # A device's alarm list also holds alarms propagated from related devices (DG Set 2/3 alarms show up
+    # under DG SET1); count only the alarms this device raised so nothing is counted twice
+    alarms = [a for a in alarms if a.get("originator", {}).get("id") == dev_id]
 
     return {
         "id": dev_id,

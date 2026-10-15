@@ -176,6 +176,23 @@ class DeliveryTest(unittest.TestCase):
         delivery.send_failure_alert(None, "stage", RuntimeError("x"))
 
 
+class CollectTest(unittest.TestCase):
+    def test_propagated_alarms_are_not_counted(self):
+        from infra_reports.collect import collect_device
+        client = mock.Mock()
+        client.timeseries_keys.return_value = []
+        client.latest.return_value = {}
+        client.history.return_value = {}
+        client.alarms.return_value = [
+            {"type": "DG Offline", "originator": {"id": "dg1"}},
+            {"type": "Engine Overspeed", "originator": {"id": "dg2"}},  # propagated from another DG
+        ]
+        dev = collect_device(client, {"id": {"id": "dg1"}, "name": "DG1", "type": "woodward_kg1500"},
+                             "dg", START, END, historical=True)
+        self.assertEqual(dev["alarms_count"], 1)
+        self.assertEqual(dev["alarm_types"], {"DG Offline": 1})
+
+
 class HealthCheckTest(unittest.TestCase):
     def setUp(self):
         self.path = Path(tempfile.mkdtemp()) / "last_success.json"
