@@ -18,6 +18,9 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 PORT = int(os.getenv("TELEGRAM_NOTIFIER_PORT") or os.getenv("PORT", 5051))
 # Alarms of devices named '[TEST] ...' go only to TELEGRAM_TEST_CHAT_ID (or the log), never to the real chats
 TEST_DEVICE_PREFIX = "[TEST]"
+# Alarm types that record normal operation, not a fault: kept in ThingsBoard, never sent to Telegram.
+# 'DG Offline' is raised every time a DG stops. Comma-separated; set to an empty string to send everything.
+SKIP_ALARM_TYPES = {t.strip() for t in os.getenv("TELEGRAM_SKIP_ALARM_TYPES", "DG Offline").split(",") if t.strip()}
 TELEGRAM_TEST_CHAT_ID = os.getenv("TELEGRAM_TEST_CHAT_ID", "").strip()
 # The rule chain calls this service from a Docker network; nothing outside private networks may post alarms
 ALLOWED_NETWORKS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
@@ -182,6 +185,13 @@ class WebhookHandler(BaseHTTPRequestHandler):
             orig = alarm_data.get("originator")
             if isinstance(orig, dict):
                 device_name = orig.get("name") or device_name
+
+            if alarm_type in SKIP_ALARM_TYPES:
+                logging.info(f"Not sent (operational event, not a fault): '{device_name}' - '{alarm_type}' ({action})")
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"SKIPPED")
+                return
 
             # Check Deduplication Cache
             cache_key = (device_name, alarm_type)
