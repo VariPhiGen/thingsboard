@@ -16,6 +16,9 @@ load_dotenv(Path(__file__).resolve().with_name(".env"))
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 PORT = int(os.getenv("TELEGRAM_NOTIFIER_PORT") or os.getenv("PORT", 5051))
+# Alarms of devices named '[TEST] ...' go only to TELEGRAM_TEST_CHAT_ID (or the log), never to the real chats
+TEST_DEVICE_PREFIX = "[TEST]"
+TELEGRAM_TEST_CHAT_ID = os.getenv("TELEGRAM_TEST_CHAT_ID", "").strip()
 # The rule chain calls this service from a Docker network; nothing outside private networks may post alarms
 ALLOWED_NETWORKS = [ipaddress.ip_network(n) for n in ("127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
 
@@ -198,7 +201,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 return
 
             message = format_alarm_message(alarm_data, action)
-            sent = send_telegram_message(message)
+            if str(device_name).startswith(TEST_DEVICE_PREFIX):
+                # Test devices never reach the real recipients: only the test chat, or the log
+                if TELEGRAM_TEST_CHAT_ID:
+                    sent = send_telegram_message("🧪 TEST\n" + message, [TELEGRAM_TEST_CHAT_ID])
+                else:
+                    logging.info(f"Test alarm, not sent:\n{message}")
+                    sent = True
+            else:
+                sent = send_telegram_message(message)
             if not sent:
                 with CACHE_LOCK:  # let a retry of the same alarm through
                     if LAST_SENT_CACHE.get(cache_key) == (action, now):
