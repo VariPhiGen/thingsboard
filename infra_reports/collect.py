@@ -6,7 +6,10 @@ from collections import Counter
 from datetime import datetime
 
 from .config import REPORT_TZ
-from .metrics import bucket_series, integrate_energy_kwh, report_window, resolve_report_date, sample_stats, valid_samples
+from .metrics import (
+    RUNNING_KW, bucket_series, count_runs, integrate_energy_kwh, report_window, resolve_report_date, sample_stats,
+    valid_samples,
+)
 
 log = logging.getLogger(__name__)
 
@@ -18,6 +21,14 @@ _SENSOR_OFFLINE_RE = re.compile(r"(?<![\d.])(32767|65535)(\.0+)?(?![\d.])")
 EXCLUDED_DUPLICATE = "duplicate"
 EXCLUDED_SENSOR = "sensor offline reading"
 EXCLUDED_TRANSIENT = "cleared within 2 min"
+EXCLUDED_ENGINE_STOPPED = "raised while engine stopped"
+
+# Alarms that only mean something while the engine runs (oil pressure is 0 on a stopped engine)
+ENGINE_RUNNING_ALARMS = {"Low Oil Pressure"}
+# Alarm types that record a DG starting or stopping, not a fault: reported as runs, not alarms
+OPERATIONAL_ALARM_TYPES = {"DG Offline"}
+# How far back the last engine reading may be when judging an alarm raised while stopped
+ENGINE_STATE_LOOKBACK_MS = 5 * 60 * 1000
 
 LT_PANELS = [
     ("EVM Charger", "EVM_Charger"),
@@ -32,7 +43,8 @@ LT_PANELS = [
 
 # Keys whose raw history is fetched for graphs and 24h statistics, per report category
 HISTORY_KEYS = {
-    "dg": {"power_kw", "fuel_level", "battery_voltage", "coolant_temp", "oil_pressure", "engine_rpm", "energy_kwh"},
+    "dg": {"power_kw", "fuel_level", "battery_voltage", "coolant_temp", "oil_pressure", "engine_rpm", "energy_kwh",
+           "run_hours"},
     "lt": {f"{prefix}_{m}" for _, prefix in LT_PANELS for m in ("power", "voltage", "current", "frequency")},
     "fire": {"relay_online"} | {f"cylinder_pressure_{i}" for i in range(1, 10)},
     "ro": {"tds", "water_flow", "pressure", "ph"},
@@ -47,12 +59,25 @@ def classify(device, profiles):
     return None
 
 
-def screen_alarms(alarms):
+def engine_stopped_at(ts, rpm_samples, power_samples):
+    """True when the last valid reading before ts shows a stopped engine (RPM <= 100 and power <= 5 kW),
+    False when it shows a running one, None when there is no reading within ENGINE_STATE_LOOKBACK_MS."""
+    def last(samples):
+        prior = [(t, v) for t, v in samples if ts - ENGINE_STATE_LOOKBACK_MS <= t <= ts and v not in (32767.0, 65535.0)]
+        return prior[-1][1] if prior else None
+    rpm, power = last(rpm_samples), last(power_samples)
+    if rpm is None and power is None:
+        return None
+    return not ((rpm is not None and rpm > 100) or (power is not None and power > RUNNING_KW))
+
+
+def screen_alarms(alarms, engine_stopped=None):
     """(equipment alarms, Counter of excluded alarms by reason).
 
     Excluded, in this order: a second alarm of the same type and start time, an alarm raised on a
-    sensor-offline code, and a non-CRITICAL alarm cleared within TRANSIENT_ALARM_MS of its start
-    (a short CRITICAL alarm can be a real event, so it is always counted)."""
+    sensor-offline code, a non-CRITICAL alarm cleared within TRANSIENT_ALARM_MS of its start (a short
+    CRITICAL alarm can be a real event, so it is always counted), and an engine-running alarm raised
+    while engine_stopped(start_ts) says the engine was stopped."""
     kept, excluded, seen = [], Counter(), set()
     for alarm in alarms:
         start = alarm.get("startTs") or alarm.get("createdTime") or 0
@@ -65,6 +90,8 @@ def screen_alarms(alarms):
         elif (clear_ts and alarm.get("severity") != "CRITICAL"
               and 0 <= clear_ts - start < TRANSIENT_ALARM_MS):
             excluded[EXCLUDED_TRANSIENT] += 1
+        elif alarm.get("type") in ENGINE_RUNNING_ALARMS and engine_stopped and engine_stopped(start) is True:
+            excluded[EXCLUDED_ENGINE_STOPPED] += 1
         else:
             kept.append(alarm)
         seen.add(key)
@@ -81,15 +108,16 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
     latest = client.latest(dev_id, keys, end_ts if historical else None)
 
     history = client.history(dev_id, sorted(k for k in keys if k in HISTORY_KEYS.get(category, ())), start_ts, end_ts)
-    series, agg = {}, {}
-    energy_kwh = energy_coverage = None
+    series, agg, samples_by_key = {}, {}, {}
+    energy_kwh = energy_coverage = runs = None
     for key, points in history.items():
-        samples = valid_samples(points)
+        samples = samples_by_key[key] = valid_samples(points)
         series[key] = bucket_series(samples, start_ts, end_ts)
         for stat, value in sample_stats(samples).items():
             agg[f"{key}_24h_{stat}"] = value
         if key == "power_kw":
             energy_kwh, energy_coverage = integrate_energy_kwh(samples, start_ts, end_ts)
+            runs = count_runs(samples, start_ts, end_ts)
 
     if historical:
         # The current 'active' attribute says nothing about a past day: online = sent data that day
@@ -105,7 +133,13 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
     # A device's alarm list also holds alarms propagated from related devices (DG Set 2/3 alarms show up
     # under DG SET1); count only the alarms this device raised so nothing is counted twice
     alarms = [a for a in alarms if a.get("originator", {}).get("id") == dev_id]
-    alarms, alarms_excluded = screen_alarms(alarms)
+    engine_stopped = None
+    if "engine_rpm" in samples_by_key or "power_kw" in samples_by_key:
+        def engine_stopped(ts):
+            return engine_stopped_at(ts, samples_by_key.get("engine_rpm", []), samples_by_key.get("power_kw", []))
+    alarms, alarms_excluded = screen_alarms(alarms, engine_stopped)
+    operational = Counter(a.get("type") for a in alarms if a.get("type") in OPERATIONAL_ALARM_TYPES)
+    alarms = [a for a in alarms if a.get("type") not in OPERATIONAL_ALARM_TYPES]
 
     return {
         "id": dev_id,
@@ -123,6 +157,8 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
         "alarm_types": dict(Counter(a.get("type", "Unknown") for a in alarms)),
         "active_alarms": [a.get("type") for a in alarms],
         "alarms_excluded": dict(alarms_excluded),
+        "operational_events": dict(operational),
+        "runs_24h": runs,
         "series_start_ts": start_ts,
         "series_end_ts": end_ts,
         "historical": historical,

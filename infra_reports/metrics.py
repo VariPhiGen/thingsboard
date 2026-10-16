@@ -9,6 +9,8 @@ BUCKET_MS = 30 * 60 * 1000
 SENSOR_OFFLINE_VALUES = {32767.0, 65535.0}
 # Power samples further apart than this are a data gap: the load in between is unknown
 MAX_POWER_GAP_MS = 5 * 60 * 1000
+# A DG delivering more than this is running (same threshold as the rule chain's DG status)
+RUNNING_KW = 5.0
 
 
 def resolve_report_date(report_date, now=None):
@@ -97,3 +99,15 @@ def integrate_energy_kwh(power_samples, start_ts, end_ts, max_gap_ms=MAX_POWER_G
             covered_ms += dt
     window = end_ts - start_ts
     return energy_kwh, (covered_ms / window if window > 0 else 0.0)
+
+
+def count_runs(power_samples, start_ts, end_ts, threshold_kw=RUNNING_KW):
+    """Number of separate running periods in [start_ts, end_ts): rises of power above threshold_kw.
+    A data gap inside a run does not split it; a run already going at start_ts counts once."""
+    runs, running = 0, False
+    for ts, kw in power_samples:
+        if start_ts <= ts < end_ts:
+            if kw > threshold_kw and not running:
+                runs += 1
+            running = kw > threshold_kw
+    return runs

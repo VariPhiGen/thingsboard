@@ -184,13 +184,13 @@ class CollectTest(unittest.TestCase):
         client.latest.return_value = {}
         client.history.return_value = {}
         client.alarms.return_value = [
-            {"type": "DG Offline", "originator": {"id": "dg1"}},
+            {"type": "Low Fuel Level", "originator": {"id": "dg1"}},
             {"type": "Engine Overspeed", "originator": {"id": "dg2"}},  # propagated from another DG
         ]
         dev = collect_device(client, {"id": {"id": "dg1"}, "name": "DG1", "type": "woodward_kg1500"},
                              "dg", START, END, historical=True)
         self.assertEqual(dev["alarms_count"], 1)
-        self.assertEqual(dev["alarm_types"], {"DG Offline": 1})
+        self.assertEqual(dev["alarm_types"], {"Low Fuel Level": 1})
 
     def test_screen_alarms(self):
         from infra_reports.collect import screen_alarms
@@ -210,11 +210,38 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(excluded, {"duplicate": 1, "cleared within 2 min": 1, "sensor offline reading": 1})
 
     def test_excluded_alarms_shown_but_not_counted(self):
-        dg = device("DG1", "dg", alarms_count=0, alarm_types={},
+        dg = device("DG1", "dg", alarms_count=0, alarm_types={}, runs_24h=2, agg_24h={"run_hours_24h_delta": 0.7},
                     alarms_excluded={"cleared within 2 min": 861, "sensor offline reading": 7})
         html = generate_dg_set_html(DeviceSummary([dg], START, END, True))
         self.assertIn("No equipment alarms.", html)
-        self.assertIn("868 not counted (861 cleared within 2 min, 7 sensor offline reading)", html)
+        self.assertIn("Excludes data-quality events", html)
+        self.assertIn("Note: 868 automatic notifications during the day came from monitoring data issues", html)
+        self.assertNotIn("cleared within 2 min", html)   # internal reasons are not shown to the client
+        self.assertIn("Ran 2× · 0.7 h", html)
+
+    def test_dg_stops_and_stopped_engine_alarms_are_not_equipment_alarms(self):
+        from infra_reports.collect import collect_device
+        minute = 60_000
+        client = mock.Mock()
+        client.timeseries_keys.return_value = ["power_kw", "engine_rpm"]
+        client.latest.return_value = {}
+        client.history.return_value = {
+            "power_kw": [{"ts": START + i * minute, "value": v} for i, v in enumerate([0, 500, 500, 0, 0, 450, 0])],
+            "engine_rpm": [{"ts": START + i * minute, "value": v} for i, v in enumerate([0, 1500, 1500, 0, 0, 1500, 0])],
+        }
+        client.alarms.return_value = [
+            {"type": "DG Offline", "severity": "MAJOR", "startTs": START + 3 * minute, "originator": {"id": "dg1"}},
+            {"type": "Low Oil Pressure", "severity": "CRITICAL", "startTs": START + 4 * minute,
+             "originator": {"id": "dg1"}},  # engine stopped: oil pressure is 0 by nature
+            {"type": "Low Oil Pressure", "severity": "CRITICAL", "startTs": START + 2 * minute + 1,
+             "originator": {"id": "dg1"}},  # engine running: a real fault
+        ]
+        dev = collect_device(client, {"id": {"id": "dg1"}, "name": "DG1", "type": "woodward_kg1500"},
+                             "dg", START, END, historical=True)
+        self.assertEqual(dev["runs_24h"], 2)
+        self.assertEqual(dev["alarm_types"], {"Low Oil Pressure": 1})
+        self.assertEqual(dev["operational_events"], {"DG Offline": 1})
+        self.assertEqual(dev["alarms_excluded"], {"raised while engine stopped": 1})
 
 
 class HealthCheckTest(unittest.TestCase):

@@ -117,27 +117,23 @@ def trends_section(blocks):
     return f'<div class="section">{first}{"".join(blocks[1:])}</div>'
 
 
-def excluded_alarms_note(devices):
-    """'N not counted (reason a, reason b)' for alarms screened out of the counts; '' when none."""
-    reasons = {}
-    for d in devices:
-        for reason, n in (d.get("alarms_excluded") or {}).items():
-            reasons[reason] = reasons.get(reason, 0) + n
-    total = sum(reasons.values())
-    if not total:
-        return ""
-    detail = ", ".join(f"{n:,} {reason}" for reason, n in sorted(reasons.items(), key=lambda kv: -kv[1]))
-    return f"{total:,} not counted ({detail})"
+def excluded_alarms_count(devices):
+    """Number of alarm notifications screened out of the counts as data-quality events."""
+    return sum(n for d in devices for n in (d.get("alarms_excluded") or {}).values())
+
+
+DATA_QUALITY_KPI_NOTE = "Excludes data-quality events"
 
 
 def alarm_section(devices, historical):
     """Alarm counts by type and device; empty string when there are none."""
     types = sorted({t for d in devices for t in d.get("alarm_types", {})},
                    key=lambda t: -sum(d.get("alarm_types", {}).get(t, 0) for d in devices))
-    excluded = excluded_alarms_note(devices)
-    note = (f'<div class="muted" style="margin-top:8px;">{escape(excluded)}: duplicates, alarms raised on a '
-            f'sensor-offline code (32767/65535) and non-critical alarms cleared within 2 minutes are status '
-            f'or data faults, not equipment events.</div>') if excluded else ""
+    excluded = excluded_alarms_count(devices)
+    note = (f'<div class="muted" style="margin-top:8px;">Note: {excluded:,} automatic '
+            f'notification{"s" if excluded != 1 else ""}{" during the day" if historical else ""} came from '
+            f'monitoring data issues (missing or invalid sensor readings and repeated notifications), not from '
+            f'equipment faults, and {"are" if excluded != 1 else "is"} not counted above.</div>') if excluded else ""
     if not types:
         if not excluded:
             return ""

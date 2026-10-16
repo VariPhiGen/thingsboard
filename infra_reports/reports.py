@@ -4,7 +4,8 @@ from html import escape
 from .charts import SERIES_COLORS, chart_card, no_data
 from .collect import LT_PANELS, period_of
 from .layout import (
-    BADGE_COLORS, alarm_section, badge, excluded_alarms_note, fmt_latest, fmt_sync, fmt_val, is_fresh, is_historical, kpi, kv,
+    BADGE_COLORS, DATA_QUALITY_KPI_NOTE, alarm_section, badge, excluded_alarms_count, fmt_latest, fmt_sync, fmt_val,
+    is_fresh, is_historical, kpi, kv,
     live_val, live_word, report_meta, report_page, trends_section, valid_float,
 )
 
@@ -39,6 +40,19 @@ def _meter_check(meter_delta, energy_kwh):
     return ""
 
 
+def _run_summary(d):
+    """'Ran 2× · 0.7 h' under the state badge, from the power readings and the run-hours counter."""
+    runs = d.get("runs_24h")
+    if runs is None:
+        return ""
+    if runs == 0:
+        text = "Did not run"
+    else:
+        hours = d["agg_24h"].get("run_hours_24h_delta")
+        text = f"Ran {runs}×" + (f" · {hours:.1f} h" if hours is not None and hours >= 0 else "")
+    return f'<div class="muted nw" style="margin-top:5px;">{text}</div>'
+
+
 def generate_dg_set_html(devices_summary):
     dg_devices = _devices(devices_summary, "dg")
     historical = is_historical(devices_summary)
@@ -65,7 +79,7 @@ def generate_dg_set_html(devices_summary):
         rows_html += f"""
         <tr>
             <td><div class="name" style="color:#0d47a1;">{escape(d['name'])}</div><div style="margin-top:5px;">{online}</div></td>
-            <td class="c">{state_badge}</td>
+            <td class="c">{state_badge}{_run_summary(d)}</td>
             <td>
                 {kv(f"{live_word(devices_summary)} Power", fmt_latest(d, 'power_kw', "kW"))}
                 {kv("24h Peak", fmt_val(agg.get('power_kw_24h_max'), "kW"))}
@@ -97,7 +111,8 @@ def generate_dg_set_html(devices_summary):
         + kpi(f"{energy_24h:,.1f} kWh", "24h Energy Generated", "#ef6c00",
               f'<span class="{"warn" if coverage < LOW_COVERAGE else ""}">{coverage_note}</span>')
         + kpi(f"{total_alarms:,}", "Alarms Raised" if historical else "Active Alarms",
-              "#c62828" if total_alarms > 0 else "#2e7d32", escape(excluded_alarms_note(dg_devices)))
+              "#c62828" if total_alarms > 0 else "#2e7d32",
+              DATA_QUALITY_KPI_NOTE if excluded_alarms_count(dg_devices) else "")
     )
 
     start_ts = _period_start(devices_summary)

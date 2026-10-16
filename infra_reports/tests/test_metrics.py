@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from infra_reports.config import REPORT_TZ
 
 from infra_reports.metrics import (
-    BUCKET_MS, bucket_series, integrate_energy_kwh, parse_value, report_window, resolve_report_date, sample_stats,
+    BUCKET_MS, bucket_series, count_runs, integrate_energy_kwh, parse_value, report_window, resolve_report_date, sample_stats,
     valid_samples,
 )
 
@@ -57,6 +57,15 @@ class EnergyTest(unittest.TestCase):
     def test_trapezoid_and_negative_samples(self):
         energy, _ = integrate_energy_kwh([(0, 0.0), (60_000, 60.0), (90_000, -5.0)], 0, HOUR)
         self.assertAlmostEqual(energy, 0.5)  # (0+60)/2 kW for 1 min; negative sample ignored
+
+    def test_count_runs(self):
+        minute = 60_000
+        kw = [0, 500, 520, 0, 3, 0, 450, 460, 0]
+        samples = [(i * minute, v) for i, v in enumerate(kw)]
+        self.assertEqual(count_runs(samples, 0, HOUR), 2)
+        self.assertEqual(count_runs(samples, 2 * minute, HOUR), 2)    # a run already going at the start counts
+        self.assertEqual(count_runs([(0, 500.0), (30 * minute, 500.0)], 0, HOUR), 1)  # a data gap does not split a run
+        self.assertEqual(count_runs([], 0, HOUR), 0)
 
 
 class ReportWindowTest(unittest.TestCase):
