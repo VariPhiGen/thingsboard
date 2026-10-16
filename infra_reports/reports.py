@@ -4,7 +4,7 @@ from html import escape
 from .charts import SERIES_COLORS, chart_card, no_data
 from .collect import LT_PANELS, period_of
 from .layout import (
-    BADGE_COLORS, alarm_section, badge, fmt_latest, fmt_sync, fmt_val, is_fresh, is_historical, kpi, kv,
+    BADGE_COLORS, alarm_section, badge, excluded_alarms_note, fmt_latest, fmt_sync, fmt_val, is_fresh, is_historical, kpi, kv,
     live_val, live_word, report_meta, report_page, trends_section, valid_float,
 )
 
@@ -97,7 +97,7 @@ def generate_dg_set_html(devices_summary):
         + kpi(f"{energy_24h:,.1f} kWh", "24h Energy Generated", "#ef6c00",
               f'<span class="{"warn" if coverage < LOW_COVERAGE else ""}">{coverage_note}</span>')
         + kpi(f"{total_alarms:,}", "Alarms Raised" if historical else "Active Alarms",
-              "#c62828" if total_alarms > 0 else "#2e7d32")
+              "#c62828" if total_alarms > 0 else "#2e7d32", escape(excluded_alarms_note(dg_devices)))
     )
 
     start_ts = _period_start(devices_summary)

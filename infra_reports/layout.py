@@ -117,12 +117,37 @@ def trends_section(blocks):
     return f'<div class="section">{first}{"".join(blocks[1:])}</div>'
 
 
+def excluded_alarms_note(devices):
+    """'N not counted (reason a, reason b)' for alarms screened out of the counts; '' when none."""
+    reasons = {}
+    for d in devices:
+        for reason, n in (d.get("alarms_excluded") or {}).items():
+            reasons[reason] = reasons.get(reason, 0) + n
+    total = sum(reasons.values())
+    if not total:
+        return ""
+    detail = ", ".join(f"{n:,} {reason}" for reason, n in sorted(reasons.items(), key=lambda kv: -kv[1]))
+    return f"{total:,} not counted ({detail})"
+
+
 def alarm_section(devices, historical):
     """Alarm counts by type and device; empty string when there are none."""
     types = sorted({t for d in devices for t in d.get("alarm_types", {})},
                    key=lambda t: -sum(d.get("alarm_types", {}).get(t, 0) for d in devices))
+    excluded = excluded_alarms_note(devices)
+    note = (f'<div class="muted" style="margin-top:8px;">{escape(excluded)}: duplicates, alarms raised on a '
+            f'sensor-offline code (32767/65535) and non-critical alarms cleared within 2 minutes are status '
+            f'or data faults, not equipment events.</div>') if excluded else ""
     if not types:
-        return ""
+        if not excluded:
+            return ""
+        return f"""
+    <div class="section">
+        <h3>{"Alarms Raised During the Day" if historical else "Currently Active Alarms"}</h3>
+        <div>No equipment alarms.</div>
+        {note}
+    </div>
+    """
     head = "".join(f'<th class="r">{escape(d["name"])}</th>' for d in devices)
     rows = ""
     for t in types:
@@ -139,6 +164,7 @@ def alarm_section(devices, historical):
             </tr></thead>
             <tbody>{rows}</tbody>
         </table>
+        {note}
     </div>
     """
 

@@ -192,6 +192,30 @@ class CollectTest(unittest.TestCase):
         self.assertEqual(dev["alarms_count"], 1)
         self.assertEqual(dev["alarm_types"], {"DG Offline": 1})
 
+    def test_screen_alarms(self):
+        from infra_reports.collect import screen_alarms
+        minute = 60_000
+        alarms = [
+            {"type": "DG Offline", "severity": "MAJOR", "startTs": 0, "clearTs": 5 * minute},          # kept
+            {"type": "DG Offline", "severity": "MAJOR", "startTs": 0, "clearTs": 5 * minute},          # duplicate
+            {"type": "DG Offline", "severity": "MAJOR", "startTs": 10 * minute, "clearTs": 11 * minute},  # flicker
+            {"type": "DG Offline", "severity": "MAJOR", "startTs": 20 * minute, "clearTs": 0},         # still active
+            {"type": "Engine Overspeed", "severity": "CRITICAL", "startTs": 30 * minute,
+             "details": {"data": "Engine Overspeed detected: 32767 RPM (Threshold: > 1800 RPM)"}},  # sensor code
+            {"type": "Engine Overspeed", "severity": "CRITICAL", "startTs": 40 * minute,
+             "clearTs": 40 * minute + 1000, "details": {"data": "Engine Overspeed detected: 1932767.5 RPM"}},  # short critical
+        ]
+        kept, excluded = screen_alarms(alarms)
+        self.assertEqual([a["startTs"] for a in kept], [0, 20 * minute, 40 * minute])
+        self.assertEqual(excluded, {"duplicate": 1, "cleared within 2 min": 1, "sensor offline reading": 1})
+
+    def test_excluded_alarms_shown_but_not_counted(self):
+        dg = device("DG1", "dg", alarms_count=0, alarm_types={},
+                    alarms_excluded={"cleared within 2 min": 861, "sensor offline reading": 7})
+        html = generate_dg_set_html(DeviceSummary([dg], START, END, True))
+        self.assertIn("No equipment alarms.", html)
+        self.assertIn("868 not counted (861 cleared within 2 min, 7 sensor offline reading)", html)
+
 
 class HealthCheckTest(unittest.TestCase):
     def setUp(self):

@@ -1,5 +1,7 @@
 """Collects per-device telemetry, 24h statistics, graph series and alarms from ThingsBoard."""
+import json
 import logging
+import re
 from collections import Counter
 from datetime import datetime
 
@@ -7,6 +9,15 @@ from .config import REPORT_TZ
 from .metrics import bucket_series, integrate_energy_kwh, report_window, resolve_report_date, sample_stats, valid_samples
 
 log = logging.getLogger(__name__)
+
+# An alarm cleared this soon after it started is a status flicker, not an equipment event
+TRANSIENT_ALARM_MS = 2 * 60 * 1000
+# Alarm details quoting a sensor-offline code (Modbus 0x7FFF / 0xFFFF) were raised on a missing reading
+_SENSOR_OFFLINE_RE = re.compile(r"(?<![\d.])(32767|65535)(\.0+)?(?![\d.])")
+
+EXCLUDED_DUPLICATE = "duplicate"
+EXCLUDED_SENSOR = "sensor offline reading"
+EXCLUDED_TRANSIENT = "cleared within 2 min"
 
 LT_PANELS = [
     ("EVM Charger", "EVM_Charger"),
@@ -34,6 +45,30 @@ def classify(device, profiles):
         if device.get("type") in types:
             return category
     return None
+
+
+def screen_alarms(alarms):
+    """(equipment alarms, Counter of excluded alarms by reason).
+
+    Excluded, in this order: a second alarm of the same type and start time, an alarm raised on a
+    sensor-offline code, and a non-CRITICAL alarm cleared within TRANSIENT_ALARM_MS of its start
+    (a short CRITICAL alarm can be a real event, so it is always counted)."""
+    kept, excluded, seen = [], Counter(), set()
+    for alarm in alarms:
+        start = alarm.get("startTs") or alarm.get("createdTime") or 0
+        key = (alarm.get("type"), start)
+        clear_ts = alarm.get("clearTs") or 0
+        if key in seen:
+            excluded[EXCLUDED_DUPLICATE] += 1
+        elif _SENSOR_OFFLINE_RE.search(json.dumps(alarm.get("details") or "")):
+            excluded[EXCLUDED_SENSOR] += 1
+        elif (clear_ts and alarm.get("severity") != "CRITICAL"
+              and 0 <= clear_ts - start < TRANSIENT_ALARM_MS):
+            excluded[EXCLUDED_TRANSIENT] += 1
+        else:
+            kept.append(alarm)
+        seen.add(key)
+    return kept, excluded
 
 
 def _fmt_ts(ts):
@@ -70,6 +105,7 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
     # A device's alarm list also holds alarms propagated from related devices (DG Set 2/3 alarms show up
     # under DG SET1); count only the alarms this device raised so nothing is counted twice
     alarms = [a for a in alarms if a.get("originator", {}).get("id") == dev_id]
+    alarms, alarms_excluded = screen_alarms(alarms)
 
     return {
         "id": dev_id,
@@ -86,6 +122,7 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
         "alarms_count": len(alarms),
         "alarm_types": dict(Counter(a.get("type", "Unknown") for a in alarms)),
         "active_alarms": [a.get("type") for a in alarms],
+        "alarms_excluded": dict(alarms_excluded),
         "series_start_ts": start_ts,
         "series_end_ts": end_ts,
         "historical": historical,
