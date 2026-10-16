@@ -67,6 +67,18 @@ class EnergyTest(unittest.TestCase):
         self.assertEqual(count_runs([(0, 500.0), (30 * minute, 500.0)], 0, HOUR), 1)  # a data gap does not split a run
         self.assertEqual(count_runs([], 0, HOUR), 0)
 
+    def test_count_runs_without_load_and_read_errors(self):
+        s = 10_000
+        power = [(i * s, 0.0) for i in range(60)]
+        # Engine idles (no load) from 10 to 40; one failed RPM read at 20 (power 0, no RPM sample)
+        rpm = [(i * s, 1500.0 if 10 <= i < 40 else 0.0) for i in range(60) if i != 20]
+        self.assertEqual(count_runs(power, 0, HOUR, rpm), 1)
+        # Sensor-offline RPM code while stopped is not a run
+        self.assertEqual(count_runs(power, 0, HOUR, [(i * s, 32767.0) for i in range(60)]), 0)
+        # Two runs separated by a real stop longer than 2 minutes
+        rpm2 = [(i * s, 1500.0 if i < 10 or i >= 40 else 0.0) for i in range(60)]
+        self.assertEqual(count_runs(power, 0, HOUR, rpm2), 2)
+
 
 class ReportWindowTest(unittest.TestCase):
     def test_past_day_is_the_ist_calendar_day(self):

@@ -11,6 +11,8 @@ SENSOR_OFFLINE_VALUES = {32767.0, 65535.0}
 MAX_POWER_GAP_MS = 5 * 60 * 1000
 # A DG delivering more than this is running (same threshold as the rule chain's DG status)
 RUNNING_KW = 5.0
+# A stop shorter than this does not end a run (the rule chain also needs 2 min of OFF)
+MIN_STOP_MS = 2 * 60 * 1000
 
 
 def resolve_report_date(report_date, now=None):
@@ -101,13 +103,36 @@ def integrate_energy_kwh(power_samples, start_ts, end_ts, max_gap_ms=MAX_POWER_G
     return energy_kwh, (covered_ms / window if window > 0 else 0.0)
 
 
-def count_runs(power_samples, start_ts, end_ts, threshold_kw=RUNNING_KW):
-    """Number of separate running periods in [start_ts, end_ts): rises of power above threshold_kw.
-    A data gap inside a run does not split it; a run already going at start_ts counts once."""
-    runs, running = 0, False
+def count_runs(power_samples, start_ts, end_ts, rpm_samples=(), threshold_kw=RUNNING_KW, threshold_rpm=100,
+               min_stop_ms=MIN_STOP_MS):
+    """Number of separate engine runs in [start_ts, end_ts).
+
+    At each timestamp the engine runs when RPM is above threshold_rpm or power above threshold_kw,
+    so a run without load still counts. Sensor-offline RPM codes and failed reads are not readings.
+    A stop shorter than min_stop_ms (a read error, a dip in the data) does not end a run, and a data
+    gap does not split one. A run already going at start_ts counts once."""
+    readings = {}
     for ts, kw in power_samples:
-        if start_ts <= ts < end_ts:
-            if kw > threshold_kw and not running:
-                runs += 1
-            running = kw > threshold_kw
+        readings.setdefault(ts, {})["power"] = kw
+    for ts, rpm in rpm_samples:
+        if rpm not in SENSOR_OFFLINE_VALUES:
+            readings.setdefault(ts, {})["rpm"] = rpm
+    runs, last_running_ts = 0, None
+    for ts in sorted(readings):
+        if not start_ts <= ts < end_ts:
+            continue
+        r = readings[ts]
+        if r.get("rpm", 0) > threshold_rpm or r.get("power", 0) > threshold_kw:
+            if last_running_ts is None or ts - last_running_ts > min_stop_ms:
+                stopped_since = None if last_running_ts is None else last_running_ts
+                # A gap with no readings at all is not a stop: only count a new run after a seen stop
+                if stopped_since is None or _seen_stop(readings, stopped_since, ts, threshold_kw, threshold_rpm):
+                    runs += 1
+            last_running_ts = ts
     return runs
+
+
+def _seen_stop(readings, after_ts, before_ts, threshold_kw, threshold_rpm):
+    """True when a reading strictly between the two timestamps shows a stopped engine."""
+    return any(after_ts < ts < before_ts and r.get("rpm", 0) <= threshold_rpm and r.get("power", 0) <= threshold_kw
+               for ts, r in readings.items())

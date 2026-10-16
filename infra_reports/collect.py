@@ -117,7 +117,8 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
             agg[f"{key}_24h_{stat}"] = value
         if key == "power_kw":
             energy_kwh, energy_coverage = integrate_energy_kwh(samples, start_ts, end_ts)
-            runs = count_runs(samples, start_ts, end_ts)
+    if "power_kw" in samples_by_key or "engine_rpm" in samples_by_key:
+        runs = count_runs(samples_by_key.get("power_kw", []), start_ts, end_ts, samples_by_key.get("engine_rpm", []))
 
     if historical:
         # The current 'active' attribute says nothing about a past day: online = sent data that day
