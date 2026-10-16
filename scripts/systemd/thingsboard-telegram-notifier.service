@@ -1,0 +1,18 @@
+# ThingsBoard alarm -> Telegram notifier (telegram_notifier.py).
+# The root rule chain node "Telegram Webhook REST API" posts every alarm created/cleared to port 5051.
+# Install: sudo cp scripts/systemd/thingsboard-telegram-notifier.service /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now thingsboard-telegram-notifier
+[Unit]
+Description=ThingsBoard alarm to Telegram notifier
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/thingsboard
+ExecStart=/usr/bin/python3 -u /home/ubuntu/thingsboard/telegram_notifier.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
