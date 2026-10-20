@@ -1,0 +1,541 @@
+{
+  "id": {
+    "entityType": "DASHBOARD",
+    "id": "51158130-ca34-11f1-a8a7-c1f9998e0221"
+  },
+  "createdTime": 1792246147267,
+  "tenantId": {
+    "entityType": "TENANT",
+    "id": "1d4b1fa0-6a70-11f1-87c3-df6f31aa9de9"
+  },
+  "title": "Fire Suppression UPS Room 2",
+  "name": "Fire Suppression UPS Room 2",
+  "image": null,
+  "mobileHide": false,
+  "mobileOrder": null,
+  "assignedCustomers": null,
+  "configuration": {
+    "description": "Unified Single-Device 9-Panel Fire Suppression Dashboard",
+    "widgets": {
+      "w_pressure_1": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 0,
+        "col": 0,
+        "id": "w_pressure_1",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_1_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 1",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_2": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 4,
+        "col": 0,
+        "id": "w_pressure_2",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_2_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 2",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_3": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 8,
+        "col": 0,
+        "id": "w_pressure_3",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_3_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 3",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_4": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 12,
+        "col": 0,
+        "id": "w_pressure_4",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_4_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 4",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_5": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 16,
+        "col": 0,
+        "id": "w_pressure_5",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_5_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 5",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_6": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 20,
+        "col": 0,
+        "id": "w_pressure_6",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_6_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 6",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_7": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 24,
+        "col": 0,
+        "id": "w_pressure_7",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_7_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 7",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      },
+      "w_pressure_8": {
+        "typeFullFqn": "system.cards.value_card",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 4,
+        "row": 28,
+        "col": 0,
+        "id": "w_pressure_8",
+        "config": {
+          "title": "",
+          "showTitle": false,
+          "showTitleIcon": false,
+          "datasources": [
+            {
+              "type": "entity",
+              "name": "",
+              "entityAliasId": "single-fire-device-alias",
+              "dataKeys": [
+                {
+                  "name": "fire_suppression_8_pressure",
+                  "type": "timeseries",
+                  "label": "Fire Suppression 8",
+                  "color": "#03a9f4",
+                  "units": "",
+                  "decimals": 1,
+                  "usePostProcessing": true,
+                  "postFuncBody": "return (value === true || value === 'true' || value === 1 || value === '1') ? 'High Pressure' : 'Low Pressure';",
+                  "settings": {}
+                }
+              ]
+            }
+          ],
+          "timewindow": {
+            "realtime": {
+              "realtimeType": 0,
+              "interval": 1000,
+              "timewindowMs": 60000
+            }
+          },
+          "settings": {
+            "showIcon": false,
+            "autoScale": false,
+            "valueFont": {
+              "size": 36,
+              "sizeUnit": "px",
+              "family": "Roboto",
+              "weight": "500",
+              "style": "normal"
+            }
+          }
+        }
+      }
+    },
+    "states": {
+      "default": {
+        "name": "Live Fire Suppression Overview",
+        "root": true,
+        "layouts": {
+          "main": {
+            "widgets": {
+              "w_pressure_1": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 0,
+                "col": 0
+              },
+              "w_pressure_2": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 4,
+                "col": 0
+              },
+              "w_pressure_3": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 8,
+                "col": 0
+              },
+              "w_pressure_4": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 12,
+                "col": 0
+              },
+              "w_pressure_5": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 16,
+                "col": 0
+              },
+              "w_pressure_6": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 20,
+                "col": 0
+              },
+              "w_pressure_7": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 24,
+                "col": 0
+              },
+              "w_pressure_8": {
+                "sizeX": 24,
+                "sizeY": 4,
+                "row": 28,
+                "col": 0
+              }
+            },
+            "gridSettings": {
+              "backgroundColor": "#eeeeee",
+              "columns": 24,
+              "margin": 10,
+              "backgroundSizeMode": "100%"
+            }
+          }
+        }
+      }
+    },
+    "entityAliases": {
+      "single-fire-device-alias": {
+        "id": "single-fire-device-alias",
+        "alias": "LT Panel Fire Gateway",
+        "filter": {
+          "type": "singleEntity",
+          "resolveMultiple": false,
+          "singleEntity": {
+            "entityType": "DEVICE",
+            "id": "7f45c350-ca32-11f1-a8a7-c1f9998e0221"
+          }
+        }
+      }
+    },
+    "filters": {},
+    "timewindow": {
+      "displayValue": "",
+      "selectedTab": 0,
+      "realtime": {
+        "realtimeType": 0,
+        "interval": 1000,
+        "timewindowMs": 60000,
+        "quickInterval": "CURRENT_DAY"
+      }
+    },
+    "settings": {
+      "stateControllerId": "entity",
+      "showTitle": true,
+      "showDashboardsSelect": true,
+      "showEntitiesSelect": true,
+      "showDashboardTimewindow": true,
+      "showDashboardExport": true,
+      "toolbarAlwaysOpen": true
+    }
+  },
+  "resources": null,
+  "version": 2,
+  "externalId": null
+}

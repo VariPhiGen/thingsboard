@@ -161,10 +161,8 @@ def main():
         {"key": "ph", "label": "pH", "unit": ""}
     ]
     
-    text_keys = [
-        {"key": "status", "label": "Operating Status", "unit": ""},
-        {"key": "ping", "label": "Ping", "unit": ""}
-    ]
+    # Operating Status / Ping cards removed from the dashboard on request
+    text_keys = []
     
     # 4 cards per row instead of 6 to prevent text overlapping
     col_width = 6
