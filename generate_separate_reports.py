@@ -40,7 +40,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", 465))
 SMTP_USER = os.getenv("SMTP_USER", "information@variphi.com")
 SMTP_PASSWORD = os.getenv("SMTP_PASS") or os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM = os.getenv("SMTP_FROM") or SMTP_USER
-REPORT_RECIPIENTS = os.getenv("REPORT_RECIPIENTS", "shivamskr151@gmail.com,muskan.betla@gmail.com,msdeo990@gmail.com,wr.gowthamvarma@gmail.com,sharavan.m@delhivery.com,shahill.suswal@delhivery.com")
+REPORT_RECIPIENTS = os.getenv("REPORT_RECIPIENTS", "information@variphi.com,muskan.betla@gmail.com,wr.gowthamvarma@gmail.com,sharavan.m@delhivery.com,shahill.suswal@delhivery.com,nitish@variphi.com,msdeo@variphi.com,shivam@variphi.com")
 
 _RESOLVED_BASE_URL = None
 
