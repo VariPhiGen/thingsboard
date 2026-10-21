@@ -12,7 +12,7 @@ from infra_reports.config import DEFAULT_PROFILES, REPORT_TZ, ConfigError, Setti
 from infra_reports.delivery import ReportError, render_pdf, send_email
 from infra_reports.layout import fmt_latest, fmt_val, is_fresh
 from infra_reports.metrics import BUCKET_MS
-from infra_reports.reports import REPORTS, generate_dg_set_html, generate_lt_panels_html
+from infra_reports.reports import REPORTS, generate_dg_set_html, generate_lt_panels_html, generate_ro_plant_html
 
 START = 1_000 * BUCKET_MS
 END = START + 48 * BUCKET_MS
@@ -118,6 +118,55 @@ class ReportsTest(unittest.TestCase):
         ]))
         self.assertIn("NO LIVE DATA", html)
         self.assertIn("0.0 kW", html)  # total power excludes the stale 678 kW
+
+    def test_ro_report_dashboard_alignment(self):
+        # Verify all 7 dashboard telemetry keys are rendered and fresh data shows correctly
+        ro = device("RO", "ro", {
+            "tds_ppm": "55.0",
+            "water_flow": "12.5",
+            "salinity_ppm": "54.0",
+            "ec_us_cm": "110.5",
+            "temperature_c": "30.5",
+            "pressure": "45.0",
+            "ph": "7.2",
+        }, agg_24h={
+            "tds_ppm_24h_avg": 55.0, "tds_ppm_24h_min": 50.0, "tds_ppm_24h_max": 62.0,
+            "water_flow_24h_avg": 12.0, "water_flow_24h_min": 0.0, "water_flow_24h_max": 15.0,
+            "salinity_ppm_24h_avg": 54.0, "salinity_ppm_24h_min": 50.0, "salinity_ppm_24h_max": 60.0,
+            "ec_us_cm_24h_avg": 110.0, "ec_us_cm_24h_min": 100.0, "ec_us_cm_24h_max": 120.0,
+            "temperature_c_24h_avg": 30.0, "temperature_c_24h_min": 28.0, "temperature_c_24h_max": 32.0,
+            "pressure_24h_avg": 45.0, "pressure_24h_min": 40.0, "pressure_24h_max": 50.0,
+            "ph_24h_avg": 7.2, "ph_24h_min": 7.0, "ph_24h_max": 7.4,
+        }, series_24h={
+            "tds_ppm": [55.0] * 48,
+            "water_flow": [12.0] * 48,
+            "salinity_ppm": [54.0] * 48,
+            "ec_us_cm": [110.0] * 48,
+            "temperature_c": [30.0] * 48,
+        })
+        html = generate_ro_plant_html(self.summary([ro]))
+        self.assertIn("TDS (Total Dissolved Solids)", html)
+        self.assertIn("55 ppm", html)
+        self.assertIn("Permeate Water Flow Rate", html)
+        self.assertIn("12.5 L/min", html)
+        self.assertIn("Salinity Level", html)
+        self.assertIn("54 ppm", html)
+        self.assertIn("Electrical Conductivity (EC)", html)
+        self.assertIn("110.5 µS/cm", html)
+        self.assertIn("Water Temperature", html)
+        self.assertIn("30.5 °C", html)
+        self.assertIn("RO Membrane Pressure", html)
+        self.assertIn("45.0 psi", html)
+        self.assertIn("pH Level", html)
+        self.assertIn("7.2", html)
+        self.assertIn("OPERATIONAL", html)
+        self.assertNotIn("NO DATA IN PERIOD", html)
+
+    def test_ro_report_stale_data_shows_no_data_in_period(self):
+        ro_stale = device("RO", "ro", {"tds": "123"}, ts=START - 100, series_24h={})
+        html = generate_ro_plant_html(self.summary([ro_stale]))
+        self.assertIn("NO DATA IN PERIOD", html)
+
 
 
 class DeliveryTest(unittest.TestCase):

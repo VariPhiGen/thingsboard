@@ -380,10 +380,54 @@ def tds_compliance(tds):
     if tds is None:
         return _compliance("No Data", "grey"), "No Data"
     if tds < 200:
-        return _compliance("Optimal (&lt; 200 ppm)", "green"), "Optimal (&lt; 200 ppm)"
+        return _compliance("Optimal (&lt; 200 ppm)", "green"), "Optimal (< 200 ppm)"
     if tds <= 500:
         return _compliance("Acceptable (200-500 ppm)", "amber"), "Acceptable (200-500 ppm)"
-    return _compliance("High (&gt; 500 ppm)", "red"), "High (&gt; 500 ppm)"
+    return _compliance("High (&gt; 500 ppm)", "red"), "High (> 500 ppm)"
+
+
+def flow_compliance(flow):
+    if flow is None:
+        return _compliance("No Data", "grey"), "No Data"
+    if flow > 0:
+        return _compliance("Normal Flow", "green"), "Normal Flow"
+    return _compliance("No Flow", "amber"), "No Flow"
+
+
+def salinity_compliance(sal):
+    if sal is None:
+        return _compliance("No Data", "grey"), "No Data"
+    if sal <= 200:
+        return _compliance("Optimal (&lt; 200 ppm)", "green"), "Optimal (< 200 ppm)"
+    if sal <= 500:
+        return _compliance("Acceptable (200-500 ppm)", "amber"), "Acceptable (200-500 ppm)"
+    return _compliance("High (&gt; 500 ppm)", "red"), "High (> 500 ppm)"
+
+
+def ec_compliance(ec):
+    if ec is None:
+        return _compliance("No Data", "grey"), "No Data"
+    if ec <= 500:
+        return _compliance("Optimal (&lt; 500 µS/cm)", "green"), "Optimal (< 500 µS/cm)"
+    if ec <= 1000:
+        return _compliance("Acceptable (500-1000 µS/cm)", "amber"), "Acceptable (500-1000 µS/cm)"
+    return _compliance("High (&gt; 1000 µS/cm)", "red"), "High (> 1000 µS/cm)"
+
+
+def temp_compliance(temp):
+    if temp is None:
+        return _compliance("No Data", "grey"), "No Data"
+    if 15 <= temp <= 35:
+        return _compliance("Normal (15-35 °C)", "green"), "Normal (15-35 °C)"
+    return _compliance("Out of Normal Range", "amber"), "Out of Normal Range"
+
+
+def pressure_compliance(press):
+    if press is None:
+        return _compliance("No Data", "grey"), "No Data"
+    if press <= 65:
+        return _compliance("Normal (&lt; 65 psi)", "green"), "Normal (< 65 psi)"
+    return _compliance("High (&gt; 65 psi)", "red"), "High (> 65 psi)"
 
 
 def ph_compliance(ph):
@@ -394,18 +438,33 @@ def ph_compliance(ph):
     return _compliance("Out of Range (6.5 - 8.5)", "red"), "Out of Range (6.5 - 8.5)"
 
 
+def _resolve_tds_key(ro_dev, agg, tel):
+    """Prefers 'tds_ppm' (matches live hardware and Dashboard), falls back to 'tds'."""
+    if not ro_dev:
+        return "tds"
+    if "tds_ppm_24h_avg" in agg or is_fresh(ro_dev, "tds_ppm"):
+        return "tds_ppm"
+    if "tds_ppm" in tel and "tds" not in tel:
+        return "tds_ppm"
+    if "tds_ppm" in tel and ro_dev.get("telemetry_ts", {}).get("tds_ppm", 0) >= ro_dev.get("telemetry_ts", {}).get("tds", 0):
+        return "tds_ppm"
+    return "tds"
+
+
 def generate_ro_plant_html(devices_summary):
     ro_dev = _single(devices_summary, "ro")
     tel = ro_dev["telemetry"] if ro_dev else {}
     agg = ro_dev["agg_24h"] if ro_dev else {}
     last_data = ro_dev["last_activity"] if ro_dev else "No activity"
 
-    tds, flow, ph = valid_float(tel.get("tds")), valid_float(tel.get("water_flow")), valid_float(tel.get("ph"))
-    flow_c = ((_compliance("No Data", "grey"), "No Data") if flow is None
-              else (_compliance("Normal Flow", "green"), "Normal Flow") if flow > 0
-              else (_compliance("No Flow", "amber"), "No Flow"))
-    press_c = ((_compliance("No Data", "grey"), "No Data") if valid_float(tel.get("pressure")) is None
-               else (_compliance("Monitored", "blue"), "Monitored"))
+    tds_key = _resolve_tds_key(ro_dev, agg, tel)
+    tds = valid_float(tel.get(tds_key))
+    flow = valid_float(tel.get("water_flow"))
+    sal = valid_float(tel.get("salinity_ppm"))
+    ec = valid_float(tel.get("ec_us_cm"))
+    temp = valid_float(tel.get("temperature_c"))
+    press = valid_float(tel.get("pressure"))
+    ph = valid_float(tel.get("ph"))
 
     def param_row(label, key, unit, comp, decimals=1):
         comp_html, comp_text = comp
@@ -423,36 +482,64 @@ def generate_ro_plant_html(devices_summary):
         """
 
     rows_html = (
-        param_row("TDS (Total Dissolved Solids)", "tds", "ppm", tds_compliance(tds), 0)
-        + param_row("Permeate Water Flow Rate", "water_flow", "L/min", flow_c)
-        + param_row("RO Membrane Pressure", "pressure", "psi", press_c)
-        + param_row("pH Level", "ph", "", ph_compliance(ph))
+        param_row("TDS (Total Dissolved Solids)", tds_key, "ppm", tds_compliance(tds), 0)
+        + param_row("Permeate Water Flow Rate", "water_flow", "L/min", flow_compliance(flow), 1)
+        + param_row("Salinity Level", "salinity_ppm", "ppm", salinity_compliance(sal), 0)
+        + param_row("Electrical Conductivity (EC)", "ec_us_cm", "µS/cm", ec_compliance(ec), 1)
+        + param_row("Water Temperature", "temperature_c", "°C", temp_compliance(temp), 1)
+        + param_row("RO Membrane Pressure", "pressure", "psi", pressure_compliance(press), 1)
+        + param_row("pH Level", "ph", "", ph_compliance(ph), 1)
     )
 
     kpis_html = (
-        kpi(fmt_latest(ro_dev, "tds", "ppm", 0), "Latest TDS Level", "#0288d1")
-        + kpi(fmt_val(agg.get("tds_24h_avg"), "ppm", 0), "24h Avg TDS", "#039be5")
-        + kpi(fmt_latest(ro_dev, "water_flow", "L/min"), "Permeate Water Flow", "#00796b")
-        + kpi(fmt_latest(ro_dev, "pressure", "psi"), "RO Pressure", "#2e7d32")
+        kpi(fmt_latest(ro_dev, tds_key, "ppm", 0), "Latest TDS Level", "#0288d1")
+        + kpi(fmt_val(agg.get(f"{tds_key}_24h_avg"), "ppm", 0), "24h Avg TDS", "#039be5")
+        + kpi(fmt_latest(ro_dev, "water_flow", "L/min", 1), "Permeate Water Flow", "#00796b")
+        + kpi(fmt_latest(ro_dev, "salinity_ppm", "ppm", 0), "Water Salinity", "#7b1fa2")
+        + kpi(fmt_latest(ro_dev, "temperature_c", "°C", 1), "Water Temperature", "#e65100")
     )
 
     ro_series = ro_dev["series_24h"] if ro_dev else {}
     start_ts = _period_start(devices_summary)
-    if any(v is not None for vals in ro_series.values() for v in vals):
-        ro_charts = [
-            chart_card(title, unit, [(title, SERIES_COLORS[0], ro_series.get(key, []))], start_ts)
-            for title, key, unit in [("TDS", "tds", "ppm"), ("Permeate Water Flow", "water_flow", "L/min"),
-                                     ("RO Membrane Pressure", "pressure", "psi"), ("pH Level", "ph", "pH")]
-        ]
-    else:
+
+    candidate_charts = [
+        ("TDS", tds_key, "ppm"),
+        ("Permeate Water Flow", "water_flow", "L/min"),
+        ("Salinity", "salinity_ppm", "ppm"),
+        ("Electrical Conductivity (EC)", "ec_us_cm", "µS/cm"),
+        ("Water Temperature", "temperature_c", "°C"),
+        ("RO Membrane Pressure", "pressure", "psi"),
+        ("pH Level", "ph", "pH"),
+    ]
+    ro_charts = [
+        chart_card(title, unit, [(title, SERIES_COLORS[i % len(SERIES_COLORS)], ro_series.get(key, []))], start_ts)
+        for i, (title, key, unit) in enumerate(candidate_charts)
+        if any(v is not None for v in ro_series.get(key, []))
+    ]
+    if not ro_charts:
         ro_charts = [no_data()]
+
+    has_period_data = (
+        any(v is not None for vals in ro_dev.get("series_24h", {}).values() for v in (vals if isinstance(vals, list) else [vals]))
+        or any(is_fresh(ro_dev, k) for k in ro_dev.get("telemetry", {}))
+    ) if ro_dev else False
+
+    alarms_count = ro_dev.get("alarms_count", 0) if ro_dev else 0
+    historical = is_historical(devices_summary)
 
     if ro_dev is None:
         status_badge = badge("DEVICE NOT FOUND", "grey")
-    elif is_fresh(ro_dev, "status"):
-        status_badge = badge(tel.get("status"), "blue")
-    else:
+    elif not has_period_data:
         status_badge = badge("NO DATA IN PERIOD", "grey")
+    elif alarms_count > 0:
+        alarm_label = f"{alarms_count:,} ALARM(S) {'RAISED' if historical else 'ACTIVE'}"
+        status_badge = badge(alarm_label, "amber")
+    elif is_fresh(ro_dev, "status") and tel.get("status"):
+        status_badge = badge(tel.get("status"), "blue")
+    elif flow is not None and flow > 0:
+        status_badge = badge("OPERATIONAL", "green")
+    else:
+        status_badge = badge("ONLINE / STANDBY", "blue")
 
     body_html = f"""
     <div class="section">
@@ -460,12 +547,12 @@ def generate_ro_plant_html(devices_summary):
         <table class="data">
             <thead>
                 <tr style="background-color:#e1f5fe; border-bottom:2px solid #b3e5fc;">
-                    <th style="width:22%;">Parameter</th>
+                    <th style="width:24%;">Parameter</th>
                     <th class="r" style="width:16%;">Latest Reading</th>
                     <th class="r" style="width:12%;">24h Average</th>
                     <th class="r" style="width:12%;">24h Minimum</th>
                     <th class="r" style="width:12%;">24h Maximum</th>
-                    <th style="width:26%;">Quality Compliance</th>
+                    <th style="width:24%;">Quality Compliance</th>
                 </tr>
             </thead>
             <tbody>{rows_html}</tbody>

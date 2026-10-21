@@ -47,7 +47,7 @@ HISTORY_KEYS = {
            "run_hours"},
     "lt": {f"{prefix}_{m}" for _, prefix in LT_PANELS for m in ("power", "voltage", "current", "frequency")},
     "fire": {"relay_online"} | {f"cylinder_pressure_{i}" for i in range(1, 10)},
-    "ro": {"tds", "water_flow", "pressure", "ph"},
+    "ro": {"tds", "tds_ppm", "water_flow", "pressure", "ph", "salinity_ppm", "temperature_c", "ec_us_cm"},
 }
 
 
