@@ -33,6 +33,9 @@ BASE_URL = DEFAULT_BASE_URLS[0]
 
 SYSADMIN_USER = os.getenv("TB_USER", "sysadmin@thingsboard.org")
 SYSADMIN_PASS = os.getenv("TB_PASS", "sysadmin")
+# Preferred: direct tenant-admin login (no sysadmin impersonation needed).
+TENANT_USER = os.getenv("TB_TENANT_USER", "").strip()
+TENANT_PASS = os.getenv("TB_TENANT_PASS", "")
 
 # Email SMTP Settings
 SMTP_SERVER = os.getenv("SMTP_HOST") or os.getenv("SMTP_SERVER", "smtpout.secureserver.net")
@@ -50,18 +53,21 @@ def get_base_url():
         return _RESOLVED_BASE_URL
 
     candidates = [
+        os.getenv("TB_BASE_URL", "").strip().rstrip("/"),
         "http://172.17.0.1:9091",
         "http://172.20.0.1:9091",
-        os.getenv("TB_BASE_URL", "").strip(),
         "http://localhost:9091"
     ]
     candidates = [u for u in candidates if u]
 
     for base in candidates:
         url = f"{base}/api/auth/login"
-        payload = {"username": SYSADMIN_USER, "password": SYSADMIN_PASS}
+        if TENANT_USER and TENANT_PASS:
+            payload = {"username": TENANT_USER, "password": TENANT_PASS}
+        else:
+            payload = {"username": SYSADMIN_USER, "password": SYSADMIN_PASS}
         try:
-            res = requests.post(url, json=payload, headers={"Accept": "application/json"}, timeout=3)
+            res = requests.post(url, json=payload, headers={"Accept": "application/json"}, timeout=10)
             if res.status_code == 200:
                 _RESOLVED_BASE_URL = base
                 return base
@@ -89,6 +95,9 @@ def safe_float(val, default=0.0):
 
 def get_tenant_headers():
     base = get_base_url()
+    if TENANT_USER and TENANT_PASS:
+        tenant_token = login(TENANT_USER, TENANT_PASS)
+        return {"X-Authorization": f"Bearer {tenant_token}", "Content-Type": "application/json"}
     sys_token = login(SYSADMIN_USER, SYSADMIN_PASS)
     sys_headers = {"X-Authorization": f"Bearer {sys_token}", "Content-Type": "application/json"}
 
