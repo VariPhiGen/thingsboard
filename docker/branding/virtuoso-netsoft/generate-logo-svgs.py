@@ -17,8 +17,13 @@ def main() -> None:
     svg = (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {VIEWBOX_W} {VIEWBOX_H}" '
         f'role="img" aria-label="{LABEL}">\n'
+        f'  <defs>\n'
+        f'    <filter id="white-logo">\n'
+        f'      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0"/>\n'
+        f'    </filter>\n'
+        f'  </defs>\n'
         f'  <image width="{VIEWBOX_W}" height="{VIEWBOX_H}" preserveAspectRatio="xMidYMid meet"\n'
-        f'    href="data:image/png;base64,{b64}"/>\n'
+        f'    filter="url(#white-logo)" href="data:image/png;base64,{b64}"/>\n'
         f"</svg>\n"
     )
     for name in ("logo_title_white.svg", "logo_white.svg"):
