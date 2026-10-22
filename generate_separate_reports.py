@@ -445,7 +445,7 @@ def generate_fire_suppression_report(devices_summary):
     date_str = datetime.now().strftime('%d %B %Y')
     time_str = datetime.now().strftime('%H:%M:%S IST')
 
-    fire_dev = next((d for d in devices_summary if "Fire" in d['name'] or d['type'] == 'LT Panel Fire Profile'), None)
+    fire_dev = next((d for d in devices_summary if ("Fire" in d['name'] and "UPS Room 2" not in d['name']) or d['name'] == 'Fire Suppression'), None)
 
     tel = fire_dev['telemetry'] if fire_dev else {}
     alarms_count = fire_dev['alarms_count'] if fire_dev else 0
@@ -549,6 +549,135 @@ def generate_fire_suppression_report(devices_summary):
     return html
 
 # ==============================================================================
+# REPORT 4: FIRE SUPPRESSION UPS ROOM 2 REPORT GENERATOR
+# ==============================================================================
+def generate_fire_suppression_ups_room_2_report(devices_summary):
+    date_str = datetime.now().strftime('%d %B %Y')
+    time_str = datetime.now().strftime('%H:%M:%S IST')
+
+    fire_dev = next((d for d in devices_summary if "UPS Room 2" in d['name']), None)
+
+    tel = fire_dev['telemetry'] if fire_dev else {}
+    alarms_count = fire_dev['alarms_count'] if fire_dev else 0
+    is_active = fire_dev['is_active'] if fire_dev else False
+
+    # Check 10 cylinders/panels in UPS Room 2
+    # 1 / '1' = High Pressure (Normal), 0 / '0' = Low Pressure (Fault)
+    cyl_statuses = []
+    for i in range(1, 11):
+        k = f"fire_suppression_{i}_pressure"
+        val = tel.get(k)
+        if val is None:
+            cyl_statuses.append(None)
+        else:
+            cyl_statuses.append(str(val).lower() in ('1', 'true'))
+
+    cyl_reported = [s for s in cyl_statuses if s is not None]
+    cyl_ok_count = sum(1 for s in cyl_reported if s)
+    total_panels = 10
+    has_fault = any(s is False for s in cyl_statuses)
+
+    sys_status_badge = (
+        '<span style="background-color:#4caf50;color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;">ALL CYLINDERS NORMAL</span>'
+        if (not has_fault and alarms_count == 0 and len(cyl_reported) > 0)
+        else '<span style="background-color:#f44336;color:#fff;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;">LOW PRESSURE DETECTED</span>'
+    )
+
+    panels_rows = ""
+    for i in range(1, 11):
+        cyl = cyl_statuses[i - 1]
+        if cyl is None:
+            cyl_badge = '<span style="background-color:#9e9e9e;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">NO DATA</span>'
+            status_text = '<span style="color:#757575;">No reading</span>'
+        elif cyl:
+            cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">HIGH PRESSURE (OK)</span>'
+            status_text = '<span style="color:#2e7d32;font-weight:bold;">Normal</span>'
+        else:
+            cyl_badge = '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">LOW PRESSURE</span>'
+            status_text = '<span style="color:#c62828;font-weight:bold;">Attention Required</span>'
+
+        panels_rows += f"""
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+            <td style="padding:12px;font-weight:bold;color:#c62828;">Fire Suppression {i}</td>
+            <td style="padding:12px;">UPS Room 2 &mdash; Gas Cylinder {i}</td>
+            <td style="padding:12px;text-align:center;">{cyl_badge}</td>
+            <td style="padding:12px;">Pressure Switch Sensor</td>
+            <td style="padding:12px;">{status_text}</td>
+        </tr>
+        """
+
+    active_badge = (
+        '<span style="background-color:#4caf50;color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:bold;">ONLINE</span>'
+        if is_active
+        else '<span style="background-color:#757575;color:#fff;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:bold;">STANDBY</span>'
+    )
+
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Daily Fire Suppression UPS Room 2 Safety Report</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px;">
+        <div style="max-width: 960px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            
+            <!-- Header -->
+            <div style="background: linear-gradient(135deg, #b71c1c 0%, #c62828 100%); color: #ffffff; padding: 25px 30px;">
+                <h1 style="margin: 0; font-size: 24px; letter-spacing: 0.5px;">🧯 Daily Fire Suppression Safety Report &mdash; UPS Room 2</h1>
+                <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 14px;">Date: {date_str} | Generated At: {time_str} | Overall Status: {sys_status_badge}</p>
+            </div>
+
+            <!-- Executive Summary Cards -->
+            <div style="display: flex; padding: 20px; background: #fafafa; border-bottom: 1px solid #eeeeee;">
+                <div style="flex: 1; text-align: center; padding: 12px; background: #ffffff; margin: 4px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div style="font-size: 24px; font-weight: bold; color: {'#4caf50' if is_active else '#757575'};">{active_badge}</div>
+                    <div style="font-size: 11px; color: #666; text-transform: uppercase;">Zone Gateway Status</div>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 12px; background: #ffffff; margin: 4px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div style="font-size: 24px; font-weight: bold; color: #1565c0;">10 Panels</div>
+                    <div style="font-size: 11px; color: #666; text-transform: uppercase;">Monitored Cylinders</div>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 12px; background: #ffffff; margin: 4px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div style="font-size: 24px; font-weight: bold; color: {'#4caf50' if cyl_ok_count == total_panels else '#ef6c00'};">{cyl_ok_count} / {total_panels} OK</div>
+                    <div style="font-size: 11px; color: #666; text-transform: uppercase;">Normal Pressure</div>
+                </div>
+                <div style="flex: 1; text-align: center; padding: 12px; background: #ffffff; margin: 4px; border-radius: 6px; border: 1px solid #e0e0e0;">
+                    <div style="font-size: 24px; font-weight: bold; color: {'#4caf50' if alarms_count == 0 else '#f44336'};">{alarms_count} Active</div>
+                    <div style="font-size: 11px; color: #666; text-transform: uppercase;">Safety Alarms</div>
+                </div>
+            </div>
+
+            <!-- Breakdown Table -->
+            <div style="padding: 20px;">
+                <h3 style="color: #333; margin-top: 0;">📊 UPS Room 2 &mdash; 10 Fire Panel Zones &amp; Cylinder Pressures</h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background-color: #ffebee; text-align: left; border-bottom: 2px solid #ffcdd2;">
+                            <th style="padding: 10px;">Panel Zone</th>
+                            <th style="padding: 10px;">Location / Description</th>
+                            <th style="padding: 10px; text-align:center;">Cylinder Pressure</th>
+                            <th style="padding: 10px;">Sensor Type</th>
+                            <th style="padding: 10px;">Health State</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {panels_rows}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer -->
+            <div style="background: #f0f4f8; padding: 15px; text-align: center; font-size: 12px; color: #777777; border-top: 1px solid #e0e0e0;">
+                Automated Fire Suppression Safety Report &bull; Virtuoso NetSoft Infrastructure Operations
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
+# ==============================================================================
 # EMAIL SENDER FOR SEPARATE REPORTS
 # ==============================================================================
 def send_single_report_email(subject, html_content, recipients_override=None):
@@ -597,6 +726,7 @@ def generate_all_separate_reports(summary=None):
     dg_html = generate_dg_set_report(summary)
     lt_html = generate_lt_panels_report(summary)
     fire_html = generate_fire_suppression_report(summary)
+    fire_ups2_html = generate_fire_suppression_ups_room_2_report(summary)
 
     date_str = datetime.now().strftime('%d %b %Y')
 
@@ -612,6 +742,10 @@ def generate_all_separate_reports(summary=None):
         "fire_suppression": {
             "subject": f"🧯 Daily Fire Suppression Safety Report — {date_str}",
             "html": fire_html
+        },
+        "fire_ups_room2": {
+            "subject": f"🧯 Daily Fire Suppression UPS Room 2 Safety Report — {date_str}",
+            "html": fire_ups2_html
         }
     }
 
@@ -626,15 +760,18 @@ def main():
         p1 = "/home/ubuntu/thingsboard/dg_set_report_preview.html"
         p2 = "/home/ubuntu/thingsboard/lt_panels_report_preview.html"
         p3 = "/home/ubuntu/thingsboard/fire_suppression_report_preview.html"
+        p4 = "/home/ubuntu/thingsboard/fire_suppression_ups_room2_report_preview.html"
 
         with open(p1, "w", encoding="utf-8") as f: f.write(reports["dg_set"]["html"])
         with open(p2, "w", encoding="utf-8") as f: f.write(reports["lt_panels"]["html"])
         with open(p3, "w", encoding="utf-8") as f: f.write(reports["fire_suppression"]["html"])
+        with open(p4, "w", encoding="utf-8") as f: f.write(reports["fire_ups_room2"]["html"])
 
         print(f"✅ HTML Previews saved:")
         print(f"   1. DG Set: {p1}")
         print(f"   2. LT Panels: {p2}")
         print(f"   3. Fire Suppression: {p3}")
+        print(f"   4. Fire Suppression UPS Room 2: {p4}")
 
     if "--send-now" in args:
         recipients = None
@@ -642,17 +779,38 @@ def main():
             if a.startswith("--to="):
                 recipients = a.split("=")[1]
         
-        print("\nSending 3 separate email reports...")
+        print("\nSending 4 separate email reports...")
         send_single_report_email(reports["dg_set"]["subject"], reports["dg_set"]["html"], recipients)
         send_single_report_email(reports["lt_panels"]["subject"], reports["lt_panels"]["html"], recipients)
         send_single_report_email(reports["fire_suppression"]["subject"], reports["fire_suppression"]["html"], recipients)
+        send_single_report_email(reports["fire_ups_room2"]["subject"], reports["fire_ups_room2"]["html"], recipients)
         print("Done!")
+
+    if "--daemon" in args:
+        print("=================================================================")
+        print("   SEPARATE EMAIL REPORTS DAEMON ACTIVATED (Runs at 08:00 AM IST)")
+        print("=================================================================")
+        while True:
+            # Check for 08:00 AM IST (which is 02:30 AM UTC)
+            now_utc = datetime.utcnow()
+            # 02:30 UTC = 08:00 AM IST
+            if now_utc.hour == 2 and now_utc.minute == 30:
+                print(f"[{now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')}] Dispatching 4 daily scheduled separate reports...")
+                summary = fetch_master_devices_summary()
+                reports = generate_all_separate_reports(summary)
+                send_single_report_email(reports["dg_set"]["subject"], reports["dg_set"]["html"])
+                send_single_report_email(reports["lt_panels"]["subject"], reports["lt_panels"]["html"])
+                send_single_report_email(reports["fire_suppression"]["subject"], reports["fire_suppression"]["html"])
+                send_single_report_email(reports["fire_ups_room2"]["subject"], reports["fire_ups_room2"]["html"])
+                time.sleep(60)
+            time.sleep(30)
 
     if not args:
         print("\nUsage:")
-        print("  python3 generate_separate_reports.py --preview              (Generates HTML preview files for all 3 reports)")
-        print("  python3 generate_separate_reports.py --send-now             (Sends all 3 separate email reports immediately)")
-        print("  python3 generate_separate_reports.py --send-now --to=a@b.com (Sends 3 separate reports to specific email)")
+        print("  python3 generate_separate_reports.py --preview              (Generates HTML preview files for all 4 reports)")
+        print("  python3 generate_separate_reports.py --send-now             (Sends all 4 separate email reports immediately)")
+        print("  python3 generate_separate_reports.py --send-now --to=a@b.com (Sends 4 separate reports to specific email)")
+        print("  python3 generate_separate_reports.py --daemon               (Runs background scheduler daily at 08:00 AM IST)")
 
 if __name__ == "__main__":
     main()

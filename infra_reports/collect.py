@@ -46,7 +46,7 @@ HISTORY_KEYS = {
     "dg": {"power_kw", "fuel_level", "battery_voltage", "coolant_temp", "oil_pressure", "engine_rpm", "energy_kwh",
            "run_hours"},
     "lt": {f"{prefix}_{m}" for _, prefix in LT_PANELS for m in ("power", "voltage", "current", "frequency")},
-    "fire": {"relay_online"} | {f"cylinder_pressure_{i}" for i in range(1, 10)},
+    "fire": {"relay_online"} | {f"cylinder_pressure_{i}" for i in range(1, 10)} | {f"fire_suppression_{i}_pressure" for i in range(1, 11)},
     "ro": {"tds", "tds_ppm", "water_flow", "pressure", "ph", "salinity_ppm", "temperature_c", "ec_us_cm"},
 }
 

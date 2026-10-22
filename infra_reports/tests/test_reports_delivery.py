@@ -100,6 +100,13 @@ class ReportsTest(unittest.TestCase):
         self.assertNotIn("Time Series Trends", html)
         self.assertNotIn("<svg", html)
 
+    def test_fire_ups_room2_report(self):
+        ups_dev = device("Fire Suppression UPS Room 2", "fire", {f"fire_suppression_{i}_pressure": "1" if i > 6 else "0" for i in range(1, 11)})
+        html = REPORTS[4][3](self.summary([ups_dev]))
+        self.assertIn("UPS Room 2", html)
+        self.assertIn("4 / 10 OK", html)
+        self.assertIn("Fire Suppression 10", html)
+
     def test_dg_energy_and_meter_mismatch(self):
         html = generate_dg_set_html(self.summary([
             device("DG1", "dg", {}, energy_24h_kwh=100.0, energy_coverage=0.95, agg_24h={"energy_kwh_24h_delta": 1000.0}),

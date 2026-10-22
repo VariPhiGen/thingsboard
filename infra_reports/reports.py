@@ -262,8 +262,24 @@ def generate_lt_panels_html(devices_summary):
 # ==============================================================================
 # 3. FIRE SUPPRESSION
 # ==============================================================================
+def _fire_main(devices_summary):
+    devices = _devices(devices_summary, "fire")
+    for d in devices:
+        if "UPS Room 2" not in d.get("name", ""):
+            return d
+    return devices[0] if devices else None
+
+
+def _fire_ups2(devices_summary):
+    devices = _devices(devices_summary, "fire")
+    for d in devices:
+        if "UPS Room 2" in d.get("name", ""):
+            return d
+    return None
+
+
 def generate_fire_suppression_html(devices_summary):
-    fire_dev = _single(devices_summary, "fire")
+    fire_dev = _fire_main(devices_summary)
     tel = fire_dev["telemetry"] if fire_dev else {}
     agg = fire_dev["agg_24h"] if fire_dev else {}
     alarms_count = fire_dev["alarms_count"] if fire_dev else 0
@@ -366,6 +382,104 @@ def generate_fire_suppression_html(devices_summary):
         "linear-gradient(135deg, #b71c1c 0%, #c62828 100%)",
         report_meta(devices_summary, f" &nbsp;|&nbsp; Overall Status: {sys_status_badge}"), kpis_html, body_html,
         "Automated Fire Suppression 24h Safety PDF Report",
+    )
+
+
+# ==============================================================================
+# 3b. FIRE SUPPRESSION UPS ROOM 2
+# ==============================================================================
+def generate_fire_ups_room2_html(devices_summary):
+    fire_dev = _fire_ups2(devices_summary)
+    tel = fire_dev["telemetry"] if fire_dev else {}
+    agg = fire_dev["agg_24h"] if fire_dev else {}
+    alarms_count = fire_dev["alarms_count"] if fire_dev else 0
+    historical = is_historical(devices_summary)
+
+    def flag(key):
+        v = live_val(fire_dev, key)
+        if v is None:
+            return None
+        return str(v).lower() in ("1", "true")
+
+    cyl_statuses = [flag(f"fire_suppression_{i}_pressure") for i in range(1, 11)]
+    cyl_reported = [s for s in cyl_statuses if s is not None]
+    cyl_ok_count = sum(1 for s in cyl_reported if s)
+    cyl_all_ok = bool(cyl_reported) and cyl_ok_count == len(cyl_reported)
+
+    has_data = bool(cyl_reported)
+    if alarms_count:
+        sys_status_badge = badge(f"{alarms_count:,} ALARM(S) {'RAISED' if historical else 'ACTIVE'}", "red")
+    elif not has_data:
+        sys_status_badge = badge("NO DATA IN PERIOD", "grey")
+    elif cyl_all_ok:
+        sys_status_badge = badge("SYSTEM NORMAL", "green")
+    else:
+        sys_status_badge = badge(f"{len(cyl_reported) - cyl_ok_count} LOW PRESSURE FAULT(S)", "red")
+
+    is_online = fire_dev.get("is_active", False) if fire_dev else False
+    gateway_kpi = kpi("ONLINE" if is_online else "STANDBY", "Zone Gateway State", "#2e7d32" if is_online else "#757575")
+    monitored_kpi = kpi("10 Panels", "Monitored Cylinders", "#1565c0")
+    if not cyl_reported:
+        cyl_kpi = kpi("NO DATA", "Cylinders Pressure", "#9ca3af")
+    else:
+        cyl_color = "#2e7d32" if cyl_all_ok else "#c62828"
+        cyl_kpi = kpi(f"{cyl_ok_count} / 10 OK", "Normal Pressure", cyl_color)
+    alarms_kpi = kpi(f"{alarms_count} Active", "Safety Alarms", "#2e7d32" if alarms_count == 0 else "#c62828")
+
+    kpis_html = gateway_kpi + monitored_kpi + cyl_kpi + alarms_kpi
+
+    rows_html = ""
+    for i in range(1, 11):
+        cyl = cyl_statuses[i - 1]
+        cyl_badge = badge("NO DATA", "grey") if cyl is None else badge("HIGH PRESSURE (OK)", "green") if cyl else badge("LOW PRESSURE", "red")
+
+        ok_share = agg.get(f"fire_suppression_{i}_pressure_24h_avg")
+        samples = agg.get(f"fire_suppression_{i}_pressure_24h_count", 0)
+        ok_24h = (f'{fmt_val(ok_share * 100, "% OK")}<div class="muted">{samples:,} sample{"s" if samples != 1 else ""}</div>'
+                  if ok_share is not None else '<span class="na">No samples in period</span>')
+
+        if cyl is None:
+            health = '<span class="na">No Data</span>'
+        elif not cyl:
+            health = '<b style="color:#c62828;">Attention: Low Pressure</b>'
+        else:
+            health = '<b style="color:#2e7d32;">Normal</b>'
+
+        rows_html += f"""
+        <tr>
+            <td class="name" style="color:#c62828;">Fire Suppression {i}</td>
+            <td>UPS Room 2 &mdash; Gas Cylinder {i}</td>
+            <td class="c">{cyl_badge}</td>
+            <td>{ok_24h}</td>
+            <td>{health}</td>
+        </tr>
+        """
+
+    body_html = f"""
+    <div class="section">
+        <h3>UPS Room 2 &mdash; 10 Fire Panel Zones &amp; Cylinder Pressures</h3>
+        <table class="data">
+            <thead>
+                <tr style="background-color:#ffebee; border-bottom:2px solid #ffcdd2;">
+                    <th style="width:20%;">Panel Zone</th>
+                    <th style="width:25%;">Location / Description</th>
+                    <th class="c" style="width:20%;">Cylinder Pressure</th>
+                    <th style="width:20%;">24h Pressure Health</th>
+                    <th style="width:15%;">Status</th>
+                </tr>
+            </thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+    </div>
+    {alarm_section([fire_dev], historical) if fire_dev else ""}
+    """
+
+    return report_page(
+        "Daily 24-Hour Fire Suppression Safety Report — UPS Room 2",
+        "Daily 24-Hour Fire Suppression Safety Report &mdash; UPS Room 2",
+        "linear-gradient(135deg, #b71c1c 0%, #c62828 100%)",
+        report_meta(devices_summary, f" &nbsp;|&nbsp; Overall Status: {sys_status_badge}"), kpis_html, body_html,
+        "Automated Fire Suppression 24h Safety PDF Report • UPS Room 2",
     )
 
 
@@ -577,4 +691,5 @@ REPORTS = [
     ("lt_panels", "LT Panels Power Report", "LT_Panels_24h_Report", generate_lt_panels_html),
     ("fire_suppression", "Fire Suppression Safety Report", "Fire_Suppression_24h_Report", generate_fire_suppression_html),
     ("ro_plant", "RO Plant Water Quality Report", "RO_Plant_24h_Report", generate_ro_plant_html),
+    ("fire_ups_room2", "Fire Suppression UPS Room 2 Report", "Fire_Suppression_UPS_Room_2_24h_Report", generate_fire_ups_room2_html),
 ]

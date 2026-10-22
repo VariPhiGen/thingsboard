@@ -293,9 +293,15 @@ def generate_combined_24h_report(devices_summary):
         """
 
     # --------------------------------------------------------------------------
-    # SECTION 3: FIRE SUPPRESSION 24H BREAKDOWN
+    # SECTION 3A: MAIN FIRE SUPPRESSION 24H BREAKDOWN
     # --------------------------------------------------------------------------
-    fire_dev = next((d for d in devices_summary if "Fire" in d['name'] or d['type'] == 'LT Panel Fire Profile'), None)
+    fire_dev = next(
+        (d for d in devices_summary
+         if d.get("id") == "5f3a0930-cbdf-11ef-9366-c956973c4d51"
+         or (("fire" in (d.get("name") or "").lower() or d.get("type") == "LT Panel Fire Profile")
+             and "ups room 2" not in (d.get("name") or "").lower())),
+        None,
+    )
     fire_tel = fire_dev['telemetry'] if fire_dev else {}
     
     relay_online = str(fire_tel.get('relay_online', 'true')).lower() == 'true'
@@ -315,11 +321,49 @@ def generate_combined_24h_report(devices_summary):
 
         fire_rows += f"""
         <tr style="border-bottom: 1px solid #e0e0e0;">
-            <td style="padding:10px;font-weight:bold;color:#c62828;">Fire Suppression {i}</td>
+            <td style="padding:10px;font-weight:bold;color:#c62828;">Main Fire Suppression {i}</td>
             <td style="padding:10px;text-align:center;">{cyl_badge}</td>
             <td style="padding:10px;text-align:center;">{di_badge}</td>
             <td style="padding:10px;">Gas Pressure Sensor & Alarm Loop</td>
             <td style="padding:10px;color:#4caf50;font-weight:bold;">Operational (24h Monitored)</td>
+        </tr>
+        """
+
+    # --------------------------------------------------------------------------
+    # SECTION 3B: FIRE SUPPRESSION UPS ROOM 2 (10 MONITORED CYLINDERS)
+    # --------------------------------------------------------------------------
+    fire_ups2_dev = next(
+        (d for d in devices_summary
+         if d.get("id") == "7f45c350-ca32-11f1-a8a7-c1f9998e0221"
+         or "ups room 2" in (d.get("name") or "").lower()),
+        None,
+    )
+    fire_ups2_tel = fire_ups2_dev['telemetry'] if fire_ups2_dev else {}
+    fire_ups2_rows = ""
+    ups2_ok_count = 0
+    for i in range(1, 11):
+        raw_val = fire_ups2_tel.get(f"fire_suppression_{i}_pressure")
+        is_ok = False
+        if raw_val is not None:
+            v_str = str(raw_val).strip().lower()
+            if v_str in ("1", "1.0", "true", "ok", "high"):
+                is_ok = True
+        
+        if is_ok:
+            ups2_ok_count += 1
+            cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">HIGH PRESSURE (OK)</span>'
+            status_text = '<span style="color:#2e7d32;font-weight:bold;">Normal</span>'
+        else:
+            cyl_badge = '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">LOW PRESSURE</span>'
+            status_text = '<span style="color:#c62828;font-weight:bold;">Attention Required</span>'
+
+        fire_ups2_rows += f"""
+        <tr style="border-bottom: 1px solid #e0e0e0;">
+            <td style="padding:10px;font-weight:bold;color:#c62828;">Fire Suppression {i}</td>
+            <td style="padding:10px;">UPS Room 2 &mdash; Gas Cylinder {i}</td>
+            <td style="padding:10px;text-align:center;">{cyl_badge}</td>
+            <td style="padding:10px;">Pressure Switch Sensor</td>
+            <td style="padding:10px;">{status_text}</td>
         </tr>
         """
 
@@ -434,11 +478,11 @@ def generate_combined_24h_report(devices_summary):
             </div>
 
             <!-- ========================================================================= -->
-            <!-- SECTION 3: FIRE SUPPRESSION SYSTEM -->
+            <!-- SECTION 3A: MAIN FIRE SUPPRESSION SYSTEM -->
             <!-- ========================================================================= -->
             <div style="padding: 24px; border-bottom: 2px solid #e2e8f0;">
                 <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #dc2626; padding-bottom: 8px; margin-bottom: 16px;">
-                    <h2 style="margin: 0; color: #7f1d1d; font-size: 18px;">🧯 3. Fire Suppression System & 24h Safety Status</h2>
+                    <h2 style="margin: 0; color: #7f1d1d; font-size: 18px;">🧯 3A. Main Plant Fire Suppression & 24h Safety Status</h2>
                     <span style="font-size: 12px; color: #64748b; font-weight: bold;">Relay: {'ONLINE' if relay_online else 'OFFLINE'} | Cylinders: {f'{cyl_ok_count}/9 OK' if cyl_all_ok else f'{cyl_ok_count}/9 CHECK'}</span>
                 </div>
                 <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
@@ -453,6 +497,30 @@ def generate_combined_24h_report(devices_summary):
                     </thead>
                     <tbody>
                         {fire_rows}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ========================================================================= -->
+            <!-- SECTION 3B: FIRE SUPPRESSION UPS ROOM 2 -->
+            <!-- ========================================================================= -->
+            <div style="padding: 24px; border-bottom: 2px solid #e2e8f0;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #b71c1c; padding-bottom: 8px; margin-bottom: 16px;">
+                    <h2 style="margin: 0; color: #7f1d1d; font-size: 18px;">🧯 3B. Fire Suppression UPS Room 2 &mdash; 10 Panel Zones</h2>
+                    <span style="font-size: 12px; color: #64748b; font-weight: bold;">Status: {'ACTIVE' if fire_ups2_dev and fire_ups2_dev.get('is_active') else 'STANDBY'} | Cylinders: {ups2_ok_count}/10 OK</span>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background-color: #ffebee; text-align: left; border-bottom: 2px solid #ffcdd2;">
+                            <th style="padding: 10px;">Panel Zone</th>
+                            <th style="padding: 10px;">Location / Description</th>
+                            <th style="padding: 10px; text-align:center;">Cylinder Gas Pressure</th>
+                            <th style="padding: 10px;">Sensor Type</th>
+                            <th style="padding: 10px;">Operational Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {fire_ups2_rows}
                     </tbody>
                 </table>
             </div>

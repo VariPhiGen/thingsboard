@@ -178,6 +178,30 @@ def generate_html_report(devices_summary):
         if 'status' in tel:
             kpi_list.append(f"📊 <b>Status:</b> {tel['status']}")
 
+        # 3. Fire Suppression KPIs (Main Plant & UPS Room 2)
+        ups2_pressures = [tel.get(f"fire_suppression_{i}_pressure") for i in range(1, 11) if f"fire_suppression_{i}_pressure" in tel]
+        if ups2_pressures:
+            ok_cnt = sum(1 for v in ups2_pressures if str(v).strip().lower() in ("1", "1.0", "true", "ok", "high"))
+            kpi_list.append(f"🧯 <b>UPS Room 2 Cylinders:</b> {ok_cnt}/{len(ups2_pressures)} Normal Pressure")
+            if ok_cnt < len(ups2_pressures):
+                kpi_list.append(f"⚠️ <b>Low Pressure Alert:</b> {len(ups2_pressures) - ok_cnt} panels require attention")
+        elif any(k.startswith("cylinder_pressure_") for k in tel):
+            cyl_cnt = sum(1 for i in range(1, 10) if str(tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true')
+            kpi_list.append(f"🧯 <b>Main Plant Cylinders:</b> {cyl_cnt}/9 Normal")
+
+        # 4. LT Panels KPIs
+        lt_keys = [k for k in ('p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7') if k in tel]
+        if lt_keys or 'active_power' in tel:
+            p_vals = []
+            for k in ('p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7'):
+                if k in tel:
+                    try:
+                        p_vals.append(float(tel[k]))
+                    except (ValueError, TypeError):
+                        pass
+            tot_p = sum(p_vals)
+            kpi_list.append(f"⚡ <b>Total Panel Load:</b> {tot_p:.1f} kW ({len(p_vals)} circuits active)")
+
         metrics_str = "<br/>".join(kpi_list) if kpi_list else "<i style='color:#888;'>No 24h telemetry recorded</i>"
         alarms_str = f'<b style="color:#f44336;">{d["alarms_count"]} Active Alerts</b>' if d['alarms_count'] > 0 else '<span style="color:#4caf50;">Normal</span>'
 
