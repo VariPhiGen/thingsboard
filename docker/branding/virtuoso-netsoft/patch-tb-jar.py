@@ -88,13 +88,18 @@ DARK_CHARCOAL_CSS = """
       display: none !important;
     }
 
-    /* Hide Connect mobile app widget completely */
+    /* Hide Connect mobile app, Get started widgets, and broken widget error containers */
+    tb-dashboard-widget:has(.tb-error-container),
+    .tb-error-container,
     tb-mobile-app-qrcode-widget,
     .tb-mobile-app-qrcode-panel,
     tb-dashboard-widget:has(tb-mobile-app-qrcode-widget),
     tb-dashboard-widget:has(.tb-mobile-app-qrcode-panel),
     tb-dashboard-widget:has([title*="Connect mobile app"]),
     tb-dashboard-widget:has([title*="Download mobile app"]),
+    tb-dashboard-widget:has([title*="Get started"]),
+    tb-dashboard-widget:has([title*="Getting started"]),
+    tb-dashboard-widget:has([title*="Select show mobile QR code"]),
     tb-dashboard-widget:has(img[alt*="App Store"]),
     tb-dashboard-widget:has(img[alt*="Google Play"]) {
       display: none !important;
@@ -269,51 +274,100 @@ def main():
                 shutil.copyfileobj(f_in, f_out)
             print("    main-RUDBBS27.js patched & re-gzipped")
 
-    print("==> 7. Patching home page dashboard templates to remove Connect mobile app")
+    print("==> 7. Patching home page dashboard templates (remove broken IoT Hub & Get started, re-layout to full width)")
     import json
-    for dash_file in ["tenant_admin_home_page.json", "sys_admin_home_page.json"]:
-        dash_path = f"{PUBLIC_DIR}/assets/dashboard/{dash_file}"
-        if os.path.exists(dash_path):
-            with open(dash_path, 'r', encoding='utf-8') as f:
-                d = json.load(f)
-            
-            # Remove mobile_app_qr_code widget if present
-            removed_ids = set()
-            for wid, w in list(d.get('configuration', {}).get('widgets', {}).items()):
-                if w.get('typeFullFqn') == 'system.mobile_app_qr_code' or 'mobile-app' in str(w.get('config', {}).get('title')):
-                    del d['configuration']['widgets'][wid]
-                    removed_ids.add(wid)
-                    print(f"    Removed widget {wid} from {dash_file}")
+    
+    # 7a. Tenant Admin Home Page
+    dash_path = f"{PUBLIC_DIR}/assets/dashboard/tenant_admin_home_page.json"
+    if os.path.exists(dash_path):
+        with open(dash_path, 'r', encoding='utf-8') as f:
+            d = json.load(f)
 
-            # Remove from states -> mobile_app_qr_code -> layouts -> main -> widgets
-            states = d.get('configuration', {}).get('states', {})
-            if 'mobile_app_qr_code' in states:
-                mwidgets = states['mobile_app_qr_code'].get('layouts', {}).get('main', {}).get('widgets', {})
-                for wid in list(mwidgets.keys()):
-                    if wid in removed_ids or wid not in d.get('configuration', {}).get('widgets', {}):
-                        del mwidgets[wid]
-                        print(f"    Removed {wid} from mobile_app_qr_code layout in {dash_file}")
-                for wid in mwidgets.keys():
-                    mwidgets[wid]['sizeY'] = 58
-                    mwidgets[wid]['mobileHide'] = False
-                    print(f"    Set widget {wid} sizeY to 58 in mobile_app_qr_code layout in {dash_file}")
+        to_remove = set()
+        for wid, w in d.get('configuration', {}).get('widgets', {}).items():
+            title = str(w.get('config', {}).get('title', ''))
+            fqn = str(w.get('typeFullFqn', ''))
+            if ('iot_hub' in fqn or 'IoT Hub' in title or 
+                'getting_started' in fqn or 'Getting started' in title or 
+                'Select show mobile' in title or 'mobile-app' in title or 'mobile_app' in fqn):
+                to_remove.add(wid)
 
-            # In select show mobile QR code widget, render state mobile_app_qr_code (which now contains only Getting Started)
-            for wid, w in d.get('configuration', {}).get('widgets', {}).items():
-                if w.get('config', {}).get('title') == 'Select show mobile QR code':
-                    w['config']['settings']['markdownTextFunction'] = (
-                        "let html = '<div style=\"width: 100%; height: 100%;\">';\n"
-                        "let supportMobile = '${mobileQrEnabled:valuePlaceholder}';\n"
-                        "ctx.dashboardWidget.widgetLayout.mobileHide = false;\n"
-                        "html += '<tb-dashboard-state stateId=\"mobile_app_qr_code\" [ctx]=\"ctx\"></tb-dashboard-state>';\n"
-                        "html += '</div>';\n"
-                        "return html;"
-                    )
-                    print(f"    Updated markdownTextFunction in widget {wid} in {dash_file}")
+        for wid in to_remove:
+            d['configuration']['widgets'].pop(wid, None)
+            print(f"    Removed widget {wid} from tenant_admin_home_page.json")
 
-            with open(dash_path, 'w', encoding='utf-8') as f:
-                json.dump(d, f)
-            print(f"    {dash_file} patched and saved")
+        states = d.get('configuration', {}).get('states', {})
+        if 'mobile_app_qr_code' in states:
+            del states['mobile_app_qr_code']
+
+        if 'default' in states and 'main' in states['default'].get('layouts', {}):
+            main_widgets = states['default']['layouts']['main'].get('widgets', {})
+            for wid in list(main_widgets.keys()):
+                if wid in to_remove:
+                    del main_widgets[wid]
+
+            # Re-layout remaining 7 widgets across 120 columns seamlessly
+            layout_map = {
+                '35d3ac3b-f1af-dc3d-a1d1-11f351d16fc6': {'col': 0, 'row': 0, 'sizeX': 60, 'sizeY': 12},   # Devices
+                '7ac20b6a-dc40-b18e-9f5f-bca20bc693bb': {'col': 60, 'row': 0, 'sizeX': 60, 'sizeY': 12},  # Alarms
+                '6d6e2b1d-6ce7-4678-3745-c6b0897b2674': {'col': 0, 'row': 12, 'sizeX': 60, 'sizeY': 17},  # Dashboards
+                'd70cc256-4c7b-ee06-9905-b8c5e546605f': {'col': 60, 'row': 12, 'sizeX': 60, 'sizeY': 17}, # Activity / Transport messages
+                '9e3ef045-d8bc-1640-a3f4-2dd10b19d50e': {'col': 0, 'row': 29, 'sizeX': 40, 'sizeY': 14},   # Quick links
+                '867f82cf-ecf2-2d5c-35cb-08c6f2edc3a4': {'col': 40, 'row': 29, 'sizeX': 40, 'sizeY': 14},  # Documentation
+                'ebbd0a6e-8a47-e770-5086-7f4974250f2d': {'col': 80, 'row': 29, 'sizeX': 40, 'sizeY': 14},  # Usage info
+            }
+            for wid, pos in layout_map.items():
+                if wid in main_widgets:
+                    main_widgets[wid].update(pos)
+
+        with open(dash_path, 'w', encoding='utf-8') as f:
+            json.dump(d, f)
+        print("    tenant_admin_home_page.json cleaned and re-layouted to full 120-col width")
+
+    # 7b. Sys Admin Home Page
+    sys_path = f"{PUBLIC_DIR}/assets/dashboard/sys_admin_home_page.json"
+    if os.path.exists(sys_path):
+        with open(sys_path, 'r', encoding='utf-8') as f:
+            d = json.load(f)
+
+        to_remove = set()
+        for wid, w in d.get('configuration', {}).get('widgets', {}).items():
+            title = str(w.get('config', {}).get('title', ''))
+            fqn = str(w.get('typeFullFqn', ''))
+            if ('getting_started' in fqn or 'Getting started' in title or 
+                'Select show mobile' in title or 'mobile-app' in title or 'mobile_app' in fqn):
+                to_remove.add(wid)
+
+        for wid in to_remove:
+            d['configuration']['widgets'].pop(wid, None)
+            print(f"    Removed widget {wid} from sys_admin_home_page.json")
+
+        states = d.get('configuration', {}).get('states', {})
+        if 'mobile_app_qr_code' in states:
+            del states['mobile_app_qr_code']
+
+        if 'default' in states and 'main' in states['default'].get('layouts', {}):
+            main_widgets = states['default']['layouts']['main'].get('widgets', {})
+            for wid in list(main_widgets.keys()):
+                if wid in to_remove:
+                    del main_widgets[wid]
+
+            sys_layout_map = {
+                '163025d8-3ca4-dd1e-c17b-e40d8e03e8a8': {'col': 0, 'row': 0, 'sizeX': 60, 'sizeY': 15},   # Entities info cards
+                '4b5e47ed-c197-a937-d727-041ba8decec2': {'col': 60, 'row': 0, 'sizeX': 60, 'sizeY': 26},  # System info
+                '867f82cf-ecf2-2d5c-35cb-08c6f2edc3a4': {'col': 0, 'row': 15, 'sizeX': 60, 'sizeY': 14},  # Documentation
+                'd70cc256-4c7b-ee06-9905-b8c5e546605f': {'col': 60, 'row': 26, 'sizeX': 60, 'sizeY': 16}, # Transport messages
+                'd2784f6c-0518-fd95-1d28-b21f70bdcb10': {'col': 0, 'row': 29, 'sizeX': 60, 'sizeY': 13},  # Configured features
+                '66dcf1a2-9d83-6873-c693-d6a5d989b3f8': {'col': 0, 'row': 42, 'sizeX': 40, 'sizeY': 16},  # Version
+                '8acbf5df-f9fc-114d-216f-86f081aa4779': {'col': 40, 'row': 42, 'sizeX': 80, 'sizeY': 16}, # Functions
+            }
+            for wid, pos in sys_layout_map.items():
+                if wid in main_widgets:
+                    main_widgets[wid].update(pos)
+
+        with open(sys_path, 'w', encoding='utf-8') as f:
+            json.dump(d, f)
+        print("    sys_admin_home_page.json cleaned and re-layouted to full 120-col width")
 
     print("==> 8. Patching chunk-3WMNFA25.js (Keycloak SSO Logout)")
     chunk_path = f"{PUBLIC_DIR}/chunk-3WMNFA25.js"
