@@ -24,18 +24,55 @@ class ReportError(RuntimeError):
 
 # ------------------------------------------------------------------ PDF
 def resolve_pdf_service(urls):
-    """First pdf-generator URL whose /health answers (probed once each, no retries)."""
+    """First pdf-generator URL whose /health answers, or 'local' if wkhtmltopdf is installed."""
     for url in urls:
         try:
             if requests.get(f"{url}/health", timeout=(2, 5)).ok:
                 return url
         except requests.RequestException:
             continue
+    import shutil
+    if shutil.which("wkhtmltopdf"):
+        return "local"
     raise ReportError(f"PDF generator unreachable (tried {', '.join(urls)})")
 
 
 def render_pdf(session, service_url, html, filename, timeout=120):
-    """HTML -> PDF bytes via the pdf-generator service; raises ReportError on any failure."""
+    """HTML -> PDF bytes via local wkhtmltopdf or the pdf-generator service; raises ReportError on any failure."""
+    if service_url == "local":
+        import subprocess
+        import tempfile
+        import os
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as html_f:
+                html_f.write(html)
+                html_path = html_f.name
+            pdf_path = html_path.replace(".html", ".pdf")
+            cmd = [
+                "wkhtmltopdf",
+                "--disable-javascript",
+                "--page-size", "A4",
+                "--margin-top", "10mm",
+                "--margin-bottom", "10mm",
+                "--margin-left", "10mm",
+                "--margin-right", "10mm",
+                html_path,
+                pdf_path,
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+            if res.returncode == 0 and os.path.exists(pdf_path):
+                with open(pdf_path, "rb") as f:
+                    pdf_bytes = f.read()
+                try: os.remove(html_path)
+                except Exception: pass
+                try: os.remove(pdf_path)
+                except Exception: pass
+                if pdf_bytes.startswith(b"%PDF"):
+                    return pdf_bytes
+        except Exception as exc:
+            raise ReportError(f"Local PDF generation failed for {filename}: {exc}") from exc
+        raise ReportError(f"Local PDF generation failed for {filename}")
+
     try:
         res = session.post(f"{service_url}/render-raw-html-pdf", json={"html": html}, timeout=(5, timeout))
     except requests.RequestException as exc:
