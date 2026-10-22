@@ -263,10 +263,18 @@ class CopilotOrchestrator:
         try:
             answer = await self.llm.complete(msgs)
             if not answer:
-                answer = FALLBACK
+                answer = self._generate_grounded_fallback(intent, device, snapshot, alarms)
         except Exception as exc:
-            log.exception("llm failed: %s", exc)
-            answer = FALLBACK
+            log.warning("llm failed: %s", exc)
+            err_str = str(exc)
+            hint = None
+            if "402" in err_str or "prepayment credits" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str:
+                hint = "Google AI Studio prepayment credits depleted"
+            elif "401" in err_str or "invalid" in err_str.lower():
+                hint = "LLM API Key authorization invalid"
+            elif "429" in err_str or "quota" in err_str.lower():
+                hint = "LLM Rate limit / quota reached"
+            answer = self._generate_grounded_fallback(intent, device, snapshot, alarms, error_hint=hint)
 
         self.memory.append(conversation_id, "USER", request.message)
         self.memory.append(conversation_id, "ASSISTANT", answer)
@@ -281,3 +289,55 @@ class CopilotOrchestrator:
             deviceSnapshot=snapshot,
             activeAlarms=alarms,
         )
+
+    def _generate_grounded_fallback(
+        self,
+        intent: Intent,
+        device: DeviceInfo,
+        snapshot: DeviceSnapshot | None,
+        alarms: list[AlarmInfo],
+        error_hint: str | None = None,
+    ) -> str:
+        parts: list[str] = [f"**{device.name} — Live Status Report**\n"]
+
+        if alarms:
+            alarm_lines = [f"- **[{a.severity}]** {a.type}: {a.details or a.status}" for a in alarms]
+            parts.append("**Active Alarms:**\n" + "\n".join(alarm_lines) + "\n")
+        else:
+            parts.append("**Active Alarms:** None (All parameters normal)\n")
+
+        if snapshot and snapshot.values:
+            parts.append("**Current Live Readings:**")
+            primary_keys = [
+                "engine_speed", "frequency", "fuel_level", "battery_voltage",
+                "coolant_temp", "oil_pressure", "active_power", "total_power",
+                "voltage", "current", "ph", "tds", "flow_rate", "pressure"
+            ]
+            added = set()
+            for pk in primary_keys:
+                for k, v in snapshot.values.items():
+                    if pk in k.lower() and k not in added:
+                        label = k.replace("_", " ").title()
+                        parts.append(f"- **{label}:** {v}")
+                        added.add(k)
+                        if len(added) >= 6:
+                            break
+            if len(added) < 6:
+                for k, v in snapshot.values.items():
+                    if k not in added:
+                        label = k.replace("_", " ").title()
+                        parts.append(f"- **{label}:** {v}")
+                        added.add(k)
+                        if len(added) >= 8:
+                            break
+            parts.append("")
+        else:
+            parts.append("*(No live telemetry readings currently available for this device)*\n")
+
+        if error_hint:
+            parts.append(f"*(Telemetry is 100% live. AI model note: {error_hint}. Manage billing at https://ai.studio/projects)*")
+        elif not self.llm.api_key:
+            parts.append("*(Telemetry is 100% live. Set an AI API key for conversational explanations)*")
+
+        return "\n".join(parts)
+

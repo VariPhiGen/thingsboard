@@ -11,7 +11,9 @@ services:
     environment:
       TB_BASE_URL: ${TB_BASE_URL:-http://host.docker.internal:9091}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gemini-2.5-flash}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       RAG_PERSIST_DIR: /app/data/chroma
       KNOWLEDGE_DIR: /app/knowledge
       REPORTS_DIR: /var/tmp/delhivery-reports

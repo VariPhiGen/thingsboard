@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     tb_base_url: str = "http://127.0.0.1:9091"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
+    openai_base_url: str | None = None
+    gemini_api_key: str = ""
     openai_timeout_seconds: float = 60.0
 
     redis_url: str = ""
