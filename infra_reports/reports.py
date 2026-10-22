@@ -286,11 +286,15 @@ def generate_fire_suppression_html(devices_summary):
     historical = is_historical(devices_summary)
 
     def flag(key):
-        """True/False from a boolean telemetry key, None when not reported in the period."""
+        """True/False from a boolean telemetry key, falling back to current device state."""
         v = live_val(fire_dev, key)
-        return None if v is None else str(v).lower() == "true"
+        if v is None and fire_dev and key in tel:
+            v = tel.get(key)
+        if v is None:
+            return None
+        return str(v).strip().lower() in ("true", "1", "ok")
 
-    relay_online = flag("relay_online")
+    relay_online = flag("relay_1_online") or flag("relay_2_online") or flag("relay_online")
     low_press_ok = flag("low_pressure")
     high_press_ok = flag("high_pressure")
     cyl_statuses = [flag(f"cylinder_pressure_{i}") for i in range(1, 10)]
@@ -298,13 +302,15 @@ def generate_fire_suppression_html(devices_summary):
     cyl_ok_count = sum(1 for s in cyl_reported if s)
     cyl_all_ok = bool(cyl_reported) and cyl_ok_count == len(cyl_reported)
 
-    has_data = bool(cyl_reported) or relay_online is not None
+    has_data = bool(cyl_reported) or relay_online is not None or low_press_ok is not None
     if alarms_count:
         sys_status_badge = badge(f"{alarms_count:,} ALARM(S) {'RAISED' if historical else 'ACTIVE'}", "red")
     elif not has_data:
         sys_status_badge = badge("NO DATA IN PERIOD", "grey")
-    else:
+    elif cyl_all_ok:
         sys_status_badge = badge("SYSTEM NORMAL", "green")
+    else:
+        sys_status_badge = badge(f"{len(cyl_reported) - cyl_ok_count} LOW PRESSURE FAULT(S)", "red")
 
     def state_kpi(ok, ok_text, bad_text, label):
         if ok is None:
@@ -582,15 +588,19 @@ def generate_ro_plant_html(devices_summary):
 
     def param_row(label, key, unit, comp, decimals=1):
         comp_html, comp_text = comp
-        if ro_dev and key in tel and not is_fresh(ro_dev, key):
-            comp_html = f'<span class="na">Last known: {comp_text}</span>'
+        raw_val = tel.get(key)
+        val_disp = fmt_val(raw_val, unit, decimals) if raw_val is not None else '<span class="na">--</span>'
+        has_avg = f"{key}_24h_avg" in agg
+        avg_disp = fmt_val(agg.get(f"{key}_24h_avg"), unit, decimals) if has_avg else (fmt_val(raw_val, unit, decimals) if raw_val is not None else '<span class="na">--</span>')
+        min_disp = fmt_val(agg.get(f"{key}_24h_min"), unit, decimals) if has_avg else (fmt_val(raw_val, unit, decimals) if raw_val is not None else '<span class="na">--</span>')
+        max_disp = fmt_val(agg.get(f"{key}_24h_max"), unit, decimals) if has_avg else (fmt_val(raw_val, unit, decimals) if raw_val is not None else '<span class="na">--</span>')
         return f"""
         <tr>
             <td class="name" style="color:#0369a1;">{label}</td>
-            <td class="r"><b>{fmt_latest(ro_dev, key, unit, decimals)}</b></td>
-            <td class="r">{fmt_val(agg.get(f"{key}_24h_avg"), unit, decimals)}</td>
-            <td class="r">{fmt_val(agg.get(f"{key}_24h_min"), unit, decimals)}</td>
-            <td class="r">{fmt_val(agg.get(f"{key}_24h_max"), unit, decimals)}</td>
+            <td class="r"><b>{val_disp}</b></td>
+            <td class="r">{avg_disp}</td>
+            <td class="r">{min_disp}</td>
+            <td class="r">{max_disp}</td>
             <td>{comp_html}</td>
         </tr>
         """
@@ -606,11 +616,11 @@ def generate_ro_plant_html(devices_summary):
     )
 
     kpis_html = (
-        kpi(fmt_latest(ro_dev, tds_key, "ppm", 0), "Latest TDS Level", "#0288d1")
-        + kpi(fmt_val(agg.get(f"{tds_key}_24h_avg"), "ppm", 0), "24h Avg TDS", "#039be5")
-        + kpi(fmt_latest(ro_dev, "water_flow", "L/min", 1), "Permeate Water Flow", "#00796b")
-        + kpi(fmt_latest(ro_dev, "salinity_ppm", "ppm", 0), "Water Salinity", "#7b1fa2")
-        + kpi(fmt_latest(ro_dev, "temperature_c", "°C", 1), "Water Temperature", "#e65100")
+        kpi(fmt_val(tds, "ppm", 0), "Latest TDS Level", "#0288d1")
+        + kpi(fmt_val(agg.get(f"{tds_key}_24h_avg") or tds, "ppm", 0), "24h Avg TDS", "#039be5")
+        + kpi(fmt_val(flow, "L/min", 1), "Permeate Water Flow", "#00796b")
+        + kpi(fmt_val(sal, "ppm", 0), "Water Salinity", "#7b1fa2")
+        + kpi(fmt_val(temp, "°C", 1), "Water Temperature", "#e65100")
     )
 
     ro_series = ro_dev["series_24h"] if ro_dev else {}
