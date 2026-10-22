@@ -104,6 +104,20 @@ DARK_CHARCOAL_CSS = """
     tb-dashboard-widget:has(img[alt*="Google Play"]) {
       display: none !important;
     }
+
+    /* Hide IoT Hub from Sidebar Menu */
+    .tb-site-sidenav a[href*="iot-hub"],
+    .tb-site-sidenav li:has(a[href*="iot-hub"]),
+    .tb-site-sidenav tb-menu-link:has(a[href*="iot-hub"]),
+    .tb-side-menu li:has(a[href*="iot-hub"]),
+    .tb-side-menu li:has(.is-new),
+    .tb-side-menu .is-new,
+    a.is-new,
+    li:has(a.is-new),
+    a[href*="iot-hub"],
+    li:has(a[href*="iot-hub"]) {
+      display: none !important;
+    }
 """
 
 SSO_REDIRECT_JS = """
@@ -223,18 +237,27 @@ def main():
             f.write(css)
         print("    styles-WUQVJSVC.css updated with Dark Charcoal theme and mobile app hide overrides")
 
-    print("==> 4. Patching chunk-AWADN7CA.js (appTitle)")
+    print("==> 4. Patching chunk-AWADN7CA.js (appTitle & remove IoT Hub from sidebar)")
     aw_path = f"{PUBLIC_DIR}/chunk-AWADN7CA.js"
     if os.path.exists(aw_path):
         with open(aw_path, 'r', encoding='utf-8') as f:
             js = f.read()
+        changed = False
         if 'appTitle:"ThingsBoard"' in js:
             js = js.replace('appTitle:"ThingsBoard"', 'appTitle:"Virtuoso NetSoft"')
+            changed = True
+        if ',{id:te.iot_hub}' in js:
+            js = js.replace(',{id:te.iot_hub}', '')
+            changed = True
+        elif '{id:te.iot_hub},' in js:
+            js = js.replace('{id:te.iot_hub},', '')
+            changed = True
+        if changed:
             with open(aw_path, 'w', encoding='utf-8') as f:
                 f.write(js)
             with open(aw_path, 'rb') as f_in, gzip.open(f"{aw_path}.gz", 'wb', compresslevel=9) as f_out:
                 shutil.copyfileobj(f_in, f_out)
-            print("    chunk-AWADN7CA.js patched & re-gzipped")
+            print("    chunk-AWADN7CA.js patched & re-gzipped (appTitle + IoT Hub removed from menu)")
 
     print("==> 5. Patching chunk-QBQ4XMPH.js (Powered by & links)")
     qb_path = f"{PUBLIC_DIR}/chunk-QBQ4XMPH.js"
