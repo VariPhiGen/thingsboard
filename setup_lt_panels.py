@@ -1,3 +1,4 @@
+import os
 import requests
 import json
 
@@ -100,6 +101,7 @@ def setup():
 
     # Save the token to a file for the logger to use
     token_file = "/home/ubuntu/lt_panel_data_logger/tb_token.txt"
+    os.makedirs(os.path.dirname(token_file), exist_ok=True)
     with open(token_file, "w") as f:
         f.write(access_token)
     print(f"Saved token to {token_file}")

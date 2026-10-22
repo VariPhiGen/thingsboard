@@ -9,8 +9,9 @@ except ImportError:
     ModbusSerialClient = None
     ModbusTcpClient = None
 
-BASE_URL = os.getenv("TB_BASE_URL", "http://localhost:9091")
-TOKEN_FILE = "/home/ubuntu/lt_panel_data_logger/tb_token.txt"
+BASE_URL = os.getenv("TB_BASE_URL", "https://viot.virtuosonetsoft.com")
+TOKEN_FILE = os.getenv("TOKEN_FILE", "/home/ubuntu/lt_panel_data_logger/tb_token.txt")
+DEFAULT_TOKEN = os.getenv("TB_TOKEN", os.getenv("LT_PANEL_TOKEN", "eeQw2JBxvUK1jSky5YMV"))
 
 # Modbus Hardware Settings
 MODBUS_MODE = os.getenv("MODBUS_MODE", "SERIAL") # "SERIAL" or "TCP"
@@ -31,11 +32,15 @@ PANELS = [
 
 def read_token():
     try:
-        with open(TOKEN_FILE, 'r') as f:
-            return f.read().strip()
+        if os.path.exists(TOKEN_FILE):
+            with open(TOKEN_FILE, 'r') as f:
+                token = f.read().strip()
+                if token:
+                    return token
+        return DEFAULT_TOKEN
     except Exception as e:
         print(f"Error reading token: {e}")
-        return None
+        return DEFAULT_TOKEN
 
 def get_modbus_client():
     if not ModbusSerialClient and not ModbusTcpClient:
