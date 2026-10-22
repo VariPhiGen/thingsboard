@@ -171,8 +171,10 @@ curl -s http://127.0.0.1:8097/healthz
 | Variable | Default | Notes |
 |----------|---------|--------|
 | `TB_BASE_URL` | `http://127.0.0.1:9091` | ThingsBoard API base |
-| `OPENAI_API_KEY` | _(empty)_ | Required for full answers |
-| `OPENAI_MODEL` | `gpt-4o-mini` | Chat model |
+| `OPENAI_API_KEY` | _(empty)_ | OpenAI API key |
+| `GEMINI_API_KEY` | _(empty)_ | Google Gemini / AI Studio key (`AQ.` or `AIza`) |
+| `OPENAI_MODEL` | `gemini-2.5-flash` | Chat model (`gemini-2.5-flash`, `gpt-4o-mini`, etc.) |
+| `OPENAI_BASE_URL` | _(auto)_ | Base URL (`https://generativelanguage.googleapis.com/v1beta/openai/`) |
 | `CORS_ORIGINS` | `*` | Comma-separated or `*` |
 | `RAG_PERSIST_DIR` | `./data/chroma` | Chroma persistence |
 | `KNOWLEDGE_DIR` | `./knowledge` | SOP / manual docs |
