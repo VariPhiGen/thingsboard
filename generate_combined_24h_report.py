@@ -295,29 +295,43 @@ def generate_combined_24h_report(devices_summary):
     # --------------------------------------------------------------------------
     # SECTION 3A: MAIN FIRE SUPPRESSION 24H BREAKDOWN
     # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # SECTION 3A: MAIN FIRE SUPPRESSION 24H BREAKDOWN
+    # --------------------------------------------------------------------------
     fire_dev = next(
         (d for d in devices_summary
-         if d.get("id") == "5f3a0930-cbdf-11ef-9366-c956973c4d51"
+         if d.get("id") in ("517ecde0-bbdc-11f1-8188-c1f9998e0221", "5f3a0930-cbdf-11ef-9366-c956973c4d51")
          or (("fire" in (d.get("name") or "").lower() or d.get("type") == "LT Panel Fire Profile")
              and "ups room 2" not in (d.get("name") or "").lower())),
         None,
     )
     fire_tel = fire_dev['telemetry'] if fire_dev else {}
     
-    relay_online = str(fire_tel.get('relay_online', 'true')).lower() == 'true'
-    low_press_ok = str(fire_tel.get('low_pressure', 'true')).lower() == 'true'
-    high_press_ok = str(fire_tel.get('high_pressure', 'true')).lower() == 'true'
-    cyl_statuses = [str(fire_tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true' for i in range(1, 10)]
-    cyl_all_ok = all(cyl_statuses)
-    cyl_ok_count = sum(1 for s in cyl_statuses if s)
+    relay_online = str(fire_tel.get('relay_online', '')).lower() in ('true', '1')
 
+    cyl_reported = []
     fire_rows = ""
     for i in range(1, 10):
-        cyl_val = str(fire_tel.get(f"cylinder_pressure_{i}", 'true')).lower() == 'true'
-        cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE NORMAL</span>' if cyl_val else '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE LOW</span>'
+        raw_val = fire_tel.get(f"cylinder_pressure_{i}")
+        if raw_val is not None:
+            is_ok = str(raw_val).strip().lower() in ("true", "1", "ok")
+            cyl_reported.append(is_ok)
+            if is_ok:
+                cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE NORMAL</span>'
+                status_text = '<span style="color:#2e7d32;font-weight:bold;">Operational</span>'
+            else:
+                cyl_badge = '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">PRESSURE LOW</span>'
+                status_text = '<span style="color:#c62828;font-weight:bold;">Attention Required</span>'
+        else:
+            cyl_badge = '<span style="background-color:#9e9e9e;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">NO DATA</span>'
+            status_text = '<span style="color:#757575;">No Data</span>'
 
-        di_val = str(fire_tel.get(f"di{i}", 'true')).lower() == 'true'
-        di_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">CLOSED / NORMAL</span>' if di_val else '<span style="background-color:#ff9800;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">OPEN / CHECK</span>'
+        raw_di = fire_tel.get(f"di{i}")
+        if raw_di is not None:
+            di_ok = str(raw_di).strip().lower() in ("true", "1", "closed")
+            di_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">CLOSED / NORMAL</span>' if di_ok else '<span style="background-color:#ff9800;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">OPEN / CHECK</span>'
+        else:
+            di_badge = '<span style="background-color:#9e9e9e;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">N/A</span>'
 
         fire_rows += f"""
         <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -325,9 +339,12 @@ def generate_combined_24h_report(devices_summary):
             <td style="padding:10px;text-align:center;">{cyl_badge}</td>
             <td style="padding:10px;text-align:center;">{di_badge}</td>
             <td style="padding:10px;">Gas Pressure Sensor & Alarm Loop</td>
-            <td style="padding:10px;color:#4caf50;font-weight:bold;">Operational (24h Monitored)</td>
+            <td style="padding:10px;">{status_text}</td>
         </tr>
         """
+
+    cyl_ok_count = sum(1 for s in cyl_reported if s)
+    cyl_all_ok = bool(cyl_reported) and cyl_ok_count == len(cyl_reported)
 
     # --------------------------------------------------------------------------
     # SECTION 3B: FIRE SUPPRESSION UPS ROOM 2 (10 MONITORED CYLINDERS)
@@ -343,19 +360,18 @@ def generate_combined_24h_report(devices_summary):
     ups2_ok_count = 0
     for i in range(1, 11):
         raw_val = fire_ups2_tel.get(f"fire_suppression_{i}_pressure")
-        is_ok = False
         if raw_val is not None:
-            v_str = str(raw_val).strip().lower()
-            if v_str in ("1", "1.0", "true", "ok", "high"):
-                is_ok = True
-        
-        if is_ok:
-            ups2_ok_count += 1
-            cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">HIGH PRESSURE (OK)</span>'
-            status_text = '<span style="color:#2e7d32;font-weight:bold;">Normal</span>'
+            is_ok = str(raw_val).strip().lower() in ("1", "1.0", "true", "ok", "high")
+            if is_ok:
+                ups2_ok_count += 1
+                cyl_badge = '<span style="background-color:#4caf50;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">HIGH PRESSURE (OK)</span>'
+                status_text = '<span style="color:#2e7d32;font-weight:bold;">Normal</span>'
+            else:
+                cyl_badge = '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">LOW PRESSURE</span>'
+                status_text = '<span style="color:#c62828;font-weight:bold;">Attention Required</span>'
         else:
-            cyl_badge = '<span style="background-color:#f44336;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">LOW PRESSURE</span>'
-            status_text = '<span style="color:#c62828;font-weight:bold;">Attention Required</span>'
+            cyl_badge = '<span style="background-color:#9e9e9e;color:#fff;padding:3px 8px;border-radius:4px;font-size:10px;font-weight:bold;">NO DATA</span>'
+            status_text = '<span style="color:#757575;">No Data</span>'
 
         fire_ups2_rows += f"""
         <tr style="border-bottom: 1px solid #e0e0e0;">
@@ -603,11 +619,46 @@ def get_pdf_generator_url():
     return "http://localhost:3005"
 
 def convert_html_to_pdf(html_content):
+    import subprocess
+    import tempfile
+    
+    # 1. Local fast wkhtmltopdf rendering
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as html_f:
+            html_f.write(html_content)
+            html_path = html_f.name
+        
+        pdf_path = html_path.replace(".html", ".pdf")
+        cmd = [
+            "wkhtmltopdf",
+            "--disable-javascript",
+            "--page-size", "A4",
+            "--margin-top", "12mm",
+            "--margin-bottom", "12mm",
+            "--margin-left", "10mm",
+            "--margin-right", "10mm",
+            html_path,
+            pdf_path
+        ]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+        if res.returncode == 0 and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as f:
+                pdf_bytes = f.read()
+            try: os.remove(html_path)
+            except Exception: pass
+            try: os.remove(pdf_path)
+            except Exception: pass
+            if pdf_bytes.startswith(b"%PDF"):
+                return pdf_bytes
+    except Exception as e:
+        print(f"⚠️ Local wkhtmltopdf note: {e}")
+
+    # 2. Fallback to remote service
     try:
         base = get_pdf_generator_url()
         url = f"{base}/render-raw-html-pdf"
-        res = requests.post(url, json={"html": html_content}, timeout=60)
-        if res.status_code == 200:
+        res = requests.post(url, json={"html": html_content}, timeout=30)
+        if res.status_code == 200 and res.content.startswith(b"%PDF"):
             return res.content
         print(f"⚠️ PDF generator returned status {res.status_code}: {res.text}")
     except Exception as e:
