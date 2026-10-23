@@ -128,6 +128,9 @@ DARK_CHARCOAL_CSS = """
       background: #f3f4f6 !important;
       background-color: #f3f4f6 !important;
       min-height: 100vh !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
     }
 
@@ -138,12 +141,12 @@ DARK_CHARCOAL_CSS = """
       background-color: #ffffff !important;
       border: 1px solid #e5e7eb !important;
       border-radius: 16px !important;
-      padding: 32px 28px 28px !important;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
-      max-width: 440px !important;
-      width: 100% !important;
+      padding: 36px 32px 32px !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08) !important;
+      width: 440px !important;
+      max-width: 92vw !important;
       max-height: none !important;
-      overflow: visible !important;
+      overflow: hidden !important;
       box-sizing: border-box !important;
       color: #1F232C !important;
     }
@@ -151,6 +154,9 @@ DARK_CHARCOAL_CSS = """
     .tb-login-content mat-card-content,
     .tb-login-content .mat-mdc-card-content {
       padding: 0 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
       color: #1F232C !important;
       overflow: visible !important;
     }
@@ -161,7 +167,7 @@ DARK_CHARCOAL_CSS = """
 
     .tb-login-custom-header {
       text-align: center;
-      margin-bottom: 20px;
+      margin-bottom: 22px;
     }
 
     .tb-login-custom-header .tb-login-title {
@@ -174,98 +180,61 @@ DARK_CHARCOAL_CSS = """
     }
 
     .tb-login-custom-header .tb-login-sub {
-      margin: 0 0 16px 0;
+      margin: 0 0 4px 0;
       color: #6b7280 !important;
       font-size: 14px;
       line-height: 1.5;
       font-family: inherit;
     }
 
-    .tb-login-content .mat-mdc-form-field {
-      margin-bottom: 8px !important;
+    /* Force the login form and all containers to stay within 100% width of card */
+    .tb-login-content .tb-login-form,
+    .tb-login-content .tb-login-form.flex,
+    .tb-login-content form.flex,
+    .tb-login-content form {
       width: 100% !important;
+      max-width: 100% !important;
+      min-width: 0 !important;
+      box-sizing: border-box !important;
     }
 
-    .tb-login-content .mat-mdc-form-field-flex {
-      background-color: #eef2f7 !important;
-      border-radius: 8px !important;
-    }
-
-    .tb-login-content .mdc-notched-outline__leading,
-    .tb-login-content .mdc-notched-outline__notch,
-    .tb-login-content .mdc-notched-outline__trailing {
-      border-color: #dbe2ea !important;
-    }
-
-    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
-    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
-    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
-      border-color: #2B2F3A !important;
-      border-width: 1.5px !important;
-    }
-
-    .tb-login-content input.mat-mdc-input-element {
-      color: #1F232C !important;
-      font-size: 15px !important;
-      caret-color: #1F232C !important;
-    }
-
-    .tb-login-content input.mat-mdc-input-element::placeholder {
-      color: #6b7280 !important;
-      opacity: 0.7 !important;
-    }
-
-    .tb-login-content .mat-mdc-form-field .mat-icon,
-    .tb-login-content .mat-mdc-form-field .mat-mdc-select-arrow {
-      color: #6b7280 !important;
-    }
-
-    .tb-login-content .mat-mdc-floating-label,
-    .tb-login-content .mat-mdc-form-field-label {
-      color: #1F232C !important;
-      font-weight: 600 !important;
-    }
-
-    .tb-login-content .tb-action-button,
-    .tb-login-content button[type="submit"] {
-      background: #242938 !important;
-      background-color: #242938 !important;
-      color: #ffffff !important;
-      border-radius: 8px !important;
-      height: 44px !important;
-      font-size: 15px !important;
-      font-weight: 600 !important;
+    .tb-login-content .oauth-container,
+    .tb-login-content .login-button-container {
       width: 100% !important;
-      box-shadow: none !important;
-      margin-top: 12px !important;
-      text-transform: none !important;
-      transition: background 0.15s ease !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
     }
 
-    .tb-login-content .tb-action-button:hover,
-    .tb-login-content button[type="submit"]:hover {
-      background: #1F232C !important;
-      background-color: #1F232C !important;
-    }
-
-    .tb-login-content .login-with-button {
-      background: #ffffff !important;
-      border: 1px solid #dbe2ea !important;
+    .tb-login-content .login-with-button,
+    .tb-login-content a.login-with-button,
+    .tb-login-content .login-button-container a.login-with-button {
+      background: #f8fafc !important;
+      border: 1px solid #d1d5db !important;
       color: #1F232C !important;
       border-radius: 8px !important;
       height: 44px !important;
       font-weight: 500 !important;
+      font-size: 14px !important;
       width: 100% !important;
+      max-width: 100% !important;
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       text-decoration: none !important;
+      box-sizing: border-box !important;
       transition: all 0.15s ease !important;
     }
 
-    .tb-login-content .login-with-button:hover {
-      background: #f8fafc !important;
-      border-color: #2B2F3A !important;
+    .tb-login-content .login-with-button:hover,
+    .tb-login-content a.login-with-button:hover {
+      background: #f1f5f9 !important;
+      border-color: #9ca3af !important;
+    }
+
+    .tb-login-content .container-divider {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      margin: 18px 0 14px 0 !important;
     }
 
     .tb-login-content .container-divider .mat-divider {
@@ -279,10 +248,110 @@ DARK_CHARCOAL_CSS = """
       padding: 0 12px !important;
     }
 
+    /* Form Fields */
+    .tb-login-content .mat-mdc-form-field {
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
+      margin-bottom: 8px !important;
+    }
+
+    .tb-login-content .mat-mdc-text-field-wrapper {
+      box-sizing: border-box !important;
+      width: 100% !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field-flex {
+      box-sizing: border-box !important;
+      width: 100% !important;
+    }
+
+    .tb-login-content .mdc-notched-outline {
+      box-sizing: border-box !important;
+    }
+
+    .tb-login-content .mdc-notched-outline__leading {
+      border-radius: 8px 0 0 8px !important;
+      border-color: #d1d5db !important;
+    }
+
+    .tb-login-content .mdc-notched-outline__notch {
+      border-color: #d1d5db !important;
+    }
+
+    .tb-login-content .mdc-notched-outline__trailing {
+      border-radius: 0 8px 8px 0 !important;
+      border-color: #d1d5db !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
+      border-color: #242938 !important;
+      border-width: 1.5px !important;
+    }
+
+    .tb-login-content input.mat-mdc-input-element {
+      color: #1F232C !important;
+      font-size: 15px !important;
+      caret-color: #1F232C !important;
+    }
+
+    .tb-login-content input.mat-mdc-input-element::placeholder {
+      color: #9ca3af !important;
+      opacity: 1 !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field .mat-icon,
+    .tb-login-content .mat-mdc-form-field .mat-mdc-select-arrow {
+      color: #6b7280 !important;
+    }
+
+    .tb-login-content .mat-mdc-floating-label,
+    .tb-login-content .mat-mdc-form-field-label {
+      color: #6b7280 !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field.mat-focused .mat-mdc-floating-label {
+      color: #242938 !important;
+    }
+
+    .tb-login-content .tb-action-button,
+    .tb-login-content button[type="submit"] {
+      background: #242938 !important;
+      background-color: #242938 !important;
+      color: #ffffff !important;
+      border-radius: 8px !important;
+      height: 44px !important;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      box-shadow: none !important;
+      margin: 14px 0 10px 0 !important;
+      text-transform: none !important;
+      box-sizing: border-box !important;
+      transition: background 0.15s ease !important;
+    }
+
+    .tb-login-content .tb-action-button:hover,
+    .tb-login-content button[type="submit"]:hover {
+      background: #181d28 !important;
+      background-color: #181d28 !important;
+    }
+
+    .tb-login-content .forgot-password {
+      width: 100% !important;
+      box-sizing: border-box !important;
+      display: flex !important;
+      justify-content: flex-end !important;
+      margin-top: 4px !important;
+    }
+
     .tb-login-content .forgot-password .tb-reset-password,
     .tb-login-content .forgot-password a,
     .tb-login-content .forgot-password button {
-      color: #1F232C !important;
+      color: #4b5563 !important;
       font-size: 13px !important;
       font-weight: 500 !important;
       padding: 0 !important;
@@ -290,6 +359,7 @@ DARK_CHARCOAL_CSS = """
     }
 
     .tb-login-content .forgot-password .tb-reset-password:hover {
+      color: #1F232C !important;
       text-decoration: underline !important;
     }
 """
