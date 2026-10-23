@@ -25,8 +25,12 @@
   } @else {
     <mat-card appearance="raised" style="max-height: 80vh; overflow-y: auto;">
     <mat-card-content class="!p-6">
-      <div class="flex flex-col items-center justify-start" style="padding: 16px 0;">
+      <div class="flex flex-col items-center justify-start" style="padding: 16px 0 8px 0;">
         <tb-logo link="https://virtuosonetsoft.com" target="_blank" class="login-logo"></tb-logo>
+      </div>
+      <div class="tb-login-custom-header text-center" style="margin-bottom: 20px;">
+        <div class="tb-login-title" style="font-size: 22px; font-weight: 700; color: #1F232C; margin-bottom: 6px;">Virtuoso NetSoft</div>
+        <div class="tb-login-sub" style="font-size: 14px; color: #6b7280;">Sign in to your account</div>
       </div>
         <div class="tb-login-form flex flex-col">
           @if (showSsoButtons && oauth2Clients?.length) {

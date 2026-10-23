@@ -118,6 +118,180 @@ DARK_CHARCOAL_CSS = """
     li:has(a[href*="iot-hub"]) {
       display: none !important;
     }
+
+    /* ========================================================= */
+    /* Virtuoso NetSoft Custom Login Page (Matching Keycloak SSO) */
+    /* ========================================================= */
+    .tb-login-content,
+    .tb-login-content.mat-app-background,
+    .tb-login-content.tb-dark {
+      background: #f3f4f6 !important;
+      background-color: #f3f4f6 !important;
+      min-height: 100vh !important;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    }
+
+    .tb-login-content mat-card,
+    .tb-login-content .mat-mdc-card,
+    .tb-login-content mat-card.mat-mdc-card {
+      background: #ffffff !important;
+      background-color: #ffffff !important;
+      border: 1px solid #e5e7eb !important;
+      border-radius: 16px !important;
+      padding: 32px 28px 28px !important;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08) !important;
+      max-width: 440px !important;
+      width: 100% !important;
+      max-height: none !important;
+      overflow: visible !important;
+      box-sizing: border-box !important;
+      color: #1F232C !important;
+    }
+
+    .tb-login-content mat-card-content,
+    .tb-login-content .mat-mdc-card-content {
+      padding: 0 !important;
+      color: #1F232C !important;
+      overflow: visible !important;
+    }
+
+    .tb-login-content .login-logo {
+      display: none !important;
+    }
+
+    .tb-login-custom-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .tb-login-custom-header .tb-login-title {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #1F232C !important;
+      font-family: inherit;
+    }
+
+    .tb-login-custom-header .tb-login-sub {
+      margin: 0 0 16px 0;
+      color: #6b7280 !important;
+      font-size: 14px;
+      line-height: 1.5;
+      font-family: inherit;
+    }
+
+    .tb-login-content .mat-mdc-form-field {
+      margin-bottom: 8px !important;
+      width: 100% !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field-flex {
+      background-color: #eef2f7 !important;
+      border-radius: 8px !important;
+    }
+
+    .tb-login-content .mdc-notched-outline__leading,
+    .tb-login-content .mdc-notched-outline__notch,
+    .tb-login-content .mdc-notched-outline__trailing {
+      border-color: #dbe2ea !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__leading,
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__notch,
+    .tb-login-content .mat-mdc-form-field.mat-focused .mdc-notched-outline__trailing {
+      border-color: #2B2F3A !important;
+      border-width: 1.5px !important;
+    }
+
+    .tb-login-content input.mat-mdc-input-element {
+      color: #1F232C !important;
+      font-size: 15px !important;
+      caret-color: #1F232C !important;
+    }
+
+    .tb-login-content input.mat-mdc-input-element::placeholder {
+      color: #6b7280 !important;
+      opacity: 0.7 !important;
+    }
+
+    .tb-login-content .mat-mdc-form-field .mat-icon,
+    .tb-login-content .mat-mdc-form-field .mat-mdc-select-arrow {
+      color: #6b7280 !important;
+    }
+
+    .tb-login-content .mat-mdc-floating-label,
+    .tb-login-content .mat-mdc-form-field-label {
+      color: #1F232C !important;
+      font-weight: 600 !important;
+    }
+
+    .tb-login-content .tb-action-button,
+    .tb-login-content button[type="submit"] {
+      background: #242938 !important;
+      background-color: #242938 !important;
+      color: #ffffff !important;
+      border-radius: 8px !important;
+      height: 44px !important;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      width: 100% !important;
+      box-shadow: none !important;
+      margin-top: 12px !important;
+      text-transform: none !important;
+      transition: background 0.15s ease !important;
+    }
+
+    .tb-login-content .tb-action-button:hover,
+    .tb-login-content button[type="submit"]:hover {
+      background: #1F232C !important;
+      background-color: #1F232C !important;
+    }
+
+    .tb-login-content .login-with-button {
+      background: #ffffff !important;
+      border: 1px solid #dbe2ea !important;
+      color: #1F232C !important;
+      border-radius: 8px !important;
+      height: 44px !important;
+      font-weight: 500 !important;
+      width: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-decoration: none !important;
+      transition: all 0.15s ease !important;
+    }
+
+    .tb-login-content .login-with-button:hover {
+      background: #f8fafc !important;
+      border-color: #2B2F3A !important;
+    }
+
+    .tb-login-content .container-divider .mat-divider {
+      border-top-color: #e5e7eb !important;
+    }
+
+    .tb-login-content .container-divider .text {
+      color: #9ca3af !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      padding: 0 12px !important;
+    }
+
+    .tb-login-content .forgot-password .tb-reset-password,
+    .tb-login-content .forgot-password a,
+    .tb-login-content .forgot-password button {
+      color: #1F232C !important;
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      padding: 0 !important;
+      background: none !important;
+    }
+
+    .tb-login-content .forgot-password .tb-reset-password:hover {
+      text-decoration: underline !important;
+    }
 """
 
 FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
@@ -905,14 +1079,35 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
         return origOpen.apply(this, arguments);
       };
 
+      function injectVirtuosoLoginHeader() {
+        try {
+          var card = document.querySelector('.tb-login-content mat-card-content, .tb-login-content .mat-mdc-card-content');
+          if (card && !document.getElementById('vp-login-header')) {
+            var header = document.createElement('div');
+            header.id = 'vp-login-header';
+            header.className = 'tb-login-custom-header';
+            header.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:14px;"><img src="assets/virtuoso-logo.png" style="width:92px;height:92px;object-fit:contain;" alt="Virtuoso NetSoft"/></div><div class="tb-login-title">Virtuoso NetSoft</div><div class="tb-login-sub">Sign in to your account</div>';
+            var form = card.querySelector('.tb-login-form') || card.querySelector('form');
+            if (form) {
+              card.insertBefore(header, form);
+            }
+          }
+        } catch(e) {}
+      }
+
       function checkLogin() {
         if (isLoggingOut) {
           doKeycloakLogout();
           return;
         }
-        if (window.location.pathname === '/login' && window.location.search.includes('sso=true')) {
+        if (window.location.pathname === '/login' && 
+            !window.location.search.includes('localLogin=true') && 
+            !window.location.search.includes('accessToken') && 
+            !window.location.search.includes('loginError')) {
           window.location.replace('/oauth2/authorization/68b2bc20-5e98-11f1-bade-0bee8153e08f');
+          return;
         }
+        injectVirtuosoLoginHeader();
       }
 
       checkLogin();
@@ -921,8 +1116,8 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
       var obs = new MutationObserver(function() {
         if (location.pathname !== lastPath) {
           lastPath = location.pathname;
-          checkLogin();
         }
+        checkLogin();
       });
       obs.observe(document, {subtree: true, childList: true});
     })();
