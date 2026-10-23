@@ -43,7 +43,7 @@ class ChatRequest(BaseModel):
     conversationId: str | None = None
     deviceId: UUID | None = None
     deviceQuery: str | None = None
-    dashboardId: UUID | None = None
+    dashboardId: str | UUID | None = None
     messages: list[ChatMessage] | None = None
 
 

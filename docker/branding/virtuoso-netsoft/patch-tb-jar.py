@@ -283,70 +283,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     color: #FFFFFF;
   }
 
-  /* Quick chips */
-  .tb-fc-chips-bar {
-    background: #F8FAFC;
-    padding: 8px 12px;
-    border-bottom: 1px solid #E2E8F0;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    white-space: nowrap;
-    scrollbar-width: none;
-    flex-shrink: 0;
-  }
-  .tb-fc-chips-bar::-webkit-scrollbar {
-    display: none;
-  }
-  .tb-fc-chip {
-    background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-radius: 12px;
-    padding: 4px 10px;
-    font-size: 11.5px;
-    font-weight: 500;
-    color: #334155;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    flex-shrink: 0;
-  }
-  .tb-fc-chip:hover {
-    border-color: #0F766E;
-    color: #0F766E;
-    background: #F0FDFA;
-  }
-  .tb-fc-chip.active {
-    background: #0F766E;
-    color: #FFFFFF;
-    border-color: #0F766E;
-    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
-  }
 
-  /* Focused Banner */
-  .tb-fc-focused-banner {
-    background: #ECFDF5;
-    border-bottom: 1px solid #A7F3D0;
-    padding: 6px 12px;
-    font-size: 11.5px;
-    color: #065F46;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-  }
-  .tb-fc-focused-banner button {
-    background: none;
-    border: none;
-    color: #047857;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-  }
-  .tb-fc-focused-banner button:hover {
-    background: #D1FAE5;
-  }
 
   /* Thread */
   .tb-fc-thread {
@@ -630,23 +567,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
       </div>
     </div>
 
-    <!-- Quick Chips -->
-    <div class="tb-fc-chips-bar" id="tb-fc-chips">
-      <button class="tb-fc-chip active" data-id="all">🌐 All Systems</button>
-      <button class="tb-fc-chip" data-id="dg1">⚡ DG 1</button>
-      <button class="tb-fc-chip" data-id="dg2">⚡ DG 2</button>
-      <button class="tb-fc-chip" data-id="dg3">⚡ DG 3</button>
-      <button class="tb-fc-chip" data-id="ro">💧 RO Plant</button>
-      <button class="tb-fc-chip" data-id="lt">🔌 LT Panels</button>
-      <button class="tb-fc-chip" data-id="fire">🧯 Fire Main</button>
-      <button class="tb-fc-chip" data-id="ups">🧯 UPS 2</button>
-    </div>
 
-    <!-- Focused Device Banner -->
-    <div id="tb-fc-focused-banner" class="tb-fc-focused-banner" style="display:none;">
-      <span>Talking about <strong id="tb-fc-focused-name">Device</strong></span>
-      <button id="tb-fc-focused-clear">✕ Clear</button>
-    </div>
 
     <!-- Message Thread -->
     <div class="tb-fc-thread" id="tb-fc-thread" role="log" aria-live="polite">
@@ -821,16 +742,13 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     }
   }
 
-  function updateFocusedBanner() {
-    var banner = document.getElementById('tb-fc-focused-banner');
-    var nameEl = document.getElementById('tb-fc-focused-name');
-    if (!banner || !nameEl) return;
-    if (state.selectedDeviceName) {
-      nameEl.textContent = state.selectedDeviceName;
-      banner.style.display = 'flex';
-    } else {
-      banner.style.display = 'none';
-    }
+  function getCurrentDashboardId() {
+    try {
+      var full = (window.location.pathname || '') + ' ' + (window.location.hash || '');
+      var m = full.match(/dashboards?\/([a-f0-9\-]{36})/i);
+      if (m) return m[1];
+    } catch(e) {}
+    return null;
   }
 
   function renderThread() {
@@ -952,8 +870,9 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
         conversationId: state.conversationId,
         messages: historyClean
       };
-      if (state.selectedDeviceId) {
-        payload.deviceId = state.selectedDeviceId;
+      var activeDashId = getCurrentDashboardId();
+      if (activeDashId) {
+        payload.dashboardId = activeDashId;
       }
       var res = await fetch(getCopilotBaseUrl() + '/v1/chat', {
         method: 'POST',
@@ -971,7 +890,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
       if (data.resolvedDevice && data.resolvedDevice.id) {
         state.selectedDeviceId = data.resolvedDevice.id;
         state.selectedDeviceName = data.resolvedDevice.name;
-        updateFocusedBanner();
       }
       if (data.conversationId) {
         state.conversationId = data.conversationId;
@@ -992,49 +910,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     }
   }
 
-  function handleChipClick(chipId) {
-    var chips = document.querySelectorAll('.tb-fc-chip');
-    chips.forEach(function(c) { c.classList.remove('active'); });
-
-    var targetChip = document.querySelector('.tb-fc-chip[data-id="' + chipId + '"]');
-    if (targetChip) targetChip.classList.add('active');
-
-    if (chipId === 'all') {
-      state.selectedDeviceId = null;
-      state.selectedDeviceName = null;
-      updateFocusedBanner();
-      sendQuery('Give me an operational summary of all Delhivery fleet systems.');
-      return;
-    }
-
-    var match = null;
-    if (chipId === 'dg1') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set1') || (d.name||'').toLowerCase().includes('dg 1'); });
-    else if (chipId === 'dg2') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set 2') || (d.name||'').toLowerCase().includes('dg 2'); });
-    else if (chipId === 'dg3') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set 3') || (d.name||'').toLowerCase().includes('dg 3'); });
-    else if (chipId === 'ro') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('ro'); });
-    else if (chipId === 'lt') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('lt') || (d.name||'').toLowerCase().includes('panel'); });
-    else if (chipId === 'fire') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('fire') && !(d.name||'').toLowerCase().includes('ups'); });
-    else if (chipId === 'ups') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('ups'); });
-
-    if (match) {
-      state.selectedDeviceId = match.id;
-      state.selectedDeviceName = match.name;
-      updateFocusedBanner();
-      sendQuery('What is the current status and live telemetry of ' + match.name + '?');
-    } else {
-      var queryMap = {
-        dg1: 'DG Set 1 live telemetry and alarms',
-        dg2: 'DG Set 2 live telemetry and alarms',
-        dg3: 'DG Set 3 live telemetry and alarms',
-        ro: 'What is RO Plant TDS, flow rate, and water quality right now ?',
-        lt: 'LT Panels Gateway live load and alarms',
-        fire: 'Fire Suppression system status',
-        ups: 'Fire Suppression UPS Room 2 cylinder status'
-      };
-      sendQuery(queryMap[chipId] || 'Status update');
-    }
-  }
-
   function initEvents() {
     var fab = document.getElementById('tb-fc-fab');
     if (fab) fab.addEventListener('click', function() { toggleWindow(); });
@@ -1049,15 +924,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
       state.selectedDeviceName = null;
       state.messages = [];
       localStorage.removeItem(STORAGE_KEY);
-      updateFocusedBanner();
       renderThread();
-    });
-
-    var clearFocus = document.getElementById('tb-fc-focused-clear');
-    if (clearFocus) clearFocus.addEventListener('click', function() {
-      state.selectedDeviceId = null;
-      state.selectedDeviceName = null;
-      updateFocusedBanner();
     });
 
     var sendBtn = document.getElementById('tb-fc-send');
@@ -1081,11 +948,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
         var p = card.getAttribute('data-prompt');
         if (p) sendQuery(p);
       }
-      var chip = e.target.closest('.tb-fc-chip');
-      if (chip) {
-        var cid = chip.getAttribute('data-id');
-        if (cid) handleChipClick(cid);
-      }
     });
 
     // Check visibility on navigation
@@ -1098,7 +960,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
   loadState();
   initEvents();
   updateVisibility();
-  updateFocusedBanner();
   renderThread();
   loadDevices();
 })();

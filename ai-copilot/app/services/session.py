@@ -108,6 +108,7 @@ class CopilotOrchestrator:
             devices,
             device_id=request.deviceId,
             device_query=request.deviceQuery,
+            dashboard_id=request.dashboardId,
             message=request.message,
         )
 

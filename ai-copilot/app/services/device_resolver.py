@@ -24,12 +24,31 @@ FLEET_PATTERNS = [
 ]
 
 
+DASHBOARD_DEVICE_MAP: dict[str, str] = {
+    # DG SET1
+    "09c06030-81cc-11f1-a760-b3ba4cbe1b98": "dg set1",
+    # DG Set 2
+    "12254780-b373-11f1-9522-c1f9998e0221": "dg set 2",
+    # DG Set 3
+    "e643c300-b406-11f1-9522-c1f9998e0221": "dg set 3",
+    # RO Plant Dashboard
+    "3f552f40-b332-11f1-9522-c1f9998e0221": "ro plant",
+    # LT Panels Dashboard
+    "78429090-b995-11f1-ab9c-c1f9998e0221": "lt panel",
+    # Fire Suppression
+    "9da0b780-b9b9-11f1-ab9c-c1f9998e0221": "fire suppression",
+    # Fire Suppression UPS Room 2
+    "51158130-ca34-11f1-a8a7-c1f9998e0221": "ups room 2",
+}
+
+
 class DeviceResolver:
     def resolve(
         self,
         devices: list[DeviceInfo],
         device_id: UUID | None = None,
         device_query: str | None = None,
+        dashboard_id: str | UUID | None = None,
         message: str | None = None,
     ) -> ResolveResult:
         by_id = {d.id: d for d in devices}
@@ -53,6 +72,15 @@ class DeviceResolver:
         query = (device_query or "").strip()
         if not query and message:
             query = self._extract_device_mention(message, devices) or ""
+
+        # Contextual dashboard matching: if user didn't mention another machine, use current dashboard device
+        if not query and dashboard_id:
+            dash_key = str(dashboard_id).lower().strip()
+            dash_target = DASHBOARD_DEVICE_MAP.get(dash_key)
+            if dash_target:
+                is_explicit_fleet = any(re.search(p, lower_msg, re.I) for p in FLEET_PATTERNS[:2])
+                if not is_explicit_fleet:
+                    query = dash_target
 
         # If still no single device identified, check if it is a fleet / multi-device or general question
         if not query:
