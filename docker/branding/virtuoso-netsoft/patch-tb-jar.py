@@ -1691,7 +1691,14 @@ def main():
         else:
             print("    WARNING: target logout signature not found in chunk-3WMNFA25.js")
 
-    print("==> DONE patching public UI files")
+    print("==> 9. Patching email templates with Virtuoso NetSoft branding")
+    email_patch_script = f"{BRANDING_DIR}/patch-email-templates.py"
+    if os.path.exists(email_patch_script):
+        os.system(f"python3 {email_patch_script}")
+    else:
+        print("    WARNING: patch-email-templates.py not found")
+
+    print("==> DONE patching public UI files and email templates")
 
 if __name__ == '__main__':
     main()
