@@ -859,7 +859,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
 <!-- END FLOATING COPILOT -->
 """
 
-SSO_REDIRECT_JS = """
+SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
   <script>
     (function() {
       var isLoggingOut = false;
@@ -910,10 +910,7 @@ SSO_REDIRECT_JS = """
           doKeycloakLogout();
           return;
         }
-        if (window.location.pathname === '/login' && 
-            !window.location.search.includes('localLogin=true') && 
-            !window.location.search.includes('accessToken') && 
-            !window.location.search.includes('loginError')) {
+        if (window.location.pathname === '/login' && window.location.search.includes('sso=true')) {
           window.location.replace('/oauth2/authorization/68b2bc20-5e98-11f1-bade-0bee8153e08f');
         }
       }
@@ -930,6 +927,7 @@ SSO_REDIRECT_JS = """
       obs.observe(document, {subtree: true, childList: true});
     })();
   </script>
+<!-- END SSO REDIRECT -->
 """
 
 def main():
@@ -955,6 +953,8 @@ def main():
 
     # Clean previous SSO scripts and inject updated SSO_REDIRECT_JS with logout handler
     html = re.sub(r'<!-- BEGIN FLOATING COPILOT -->.*?<!-- END FLOATING COPILOT -->', '', html, flags=re.DOTALL)
+    html = re.sub(r'<!-- BEGIN SSO REDIRECT -->.*?<!-- END SSO REDIRECT -->', '', html, flags=re.DOTALL)
+    html = re.sub(r'<script>\s*\(function\(\)\s*\{\s*var isLoggingOut.*?</script>', '', html, flags=re.DOTALL)
     html = html.replace("</body>", f"{FLOATING_COPILOT_SNIPPET.strip()}\n{SSO_REDIRECT_JS.strip()}\n</body>")
 
     if 'virtuoso-favicon.png' not in html:
