@@ -21,6 +21,26 @@ class IntentClassifier:
 
         lower = text.lower()
 
+        # 1. Greeting detection (e.g. "hi", "hii", "hello", "hyy", "hey", "namaste", etc.)
+        greeting_re = re.compile(
+            r"^(?:hi+|he+y+|hello+|hyy+|namaste|namaskar|pranam|good\s+(?:morning|afternoon|evening|day))(?:\s+(?:there|copilot|bot|assistant|ai|sir|all))?[\s!.,?~]*$",
+            re.I,
+        )
+        if greeting_re.match(lower):
+            return Intent.GREETING
+
+        # 2. Identity detection (e.g. "who are you", "what are you", "who made you", "aap kaun ho", etc.)
+        identity_re = re.compile(
+            r"\b(who\s*are\s*(?:you|u)|what\s*are\s*(?:you|u)|who\s*(?:made|created|built)\s*(?:you|u)|"
+            r"what\s*is\s*your\s*name|what(?:'s|s)\s*your\s*name|tell\s*me\s*about\s*yourself|"
+            r"introduce\s*yourself|what\s*do\s*you\s*do|"
+            r"aap\s*k[ao]un\s*h[oai]+n?|k[ao]un\s*ho\s*tum|tum\s*k[ao]un\s*ho|ap\s*k[ao]un\s*h[oai]+n?|"
+            r"apna\s*parichay|kya\s*karte\s*ho|kya\s*kar\s*sakte\s*ho)\b",
+            re.I,
+        )
+        if identity_re.search(lower):
+            return Intent.IDENTITY
+
         if any(k in lower for k in ("manual", "how do i", "how to", "sop", "procedure", "steps to")):
             return Intent.MANUAL_HOWTO
 

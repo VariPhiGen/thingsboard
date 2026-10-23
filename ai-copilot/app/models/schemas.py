@@ -23,6 +23,8 @@ class Intent(str, Enum):
     COMPARE_DEVICES = "compare_devices"
     UNSUPPORTED_SECRETS = "unsupported_secrets"
     CLARIFY_DEVICE = "clarify_device"
+    GREETING = "greeting"
+    IDENTITY = "identity"
     GENERAL = "general"
 
 
