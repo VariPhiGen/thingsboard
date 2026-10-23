@@ -86,6 +86,8 @@ services:
     volumes:
       - tb-logs:/var/log/thingsboard
       - ./virtuoso-mqtt-certs:/mqtt-certs:ro
+      - ./branding/virtuoso-netsoft/templates:/usr/share/thingsboard/conf/templates:ro
+      - ./branding/virtuoso-netsoft/i18n:/usr/share/thingsboard/conf/i18n:ro
 
 volumes:
   tb-logs:
