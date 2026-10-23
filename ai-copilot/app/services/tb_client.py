@@ -57,10 +57,11 @@ class ThingsBoardClient:
     async def get_device(self, device_id: UUID) -> dict[str, Any] | None:
         return await self._get(f"/api/device/{device_id}")
 
-    async def latest_telemetry(self, device_id: UUID, keys: list[str]) -> dict[str, Any]:
+    async def latest_telemetry(self, device_id: UUID, keys: list[str] | None = None) -> dict[str, Any]:
+        params = {"keys": ",".join(keys)} if keys else None
         raw = await self._get(
             f"/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries",
-            {"keys": ",".join(keys)},
+            params,
         )
         return raw or {}
 

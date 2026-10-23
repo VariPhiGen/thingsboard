@@ -19,11 +19,16 @@ from app.services.intent import IntentClassifier
 from app.services.llm import LlmService
 from app.services.memory import ConversationMemory, RateLimiter
 from app.services.permissions import PermissionManager
-from app.services.prompt_builder import build_messages
+from app.services.prompt_builder import build_messages, detect_language
 from app.services.rag import RagService
 from app.services.tb_client import ThingsBoardClient
 from app.services.tools.reports import format_report_context, load_latest_report_summary
-from app.services.tools.telemetry import fetch_active_alarms, fetch_ai_scores, fetch_latest_snapshot
+from app.services.tools.telemetry import (
+    fetch_active_alarms,
+    fetch_ai_scores,
+    fetch_fleet_overview,
+    fetch_latest_snapshot,
+)
 from app.services.tools.analytics import (
     analyze_window,
     compare_devices,
@@ -40,7 +45,7 @@ FALLBACK = (
 )
 UNSUPPORTED = (
     "I can help with live status, alarms, AI guidance, procedures, "
-    "and time/date/shift/duration/statistics/trend/comparison analysis, "
+    "and time/date/shift/duration/statistics/trend/comparison analysis across all plant devices, "
     "but I cannot share secrets or make configuration changes."
 )
 
@@ -106,16 +111,95 @@ class CopilotOrchestrator:
             message=request.message,
         )
 
+        # -------------------------------------------------------------
+        # CASE 1: Fleet-wide / Multi-device / General Plant Query
+        # -------------------------------------------------------------
+        if resolved.is_fleet:
+            sources: list[str] = ["fleet telemetry", "live readings", "alarms"]
+            fleet_data = await fetch_fleet_overview(client, devices)
+
+            grounding_parts: list[str] = [
+                "Facility Equipment Overview (All 7 Live Systems):"
+            ]
+            total_active_alarms = 0
+            for dev in fleet_data:
+                d_name = dev["name"]
+                d_type = dev.get("type", "")
+                vals = dev.get("values", {})
+                d_alarms = dev.get("alarms", [])
+                total_active_alarms += len(d_alarms)
+
+                reading_lines = [f"{k}: {v}" for k, v in list(vals.items())[:8]]
+                readings_str = "; ".join(reading_lines) if reading_lines else "Standby / No active values"
+                alarm_str = f"{len(d_alarms)} ACTIVE ALARM(S)" if d_alarms else "Normal (No alarms)"
+
+                grounding_parts.append(
+                    f"• {d_name} (Profile: {d_type})\n"
+                    f"  Alarms: {alarm_str}\n"
+                    f"  Telemetry: {readings_str}"
+                )
+
+            report = load_latest_report_summary(self.settings.reports_dir)
+            if report:
+                grounding_parts.append(format_report_context(report))
+                sources.append("reports")
+
+            snippets = self.rag.retrieve(request.message)
+            rag_text = self.rag.format_snippets(snippets)
+            if snippets:
+                sources.extend(f"rag:{s.get('source')}" for s in snippets)
+
+            history = self.memory.get_messages(conversation_id)
+            msgs = build_messages(
+                intent=intent,
+                user_message=request.message,
+                history=history,
+                grounding="\n\n".join(grounding_parts),
+                rag_snippets=rag_text,
+            )
+
+            lang = detect_language(request.message)
+            try:
+                answer = await self.llm.complete(msgs)
+                if not answer:
+                    answer = self._generate_fleet_fallback(fleet_data, lang=lang)
+            except Exception as exc:
+                log.warning("LLM fleet query failed: %s", exc)
+                answer = self._generate_fleet_fallback(fleet_data, error_hint=str(exc), lang=lang)
+
+            self.memory.append(conversation_id, "USER", request.message)
+            self.memory.append(conversation_id, "ASSISTANT", answer)
+
+            return ChatResponse(
+                conversationId=conversation_id,
+                answer=answer,
+                timestamp=int(time.time() * 1000),
+                intent=Intent.GENERAL,
+                sources=list(dict.fromkeys(sources)),
+                resolvedDevice=None,
+            )
+
+        # -------------------------------------------------------------
+        # CASE 2: Ambiguous device mention requiring clarification
+        # -------------------------------------------------------------
         if resolved.needs_clarification or resolved.device is None:
+            lang = detect_language(request.message)
             lines = []
             for i, d in enumerate(resolved.candidates[:12], start=1):
                 lines.append(f"{i}. {d.name}")
             listed = "\n".join(lines) if lines else "No accessible devices."
-            answer = (
-                f"{resolved.reason or 'Which device do you want to know about?'}\n\n"
-                f"Available devices:\n{listed}\n\n"
-                "Reply with the number or device name."
-            )
+            if lang == "en":
+                answer = (
+                    f"{resolved.reason or 'Which device would you like to inquire about?'}\n\n"
+                    f"Available Facility Systems:\n{listed}\n\n"
+                    "You can type the device name or number (e.g. 1, 2) to continue."
+                )
+            else:
+                answer = (
+                    f"{resolved.reason or 'Aap kis device ke baare me puchna chahte hain?'}\n\n"
+                    f"Available Facility Systems:\n{listed}\n\n"
+                    "Aap number (jaise 1, 2) ya device ka naam type karke puch sakte hain."
+                )
             self.memory.append(conversation_id, "USER", request.message)
             self.memory.append(conversation_id, "ASSISTANT", answer)
             return ChatResponse(
@@ -127,11 +211,14 @@ class CopilotOrchestrator:
                 resolvedDevice=None,
             )
 
+        # -------------------------------------------------------------
+        # CASE 3: Single Device Query
+        # -------------------------------------------------------------
         device = resolved.device
         sources: list[str] = []
         snapshot = None
         alarms: list[AlarmInfo] = []
-        grounding_parts: list[str] = [f"Device: {device.name} ({device.id})"]
+        grounding_parts: list[str] = [f"Device: {device.name} ({device.id}) [Profile: {device.type}]"]
 
         try:
             await self.perms.ensure_device_access(client, device.id)
@@ -143,7 +230,9 @@ class CopilotOrchestrator:
                     lastTelemetryTs=snap.get("lastTelemetryTs"),
                     values=snap.get("values") or {},
                 )
-                grounding_parts.append("Latest live readings:\n" + "\n".join(f"- {k}: {v}" for k, v in snapshot.values.items()))
+                grounding_parts.append(
+                    "Latest live readings:\n" + "\n".join(f"- {k}: {v}" for k, v in snapshot.values.items())
+                )
                 sources.append("live readings")
 
             if intent in {Intent.ALARMS, Intent.STATUS, Intent.GENERAL, Intent.AI_GUIDANCE}:
@@ -178,7 +267,6 @@ class CopilotOrchestrator:
                 }.get(intent, "general")
 
                 if intent == Intent.COMPARISON:
-                    # Compare previous equivalent window vs current window when user says vs yesterday/last week
                     lower = request.message.lower()
                     if "yesterday" in lower and "today" in lower:
                         today = parse_time_window("today")
@@ -189,7 +277,6 @@ class CopilotOrchestrator:
                             )
                         )
                     else:
-                        # default: previous equal-length period vs current window
                         span = max(1, window.end_ts - window.start_ts)
                         prev = TimeWindow(
                             start_ts=window.start_ts - span,
@@ -211,7 +298,6 @@ class CopilotOrchestrator:
 
             if intent == Intent.COMPARE_DEVICES:
                 window = parse_time_window(request.message)
-                # compare selected device with up to 2 peers
                 peers = [(device.id, device.name, device.type)]
                 for d in devices:
                     if d.id == device.id:
@@ -224,8 +310,8 @@ class CopilotOrchestrator:
 
             if intent in {Intent.COMPARE_DEVICES, Intent.GENERAL, Intent.MANUAL_HOWTO, Intent.AI_GUIDANCE}:
                 report = load_latest_report_summary(self.settings.reports_dir)
-                grounding_parts.append(format_report_context(report))
                 if report:
+                    grounding_parts.append(format_report_context(report))
                     sources.append("reports")
 
         except PermissionError as exc:
@@ -240,7 +326,7 @@ class CopilotOrchestrator:
             )
         except Exception as exc:
             log.exception("tooling failed: %s", exc)
-            grounding_parts.append(f"Tooling warning: {exc}")
+            grounding_parts.append(f"Tooling note: {exc}")
 
         rag_query = request.message
         if intent == Intent.MANUAL_HOWTO:
@@ -251,7 +337,6 @@ class CopilotOrchestrator:
             sources.extend(f"rag:{s.get('source')}" for s in snippets)
 
         history = self.memory.get_messages(conversation_id)
-        # Avoid duplicating current user turn if client already sent history
         msgs = build_messages(
             intent=intent,
             user_message=request.message,
@@ -260,21 +345,20 @@ class CopilotOrchestrator:
             rag_snippets=rag_text,
         )
 
+        lang = detect_language(request.message)
         try:
             answer = await self.llm.complete(msgs)
             if not answer:
-                answer = self._generate_grounded_fallback(intent, device, snapshot, alarms)
+                answer = self._generate_grounded_fallback(intent, device, snapshot, alarms, lang=lang)
         except Exception as exc:
             log.warning("llm failed: %s", exc)
             err_str = str(exc)
             hint = None
-            if "402" in err_str or "prepayment credits" in err_str.lower() or "RESOURCE_EXHAUSTED" in err_str:
-                hint = "Google AI Studio prepayment credits depleted"
-            elif "401" in err_str or "invalid" in err_str.lower():
+            if "401" in err_str or "invalid" in err_str.lower():
                 hint = "LLM API Key authorization invalid"
             elif "429" in err_str or "quota" in err_str.lower():
                 hint = "LLM Rate limit / quota reached"
-            answer = self._generate_grounded_fallback(intent, device, snapshot, alarms, error_hint=hint)
+            answer = self._generate_grounded_fallback(intent, device, snapshot, alarms, error_hint=hint, lang=lang)
 
         self.memory.append(conversation_id, "USER", request.message)
         self.memory.append(conversation_id, "ASSISTANT", answer)
@@ -290,6 +374,75 @@ class CopilotOrchestrator:
             activeAlarms=alarms,
         )
 
+    def _generate_fleet_fallback(self, fleet_data: list[dict[str, Any]], error_hint: str | None = None, lang: str = "en") -> str:
+        if lang == "en":
+            lines = [
+                "Hello! Here is the live status overview for all 7 facility systems:\n",
+            ]
+        else:
+            lines = [
+                "Namaste! Delhivery Facility ke sabhi 7 systems ka live status overview yeh raha:\n",
+            ]
+        
+        dg_lines = []
+        lt_lines = []
+        ro_lines = []
+        fire_lines = []
+
+        for d in fleet_data:
+            name = d["name"]
+            vals = d.get("values", {})
+            alarms = d.get("alarms", [])
+            has_alarms = len(alarms) > 0
+            icon = "🔴" if has_alarms else "🟢"
+            
+            summary_items = []
+            for k, v in list(vals.items())[:3]:
+                summary_items.append(f"{k}: {v}")
+            summary_str = " | ".join(summary_items) if summary_items else ("Standby (Normal)" if lang == "en" else "Standby (Normal)")
+            
+            entry = f"- {icon} **{name}**: {summary_str}"
+            if has_alarms:
+                entry += f" *(⚠️ {len(alarms)} Alarms Active)*"
+
+            lower = name.lower()
+            if "dg" in lower:
+                dg_lines.append(entry)
+            elif "lt" in lower or "panel" in lower:
+                lt_lines.append(entry)
+            elif "ro" in lower:
+                ro_lines.append(entry)
+            elif "fire" in lower or "suppression" in lower:
+                fire_lines.append(entry)
+            else:
+                dg_lines.append(entry)
+
+        if dg_lines:
+            lines.append("⚡ **DG Sets (Woodward KG1500):**")
+            lines.extend(dg_lines)
+            lines.append("")
+
+        if lt_lines:
+            lines.append("🔌 **Power & LT Panels:**")
+            lines.extend(lt_lines)
+            lines.append("")
+
+        if ro_lines:
+            lines.append("💧 **Water Treatment (RO Plant):**")
+            lines.extend(ro_lines)
+            lines.append("")
+
+        if fire_lines:
+            lines.append("🧯 **Fire Suppression Systems:**")
+            lines.extend(fire_lines)
+            lines.append("")
+
+        if lang == "en":
+            lines.append("💡 *You can type any machine name (e.g. 'RO Plant TDS' or 'DG 1 status') for detailed readings.*")
+        else:
+            lines.append("💡 *Aap kisi bhi machine ka naam (jaise 'RO Plant ka TDS' ya 'DG 1') likhkar detail me pooch sakte hain.*")
+        return "\n".join(lines)
+
     def _generate_grounded_fallback(
         self,
         intent: Intent,
@@ -297,47 +450,48 @@ class CopilotOrchestrator:
         snapshot: DeviceSnapshot | None,
         alarms: list[AlarmInfo],
         error_hint: str | None = None,
+        lang: str = "en",
     ) -> str:
-        parts: list[str] = [f"**{device.name} — Live Status Report**\n"]
+        if lang == "en":
+            parts: list[str] = [f"Hello! Here is the live status report for **{device.name}**:\n"]
+            if alarms:
+                parts.append("⚠️ **Active Alarms & Alerts:**")
+                for a in alarms:
+                    sev_icon = "🔴" if (a.severity or "").upper() == "CRITICAL" else "🟡"
+                    detail_str = f" — {a.details}" if a.details else ""
+                    parts.append(f"- {sev_icon} **{a.type}** [{a.severity or 'ALERT'}]{detail_str}")
+                parts.append("Please inspect active alarms and follow standard operating procedures.\n")
+            else:
+                parts.append("🟢 **Alert Status:** No active alarms. All parameters are within safe limits.\n")
 
-        if alarms:
-            alarm_lines = [f"- **[{a.severity}]** {a.type}: {a.details or a.status}" for a in alarms]
-            parts.append("**Active Alarms:**\n" + "\n".join(alarm_lines) + "\n")
+            if snapshot and snapshot.values:
+                parts.append("📊 **Current Live Telemetry:**")
+                for k, v in list(snapshot.values.items())[:12]:
+                    parts.append(f"• **{k}:** {v}")
+                parts.append("")
+            else:
+                parts.append("*(Machine is in standby or live telemetry is synchronizing)*\n")
+
+            parts.append("💡 *Feel free to ask about any specific reading, history trend, or maintenance SOP.*")
         else:
-            parts.append("**Active Alarms:** None (All parameters normal)\n")
+            parts: list[str] = [f"Namaste! **{device.name}** ka live status report yeh raha:\n"]
+            if alarms:
+                parts.append("⚠️ **Active Alarms & Alerts:**")
+                for a in alarms:
+                    sev_icon = "🔴" if (a.severity or "").upper() == "CRITICAL" else "🟡"
+                    detail_str = f" — {a.details}" if a.details else ""
+                    parts.append(f"- {sev_icon} **{a.type}** [{a.severity or 'ALERT'}]{detail_str}")
+                parts.append("Kripya alarms check karein aur standard operating procedure follow karein.\n")
+            else:
+                parts.append("🟢 **Alert Status:** Koi active alarm nahi hai. Sabhi parameters safe limit me hain.\n")
 
-        if snapshot and snapshot.values:
-            parts.append("**Current Live Readings:**")
-            primary_keys = [
-                "engine_speed", "frequency", "fuel_level", "battery_voltage",
-                "coolant_temp", "oil_pressure", "active_power", "total_power",
-                "voltage", "current", "ph", "tds", "flow_rate", "pressure"
-            ]
-            added = set()
-            for pk in primary_keys:
-                for k, v in snapshot.values.items():
-                    if pk in k.lower() and k not in added:
-                        label = k.replace("_", " ").title()
-                        parts.append(f"- **{label}:** {v}")
-                        added.add(k)
-                        if len(added) >= 6:
-                            break
-            if len(added) < 6:
-                for k, v in snapshot.values.items():
-                    if k not in added:
-                        label = k.replace("_", " ").title()
-                        parts.append(f"- **{label}:** {v}")
-                        added.add(k)
-                        if len(added) >= 8:
-                            break
-            parts.append("")
-        else:
-            parts.append("*(No live telemetry readings currently available for this device)*\n")
+            if snapshot and snapshot.values:
+                parts.append("📊 **Current Live Telemetry:**")
+                for k, v in list(snapshot.values.items())[:12]:
+                    parts.append(f"• **{k}:** {v}")
+                parts.append("")
+            else:
+                parts.append("*(Machine standby me hai ya live telemetry synchronize ho rahi hai)*\n")
 
-        if error_hint:
-            parts.append(f"*(Telemetry is 100% live. AI model note: {error_hint}. Manage billing at https://ai.studio/projects)*")
-        elif not self.llm.api_key:
-            parts.append("*(Telemetry is 100% live. Set an AI API key for conversational explanations)*")
-
+            parts.append("💡 *Aap kisi specific reading, past history ya maintenance SOP ke baare me pooch sakte hain.*")
         return "\n".join(parts)
-

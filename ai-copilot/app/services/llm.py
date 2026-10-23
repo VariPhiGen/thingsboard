@@ -30,21 +30,22 @@ log = logging.getLogger(__name__)
 class LlmService:
     def __init__(self, settings: Settings):
         self.settings = settings
-        api_key = (
-            settings.gemini_api_key
-            or settings.openai_api_key
-            or os.getenv("GEMINI_API_KEY", "")
-            or os.getenv("OPENAI_API_KEY", "")
-        )
-        base_url = settings.openai_base_url or os.getenv("OPENAI_BASE_URL", "")
-        model = settings.openai_model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        openai_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "")
+        gemini_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY", "")
 
-        # Auto-detect Google Gemini authorization keys (starting with 'AQ.' or 'AIza')
-        if api_key and (api_key.startswith("AQ.") or api_key.startswith("AIza")):
-            if not base_url:
-                base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
-            if model in ("gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", ""):
-                model = "gemini-2.5-flash"
+        # Prefer active OpenAI key if present
+        if openai_key and openai_key.startswith("sk-"):
+            api_key = openai_key
+            base_url = "https://api.openai.com/v1"
+            model = settings.openai_model if settings.openai_model and not settings.openai_model.startswith("gemini") else "gpt-4o-mini"
+        elif gemini_key or (openai_key and (openai_key.startswith("AQ.") or openai_key.startswith("AIza"))):
+            api_key = gemini_key or openai_key
+            base_url = settings.openai_base_url or os.getenv("OPENAI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
+            model = settings.openai_model if settings.openai_model and settings.openai_model.startswith("gemini") else "gemini-2.5-flash"
+        else:
+            api_key = openai_key or gemini_key
+            base_url = settings.openai_base_url or os.getenv("OPENAI_BASE_URL", "")
+            model = settings.openai_model or os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
         self.api_key = api_key
         self.base_url = base_url or None

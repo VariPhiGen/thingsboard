@@ -120,6 +120,992 @@ DARK_CHARCOAL_CSS = """
     }
 """
 
+FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
+<style id="tb-fc-styles">
+  #tb-fc-root {
+    position: fixed;
+    z-index: 999999;
+    font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  #tb-fc-fab {
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1F232C 0%, #2B2F3A 55%, #0F766E 100%);
+    box-shadow: 0 8px 24px rgba(15, 118, 110, 0.4), 0 4px 12px rgba(0, 0, 0, 0.25);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+    z-index: 999999;
+    outline: none;
+    user-select: none;
+  }
+  #tb-fc-fab:hover {
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 0 12px 32px rgba(15, 118, 110, 0.55), 0 6px 16px rgba(0, 0, 0, 0.3);
+  }
+  #tb-fc-fab:active {
+    transform: scale(0.96);
+  }
+  .tb-fc-fab-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+  }
+  .tb-fc-fab-online {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 13px;
+    height: 13px;
+    background-color: #10B981;
+    border: 2.5px solid #1F232C;
+    border-radius: 50%;
+  }
+  .tb-fc-fab-online::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 2px solid #10B981;
+    animation: tbFcPulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  }
+  @keyframes tbFcPulse {
+    0% { transform: scale(0.8); opacity: 0.9; }
+    70% { transform: scale(1.8); opacity: 0; }
+    100% { transform: scale(1.8); opacity: 0; }
+  }
+
+  /* Chat Window Drawer */
+  #tb-fc-window {
+    position: fixed;
+    bottom: 96px;
+    right: 26px;
+    width: 440px;
+    height: 600px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 120px);
+    background: #FFFFFF;
+    border-radius: 20px;
+    box-shadow: 0 24px 64px rgba(15, 23, 42, 0.28), 0 4px 20px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999999;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.22s ease, visibility 0.22s;
+  }
+  #tb-fc-window.tb-fc-closed {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(24px) scale(0.95);
+  }
+  #tb-fc-window.tb-fc-open {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0) scale(1);
+  }
+
+  /* Header */
+  .tb-fc-header {
+    background: #1F232C;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+  }
+  .tb-fc-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tb-fc-avatar-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.35);
+  }
+  .tb-fc-title {
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+  .tb-fc-status {
+    color: #94A3B8;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 1px;
+  }
+  .tb-fc-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10B981;
+  }
+  .tb-fc-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .tb-fc-btn-action {
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: #CBD5E1;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+  }
+  .tb-fc-btn-action:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #FFFFFF;
+  }
+
+  /* Quick chips */
+  .tb-fc-chips-bar {
+    background: #F8FAFC;
+    padding: 8px 12px;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    flex-shrink: 0;
+  }
+  .tb-fc-chips-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .tb-fc-chip {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    flex-shrink: 0;
+  }
+  .tb-fc-chip:hover {
+    border-color: #0F766E;
+    color: #0F766E;
+    background: #F0FDFA;
+  }
+  .tb-fc-chip.active {
+    background: #0F766E;
+    color: #FFFFFF;
+    border-color: #0F766E;
+    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+  }
+
+  /* Focused Banner */
+  .tb-fc-focused-banner {
+    background: #ECFDF5;
+    border-bottom: 1px solid #A7F3D0;
+    padding: 6px 12px;
+    font-size: 11.5px;
+    color: #065F46;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .tb-fc-focused-banner button {
+    background: none;
+    border: none;
+    color: #047857;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .tb-fc-focused-banner button:hover {
+    background: #D1FAE5;
+  }
+
+  /* Thread */
+  .tb-fc-thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #F8FAFC;
+    scroll-behavior: smooth;
+  }
+
+  /* Welcome Screen */
+  .tb-fc-welcome {
+    margin: auto 0;
+    text-align: center;
+    padding: 12px 6px;
+  }
+  .tb-fc-welcome-icon {
+    font-size: 32px;
+    margin-bottom: 8px;
+  }
+  .tb-fc-welcome-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 6px;
+  }
+  .tb-fc-welcome-desc {
+    font-size: 12.5px;
+    color: #64748B;
+    line-height: 1.5;
+    margin-bottom: 16px;
+  }
+  .tb-fc-prompts-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #94A3B8;
+    margin-bottom: 8px;
+    text-align: left;
+  }
+  .tb-fc-prompts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .tb-fc-prompt-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 9px 12px;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    color: #1E293B;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tb-fc-prompt-card:hover {
+    border-color: #0F766E;
+    background: #F0FDFA;
+    transform: translateX(2px);
+  }
+
+  /* Rows */
+  .tb-fc-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    max-width: 90%;
+    animation: tbFcRise 0.2s ease both;
+  }
+  .tb-fc-row-user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+  }
+  .tb-fc-row-assistant {
+    align-self: flex-start;
+  }
+  .tb-fc-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .tb-fc-row-user .tb-fc-avatar {
+    background: #DBEAFE;
+    color: #1D4ED8;
+  }
+  .tb-fc-row-assistant .tb-fc-avatar {
+    background: #1F232C;
+    color: #10B981;
+  }
+  .tb-fc-bubble {
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.55;
+    word-break: break-word;
+  }
+  .tb-fc-row-user .tb-fc-bubble {
+    background: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
+    color: #FFFFFF;
+    border-bottom-right-radius: 4px;
+    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.25);
+  }
+  .tb-fc-row-assistant .tb-fc-bubble {
+    background: #FFFFFF;
+    color: #0F172A;
+    border: 1px solid #E2E8F0;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+  .tb-fc-bubble strong { font-weight: 700; color: inherit; }
+  .tb-fc-bubble em { font-style: italic; color: inherit; }
+  .tb-fc-bubble ul, .tb-fc-bubble ol { margin: 6px 0; padding-left: 18px; }
+  .tb-fc-bubble li { margin: 2px 0; }
+  .tb-fc-time {
+    font-size: 10px;
+    color: #94A3B8;
+    margin-top: 4px;
+    text-align: right;
+  }
+  .tb-fc-row-assistant .tb-fc-time {
+    text-align: left;
+  }
+
+  /* Typing */
+  .tb-fc-typing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .tb-fc-typing-dot {
+    width: 6px;
+    height: 6px;
+    background: #0F766E;
+    border-radius: 50%;
+    animation: tbFcDot 1.4s infinite ease-in-out both;
+  }
+  .tb-fc-typing-dot:nth-child(1) { animation-delay: -0.32s; }
+  .tb-fc-typing-dot:nth-child(2) { animation-delay: -0.16s; }
+  .tb-fc-typing-label {
+    font-size: 11.5px;
+    color: #64748B;
+    margin-left: 6px;
+  }
+  @keyframes tbFcDot {
+    0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes tbFcRise {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* Composer */
+  .tb-fc-composer {
+    background: #FFFFFF;
+    border-top: 1px solid #E2E8F0;
+    padding: 10px 14px;
+    flex-shrink: 0;
+  }
+  .tb-fc-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  .tb-fc-input-row textarea {
+    flex: 1;
+    min-height: 42px;
+    max-height: 96px;
+    resize: none;
+    border: 1px solid #CBD5E1;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+    color: #0F172A;
+    background: #FFFFFF;
+  }
+  .tb-fc-input-row textarea:focus {
+    border-color: #0F766E;
+    box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+  }
+  .tb-fc-send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #0F766E 0%, #0D9488 100%);
+    border: none;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .tb-fc-send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.35);
+  }
+  .tb-fc-send-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+  .tb-fc-hint {
+    font-size: 10.5px;
+    color: #94A3B8;
+    margin-top: 6px;
+    text-align: center;
+  }
+</style>
+
+<div id="tb-fc-root">
+  <button id="tb-fc-fab" title="Virtuoso AI Copilot" aria-label="Open AI Copilot">
+    <div class="tb-fc-fab-icon">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+        <path d="M12 7v2"></path>
+        <path d="M12 13h.01"></path>
+      </svg>
+    </div>
+    <span class="tb-fc-fab-online" title="Online"></span>
+  </button>
+
+  <div id="tb-fc-window" class="tb-fc-closed">
+    <!-- Header -->
+    <div class="tb-fc-header">
+      <div class="tb-fc-header-left">
+        <div class="tb-fc-avatar-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
+            <rect x="4" y="8" width="16" height="12" rx="3"></rect>
+            <circle cx="9" cy="13" r="1.5" fill="#FFFFFF"></circle>
+            <circle cx="15" cy="13" r="1.5" fill="#FFFFFF"></circle>
+            <line x1="9" y1="17" x2="15" y2="17"></line>
+          </svg>
+        </div>
+        <div class="tb-fc-header-info">
+          <div class="tb-fc-title">Virtuoso AI Copilot</div>
+          <div class="tb-fc-status"><span class="tb-fc-status-dot"></span> Delhivery Fleet Intelligence • 🟢 Online</div>
+        </div>
+      </div>
+      <div class="tb-fc-header-actions">
+        <button id="tb-fc-btn-reset" class="tb-fc-btn-action" title="Start New Conversation">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="1 4 1 10 7 10"></polyline>
+            <polyline points="23 20 23 14 17 14"></polyline>
+            <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+          </svg>
+          <span>New</span>
+        </button>
+        <button id="tb-fc-btn-close" class="tb-fc-btn-action" title="Minimize">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Chips -->
+    <div class="tb-fc-chips-bar" id="tb-fc-chips">
+      <button class="tb-fc-chip active" data-id="all">🌐 All Systems</button>
+      <button class="tb-fc-chip" data-id="dg1">⚡ DG 1</button>
+      <button class="tb-fc-chip" data-id="dg2">⚡ DG 2</button>
+      <button class="tb-fc-chip" data-id="dg3">⚡ DG 3</button>
+      <button class="tb-fc-chip" data-id="ro">💧 RO Plant</button>
+      <button class="tb-fc-chip" data-id="lt">🔌 LT Panels</button>
+      <button class="tb-fc-chip" data-id="fire">🧯 Fire Main</button>
+      <button class="tb-fc-chip" data-id="ups">🧯 UPS 2</button>
+    </div>
+
+    <!-- Focused Device Banner -->
+    <div id="tb-fc-focused-banner" class="tb-fc-focused-banner" style="display:none;">
+      <span>Talking about <strong id="tb-fc-focused-name">Device</strong></span>
+      <button id="tb-fc-focused-clear">✕ Clear</button>
+    </div>
+
+    <!-- Message Thread -->
+    <div class="tb-fc-thread" id="tb-fc-thread" role="log" aria-live="polite">
+      <div class="tb-fc-welcome" id="tb-fc-welcome">
+        <div class="tb-fc-welcome-icon">🤖</div>
+        <div class="tb-fc-welcome-title">Delhivery Facility Copilot</div>
+        <div class="tb-fc-welcome-desc">
+          Ask in <strong>English or Hindi</strong> about generator telemetry, RO plant TDS & water quality, panel breakers, or active alarms.
+        </div>
+        <div class="tb-fc-prompts-label">Quick Actions:</div>
+        <div class="tb-fc-prompts-grid">
+          <button class="tb-fc-prompt-card" data-prompt="What is TDS right now ?">
+            <span>💧</span>
+            <span>What is TDS right now ?</span>
+          </button>
+          <button class="tb-fc-prompt-card" data-prompt="DG Set 1 live telemetry and alarms">
+            <span>⚡</span>
+            <span>DG Set 1 live status</span>
+          </button>
+          <button class="tb-fc-prompt-card" data-prompt="Are there any active alarms across Delhivery fleet?">
+            <span>🚨</span>
+            <span>Any active alarms?</span>
+          </button>
+          <button class="tb-fc-prompt-card" data-prompt="Sare devices ka summary status batao">
+            <span>📊</span>
+            <span>Sare devices ka summary do</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Composer -->
+    <div class="tb-fc-composer">
+      <div class="tb-fc-input-row">
+        <textarea id="tb-fc-input" rows="1" placeholder="Ask in English or Hindi (e.g. What is TDS right now?)..."></textarea>
+        <button type="button" id="tb-fc-send" title="Send (Enter)" class="tb-fc-send-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+      <div class="tb-fc-hint">Press <strong>Enter</strong> to send • <strong>Shift+Enter</strong> for newline</div>
+    </div>
+  </div>
+</div>
+
+<script id="tb-fc-script">
+(function() {
+  var STORAGE_KEY = 'tb_floating_copilot_v2';
+  var devices = [];
+  var state = {
+    isOpen: false,
+    busy: false,
+    conversationId: null,
+    selectedDeviceId: null,
+    selectedDeviceName: null,
+    messages: []
+  };
+
+  function getAuthToken() {
+    return localStorage.getItem('jwt_token') || '';
+  }
+
+  function generateUUID() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  function loadState() {
+    try {
+      var s = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+      state.conversationId = s.conversationId || generateUUID();
+      state.selectedDeviceId = s.selectedDeviceId || null;
+      state.selectedDeviceName = s.selectedDeviceName || null;
+      state.messages = Array.isArray(s.messages) ? s.messages : [];
+    } catch(e) {
+      state.conversationId = generateUUID();
+      state.selectedDeviceId = null;
+      state.selectedDeviceName = null;
+      state.messages = [];
+    }
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        conversationId: state.conversationId,
+        selectedDeviceId: state.selectedDeviceId,
+        selectedDeviceName: state.selectedDeviceName,
+        messages: state.messages.slice(-10)
+      }));
+    } catch(e) {}
+  }
+
+  function updateVisibility() {
+    var fab = document.getElementById('tb-fc-fab');
+    var win = document.getElementById('tb-fc-window');
+    if (!fab || !win) return;
+    var token = getAuthToken();
+    var isLoginPage = window.location.pathname.indexOf('/login') !== -1;
+    if (!token || isLoginPage) {
+      fab.style.display = 'none';
+      win.classList.remove('tb-fc-open');
+      win.classList.add('tb-fc-closed');
+      state.isOpen = false;
+    } else {
+      fab.style.display = 'flex';
+    }
+  }
+
+  function toggleWindow(open) {
+    var win = document.getElementById('tb-fc-window');
+    if (!win) return;
+    if (typeof open === 'boolean') {
+      state.isOpen = open;
+    } else {
+      state.isOpen = !state.isOpen;
+    }
+    if (state.isOpen) {
+      win.classList.remove('tb-fc-closed');
+      win.classList.add('tb-fc-open');
+      var inp = document.getElementById('tb-fc-input');
+      if (inp) setTimeout(function() { inp.focus(); }, 150);
+      scrollThread();
+      loadDevices();
+    } else {
+      win.classList.remove('tb-fc-open');
+      win.classList.add('tb-fc-closed');
+    }
+  }
+
+  function formatMarkdown(text) {
+    var s = String(text || '');
+    s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, '$1<em>$2</em>');
+    s = s.replace(/^### (.*$)/gim, '<div style="font-weight:700;font-size:13.5px;margin:6px 0 2px;">$1</div>');
+    s = s.replace(/^## (.*$)/gim, '<div style="font-weight:700;font-size:14px;margin:8px 0 3px;">$1</div>');
+    s = s.replace(/^# (.*$)/gim, '<div style="font-weight:700;font-size:15px;margin:10px 0 4px;">$1</div>');
+    
+    var lines = s.split('\n');
+    var inList = false;
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var m = line.match(/^\s*[-*•]\s+(.*)$/);
+      if (m) {
+        if (!inList) { out.push('<ul>'); inList = true; }
+        out.push('<li>' + m[1] + '</li>');
+      } else {
+        if (inList) { out.push('</ul>'); inList = false; }
+        out.push(line);
+      }
+    }
+    if (inList) out.push('</ul>');
+    s = out.join('\n');
+    s = s.replace(/\n\n+/g, '<br><br>');
+    s = s.replace(/\n(?![<])/g, '<br>');
+    return s;
+  }
+
+  function scrollThread() {
+    var thread = document.getElementById('tb-fc-thread');
+    if (thread) {
+      setTimeout(function() { thread.scrollTop = thread.scrollHeight; }, 50);
+    }
+  }
+
+  function updateFocusedBanner() {
+    var banner = document.getElementById('tb-fc-focused-banner');
+    var nameEl = document.getElementById('tb-fc-focused-name');
+    if (!banner || !nameEl) return;
+    if (state.selectedDeviceName) {
+      nameEl.textContent = state.selectedDeviceName;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  function renderThread() {
+    var thread = document.getElementById('tb-fc-thread');
+    var welcome = document.getElementById('tb-fc-welcome');
+    if (!thread) return;
+
+    if (!state.messages || state.messages.length === 0) {
+      thread.innerHTML = '';
+      if (welcome) thread.appendChild(welcome);
+      return;
+    }
+
+    thread.innerHTML = '';
+    for (var i = 0; i < state.messages.length; i++) {
+      var msg = state.messages[i];
+      appendBubbleDOM(msg.role, msg.content, msg.time);
+    }
+    scrollThread();
+  }
+
+  function appendBubbleDOM(role, text, timeStr) {
+    var thread = document.getElementById('tb-fc-thread');
+    if (!thread) return;
+
+    var row = document.createElement('div');
+    row.className = 'tb-fc-row tb-fc-row-' + (role === 'USER' ? 'user' : 'assistant');
+
+    var avatar = document.createElement('div');
+    avatar.className = 'tb-fc-avatar';
+    avatar.textContent = role === 'USER' ? 'OP' : 'AI';
+
+    var bubbleWrap = document.createElement('div');
+    bubbleWrap.style.display = 'flex';
+    bubbleWrap.style.flexDirection = 'column';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'tb-fc-bubble';
+    bubble.innerHTML = formatMarkdown(text);
+    bubbleWrap.appendChild(bubble);
+
+    if (timeStr) {
+      var t = document.createElement('div');
+      t.className = 'tb-fc-time';
+      t.textContent = timeStr;
+      bubbleWrap.appendChild(t);
+    }
+
+    row.appendChild(avatar);
+    row.appendChild(bubbleWrap);
+    thread.appendChild(row);
+    scrollThread();
+  }
+
+  function showTypingIndicator() {
+    var thread = document.getElementById('tb-fc-thread');
+    if (!thread) return;
+    var existing = document.getElementById('tb-fc-typing-indicator');
+    if (existing) existing.remove();
+
+    var typing = document.createElement('div');
+    typing.id = 'tb-fc-typing-indicator';
+    typing.className = 'tb-fc-typing';
+    typing.innerHTML = '<div class="tb-fc-typing-dot"></div><div class="tb-fc-typing-dot"></div><div class="tb-fc-typing-dot"></div><span class="tb-fc-typing-label">Analyzing live telemetry...</span>';
+    thread.appendChild(typing);
+    scrollThread();
+  }
+
+  function removeTypingIndicator() {
+    var el = document.getElementById('tb-fc-typing-indicator');
+    if (el) el.remove();
+  }
+
+  function getCopilotBaseUrl() {
+    if (window.TB_COPILOT_BASE_URL) return window.TB_COPILOT_BASE_URL;
+    if (window.location.port === '9091') {
+      return window.location.protocol + '//' + window.location.hostname + ':8097';
+    }
+    return window.location.origin + '/copilot';
+  }
+
+  async function loadDevices() {
+    var token = getAuthToken();
+    if (!token) return;
+    try {
+      var res = await fetch(getCopilotBaseUrl() + '/v1/devices', {
+        headers: { 'X-Authorization': 'Bearer ' + token }
+      });
+      if (res.ok) {
+        devices = await res.json();
+      }
+    } catch(e) {}
+  }
+
+  async function sendQuery(text) {
+    var q = String(text || '').trim();
+    if (!q || state.busy) return;
+
+    var timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    appendBubbleDOM('USER', q, timeNow);
+    state.messages.push({ role: 'USER', content: q, time: timeNow });
+    saveState();
+
+    var inp = document.getElementById('tb-fc-input');
+    if (inp) inp.value = '';
+
+    state.busy = true;
+    var sendBtn = document.getElementById('tb-fc-send');
+    if (sendBtn) sendBtn.disabled = true;
+    showTypingIndicator();
+
+    try {
+      var token = getAuthToken();
+      var historyClean = (state.messages || []).slice(-8).map(function(m) {
+        return { role: m.role, content: m.content };
+      });
+      var payload = {
+        message: q,
+        conversationId: state.conversationId,
+        messages: historyClean
+      };
+      if (state.selectedDeviceId) {
+        payload.deviceId = state.selectedDeviceId;
+      }
+      var res = await fetch(getCopilotBaseUrl() + '/v1/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var data = await res.json();
+
+      removeTypingIndicator();
+      var answer = data.answer || 'No response received from copilot.';
+      if (data.resolvedDevice && data.resolvedDevice.id) {
+        state.selectedDeviceId = data.resolvedDevice.id;
+        state.selectedDeviceName = data.resolvedDevice.name;
+        updateFocusedBanner();
+      }
+      if (data.conversationId) {
+        state.conversationId = data.conversationId;
+      }
+
+      var botTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      appendBubbleDOM('ASSISTANT', answer, botTime);
+      state.messages.push({ role: 'ASSISTANT', content: answer, time: botTime });
+      saveState();
+    } catch(err) {
+      removeTypingIndicator();
+      var errMsg = 'Unable to connect to Copilot service. Please verify your connection or retry in a moment.';
+      appendBubbleDOM('ASSISTANT', errMsg, '');
+    } finally {
+      state.busy = false;
+      if (sendBtn) sendBtn.disabled = false;
+      if (inp) inp.focus();
+    }
+  }
+
+  function handleChipClick(chipId) {
+    var chips = document.querySelectorAll('.tb-fc-chip');
+    chips.forEach(function(c) { c.classList.remove('active'); });
+
+    var targetChip = document.querySelector('.tb-fc-chip[data-id="' + chipId + '"]');
+    if (targetChip) targetChip.classList.add('active');
+
+    if (chipId === 'all') {
+      state.selectedDeviceId = null;
+      state.selectedDeviceName = null;
+      updateFocusedBanner();
+      sendQuery('Give me an operational summary of all Delhivery fleet systems.');
+      return;
+    }
+
+    var match = null;
+    if (chipId === 'dg1') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set1') || (d.name||'').toLowerCase().includes('dg 1'); });
+    else if (chipId === 'dg2') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set 2') || (d.name||'').toLowerCase().includes('dg 2'); });
+    else if (chipId === 'dg3') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('dg set 3') || (d.name||'').toLowerCase().includes('dg 3'); });
+    else if (chipId === 'ro') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('ro'); });
+    else if (chipId === 'lt') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('lt') || (d.name||'').toLowerCase().includes('panel'); });
+    else if (chipId === 'fire') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('fire') && !(d.name||'').toLowerCase().includes('ups'); });
+    else if (chipId === 'ups') match = devices.find(function(d) { return (d.name||'').toLowerCase().includes('ups'); });
+
+    if (match) {
+      state.selectedDeviceId = match.id;
+      state.selectedDeviceName = match.name;
+      updateFocusedBanner();
+      sendQuery('What is the current status and live telemetry of ' + match.name + '?');
+    } else {
+      var queryMap = {
+        dg1: 'DG Set 1 live telemetry and alarms',
+        dg2: 'DG Set 2 live telemetry and alarms',
+        dg3: 'DG Set 3 live telemetry and alarms',
+        ro: 'What is RO Plant TDS, flow rate, and water quality right now ?',
+        lt: 'LT Panels Gateway live load and alarms',
+        fire: 'Fire Suppression system status',
+        ups: 'Fire Suppression UPS Room 2 cylinder status'
+      };
+      sendQuery(queryMap[chipId] || 'Status update');
+    }
+  }
+
+  function initEvents() {
+    var fab = document.getElementById('tb-fc-fab');
+    if (fab) fab.addEventListener('click', function() { toggleWindow(); });
+
+    var closeBtn = document.getElementById('tb-fc-btn-close');
+    if (closeBtn) closeBtn.addEventListener('click', function() { toggleWindow(false); });
+
+    var resetBtn = document.getElementById('tb-fc-btn-reset');
+    if (resetBtn) resetBtn.addEventListener('click', function() {
+      state.conversationId = generateUUID();
+      state.selectedDeviceId = null;
+      state.selectedDeviceName = null;
+      state.messages = [];
+      localStorage.removeItem(STORAGE_KEY);
+      updateFocusedBanner();
+      renderThread();
+    });
+
+    var clearFocus = document.getElementById('tb-fc-focused-clear');
+    if (clearFocus) clearFocus.addEventListener('click', function() {
+      state.selectedDeviceId = null;
+      state.selectedDeviceName = null;
+      updateFocusedBanner();
+    });
+
+    var sendBtn = document.getElementById('tb-fc-send');
+    var inp = document.getElementById('tb-fc-input');
+    if (sendBtn && inp) {
+      sendBtn.addEventListener('click', function() {
+        sendQuery(inp.value);
+      });
+      inp.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendQuery(inp.value);
+        }
+      });
+    }
+
+    // Quick prompt cards delegation
+    document.addEventListener('click', function(e) {
+      var card = e.target.closest('.tb-fc-prompt-card');
+      if (card) {
+        var p = card.getAttribute('data-prompt');
+        if (p) sendQuery(p);
+      }
+      var chip = e.target.closest('.tb-fc-chip');
+      if (chip) {
+        var cid = chip.getAttribute('data-id');
+        if (cid) handleChipClick(cid);
+      }
+    });
+
+    // Check visibility on navigation
+    window.addEventListener('popstate', updateVisibility);
+    setInterval(updateVisibility, 1500);
+    var obs = new MutationObserver(updateVisibility);
+    obs.observe(document.body, { childList: true, subtree: true });
+  }
+
+  loadState();
+  initEvents();
+  updateVisibility();
+  updateFocusedBanner();
+  renderThread();
+  loadDevices();
+})();
+</script>
+<!-- END FLOATING COPILOT -->
+"""
+
 SSO_REDIRECT_JS = """
   <script>
     (function() {
@@ -215,8 +1201,8 @@ def main():
     html = html.replace("</head>", f"<style type=\"text/css\">{DARK_CHARCOAL_CSS}</style>\n</head>")
 
     # Clean previous SSO scripts and inject updated SSO_REDIRECT_JS with logout handler
-    html = re.sub(r'<script>\s*\(function\(\)\s*\{\s*(var isLoggingOut|function checkLogin).*?</script>\s*', '', html, flags=re.DOTALL)
-    html = html.replace("</body>", f"{SSO_REDIRECT_JS.strip()}\n</body>")
+    html = re.sub(r'<!-- BEGIN FLOATING COPILOT -->.*?<!-- END FLOATING COPILOT -->', '', html, flags=re.DOTALL)
+    html = html.replace("</body>", f"{FLOATING_COPILOT_SNIPPET.strip()}\n{SSO_REDIRECT_JS.strip()}\n</body>")
 
     if 'virtuoso-favicon.png' not in html:
         html = html.replace('<link rel="icon" type="image/x-icon" href="thingsboard.ico">',

@@ -40,7 +40,7 @@ class DeviceInfo(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    conversationId: UUID | None = None
+    conversationId: str | None = None
     deviceId: UUID | None = None
     deviceQuery: str | None = None
     dashboardId: UUID | None = None
@@ -62,7 +62,7 @@ class AlarmInfo(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    conversationId: UUID
+    conversationId: str | UUID
     answer: str
     timestamp: int
     resolvedDevice: DeviceInfo | None = None
