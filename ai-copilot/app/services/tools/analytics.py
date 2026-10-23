@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from app.services.tb_client import ThingsBoardClient
-from app.services.tools.telemetry import DISPLAY, keys_for_device, normalize_value
+from app.services.tools.telemetry import DISPLAY, keys_for_device, normalize_value, get_unit_for_key
 from app.services.time_window import TimeWindow, extract_metric_keys
 
 
@@ -149,12 +149,14 @@ def analyze_window(
         vals = [v for _, v in series]
         st = compute_stats(vals)
         tr = compute_trend(series)
+        unit = get_unit_for_key(key)
+        u_suffix = f" {unit}" if unit else ""
         if st.get("count"):
             stats_block.append(
-                f"- {label}: min={st['min']}, max={st['max']}, avg={st['avg']}, last={st['last']} (n={st['count']})"
+                f"- {label}: min={st['min']}{u_suffix}, max={st['max']}{u_suffix}, avg={st['avg']}{u_suffix}, last={st['last']}{u_suffix} (n={st['count']})"
             )
             trend_block.append(
-                f"- {label}: {tr['direction']} ({tr.get('from')} → {tr.get('to')}, Δ={tr.get('change')}"
+                f"- {label}: {tr['direction']} ({tr.get('from')}{u_suffix} → {tr.get('to')}{u_suffix}, Δ={tr.get('change')}{u_suffix}"
                 + (f", {tr['change_pct']}%" if tr.get("change_pct") is not None else "")
                 + ")"
             )
@@ -200,16 +202,18 @@ async def compare_periods(
         sa = compute_stats([v for _, v in _series_values((a.get("raw") or {}).get(key) or [])])
         sb = compute_stats([v for _, v in _series_values((b.get("raw") or {}).get(key) or [])])
         label = DISPLAY.get(key, key)
+        unit = get_unit_for_key(key)
+        u_suffix = f" {unit}" if unit else ""
         if not sa.get("count") and not sb.get("count"):
             lines.append(f"- {label}: no data in either period")
             continue
         avg_a = sa.get("avg")
         avg_b = sb.get("avg")
         delta = None if avg_a is None or avg_b is None else round(avg_b - avg_a, 3)
-        lines.append(
-            f"- {label}: A avg={avg_a if avg_a is not None else 'n/a'}, "
-            f"B avg={avg_b if avg_b is not None else 'n/a'}, Δ={delta if delta is not None else 'n/a'}"
-        )
+        str_a = f"{avg_a}{u_suffix}" if avg_a is not None else "n/a"
+        str_b = f"{avg_b}{u_suffix}" if avg_b is not None else "n/a"
+        str_delta = f"{delta}{u_suffix}" if delta is not None else "n/a"
+        lines.append(f"- {label}: A avg={str_a}, B avg={str_b}, Δ={str_delta}")
     return "\n".join(lines)
 
 
@@ -227,8 +231,10 @@ async def compare_devices(
         for key in extract_metric_keys(message, payload.get("keys") or []):
             st = compute_stats([v for _, v in _series_values(raw.get(key) or [])])
             label = DISPLAY.get(key, key)
+            unit = get_unit_for_key(key)
+            u_suffix = f" {unit}" if unit else ""
             if st.get("count"):
-                lines.append(f"- {label}: avg={st['avg']}, min={st['min']}, max={st['max']}")
+                lines.append(f"- {label}: avg={st['avg']}{u_suffix}, min={st['min']}{u_suffix}, max={st['max']}{u_suffix}")
             else:
                 lines.append(f"- {label}: no valid samples")
     return "\n".join(lines)
