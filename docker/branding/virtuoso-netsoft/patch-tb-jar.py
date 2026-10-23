@@ -245,20 +245,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     font-weight: 600;
     letter-spacing: -0.2px;
   }
-  .tb-fc-status {
-    color: #94A3B8;
-    font-size: 11px;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-top: 1px;
-  }
-  .tb-fc-status-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #10B981;
-  }
+
   .tb-fc-header-actions {
     display: flex;
     align-items: center;
@@ -546,7 +533,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
         </div>
         <div class="tb-fc-header-info">
           <div class="tb-fc-title">Virtuoso AI Copilot</div>
-          <div class="tb-fc-status"><span class="tb-fc-status-dot"></span> Delhivery Fleet Intelligence • 🟢 Online</div>
         </div>
       </div>
       <div class="tb-fc-header-actions">
