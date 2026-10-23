@@ -17,9 +17,9 @@ async def list_devices(
     user_token: tuple[TbUser, str] = Depends(get_tb_user),
     orchestrator=Depends(get_orchestrator),
 ):
-    _, token = user_token
+    user, token = user_token
     try:
-        return await orchestrator.list_devices(token)
+        return await orchestrator.list_devices(token, user=user)
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except Exception as exc:

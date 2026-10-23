@@ -32,17 +32,45 @@ class ThingsBoardClient:
             return None
         return resp.json()
 
-    async def list_devices(self, page_size: int = 100) -> list[dict[str, Any]]:
+    async def list_devices(self, page_size: int = 100, customer_id: str | None = None) -> list[dict[str, Any]]:
         params = {"pageSize": page_size, "page": 0, "sortProperty": "name", "sortOrder": "ASC"}
-        for path in ("/api/tenant/devices", "/api/user/devices", "/api/tenant/deviceInfos"):
+        candidate_paths: list[str] = []
+        if customer_id:
+            candidate_paths.extend([
+                f"/api/customer/{customer_id}/deviceInfos",
+                f"/api/customer/{customer_id}/devices",
+            ])
+        candidate_paths.extend([
+            "/api/tenant/devices",
+            "/api/tenant/deviceInfos",
+            "/api/user/devices",
+        ])
+        for path in candidate_paths:
             try:
                 data = await self._request_get_allow_forbidden(path, params)
-                if isinstance(data, dict) and "data" in data:
+                if isinstance(data, dict) and "data" in data and data["data"]:
                     return list(data.get("data") or [])
             except PermissionError:
                 continue
             except Exception:
                 continue
+
+        # If not found yet, check /api/auth/user to discover customerId
+        try:
+            user_info = await self._get("/api/auth/user")
+            if user_info and isinstance(user_info, dict):
+                cid = (user_info.get("customerId") or {}).get("id")
+                if cid and cid != "13814000-1dd2-11b2-8080-808080808080":
+                    for path in (f"/api/customer/{cid}/deviceInfos", f"/api/customer/{cid}/devices"):
+                        try:
+                            data = await self._request_get_allow_forbidden(path, params)
+                            if isinstance(data, dict) and "data" in data and data["data"]:
+                                return list(data.get("data") or [])
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+
         return []
 
     async def _request_get_allow_forbidden(self, path: str, params: dict[str, Any] | None = None) -> Any:

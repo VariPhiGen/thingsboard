@@ -7,8 +7,8 @@ from app.services.tb_client import ThingsBoardClient
 
 
 class PermissionManager:
-    async def list_accessible_devices(self, client: ThingsBoardClient) -> list[DeviceInfo]:
-        raw = await client.list_devices()
+    async def list_accessible_devices(self, client: ThingsBoardClient, customer_id: str | None = None) -> list[DeviceInfo]:
+        raw = await client.list_devices(customer_id=customer_id)
         out: list[DeviceInfo] = []
         for item in raw:
             try:

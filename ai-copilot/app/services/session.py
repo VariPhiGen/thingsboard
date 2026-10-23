@@ -72,9 +72,10 @@ class CopilotOrchestrator:
         self.rate_limiter = RateLimiter(settings)
         self.llm = LlmService(settings)
 
-    async def list_devices(self, token: str) -> list[DeviceInfo]:
+    async def list_devices(self, token: str, user: TbUser | None = None) -> list[DeviceInfo]:
         client = ThingsBoardClient(self.settings, token)
-        return await self.perms.list_accessible_devices(client)
+        cid = user.customerId if user else None
+        return await self.perms.list_accessible_devices(client, customer_id=cid)
 
     async def chat(self, user: TbUser, token: str, request: ChatRequest) -> ChatResponse:
         conversation_id = self.memory.ensure_conversation_id(request.conversationId)
@@ -120,7 +121,7 @@ class CopilotOrchestrator:
             )
 
         client = ThingsBoardClient(self.settings, token)
-        devices = await self.perms.list_accessible_devices(client)
+        devices = await self.perms.list_accessible_devices(client, customer_id=user.customerId)
         resolved = self.resolver.resolve(
             devices,
             device_id=request.deviceId,
