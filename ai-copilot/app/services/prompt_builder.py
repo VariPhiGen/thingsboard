@@ -42,17 +42,24 @@ CRITICAL CHATBOT BEHAVIOR & STYLE GUIDELINES:
 1. Speak like an intelligent, friendly, and expert conversational Chatbot (NOT an automated raw report generator).
 2. STRICT LANGUAGE MATCHING RULE (MANDATORY):
    - ALWAYS look at the current Operator question:
-     • If the operator asked in ENGLISH (e.g. "What is TDS right now?", "Status of LT Panels Gateway", "Is the pump running?", "Are there any alarms?"):
+     • If the operator asked in ENGLISH (e.g. "What is TDS right now?", "What is the Power Right Now in DG Set - 1 ?"):
        -> Formulate your response 100% in polished, professional ENGLISH.
        -> Absolutely DO NOT use Hindi or Devanagari script.
-     • If the operator asked in HINDI or HINGLISH (e.g. "RO Plant ka status batao", "TDS kitna hai right now?", "Sare devices ka summary do"):
-       -> Formulate your response in natural, friendly, fluent Hindi/Hinglish (e.g. "Namaste!", "RO Plant ka live status normal hai...").
+     • If the operator asked in HINDI or HINGLISH (e.g. "DG Set - 1 me abhi power kitna hai?", "TDS kitna hai right now?", "Sare devices ka summary do"):
+       -> Formulate your response in natural, friendly, fluent Hindi/Hinglish (e.g. "DG SET1 me current active power 0.0 kW hai...").
    - THE CURRENT QUESTION'S LANGUAGE ALWAYS OVERRIDES PREVIOUS CHAT HISTORY. Even if past messages were in Hindi, if the operator asks in English, switch immediately and completely to English!
-3. Conversational Structure:
-   - Greeting & Context: Greet briefly and state the machine's current operational state.
-   - ⚠️ Alarms First: If any alarm is active, explain it clearly and give practical guidance (e.g. "Overcurrent detected on Transformer 1, please inspect load"). If no alarms, reassure the operator: "🟢 All parameters normal, no active alarms."
-   - 📊 Key Telemetry: Present live readings neatly grouped with emojis and units (kW, V, A, bar, ppm, °C, %). NEVER output raw technical keys or "N/A" lines.
-   - 💡 Interactive Follow-Up: Always end with a helpful conversational offer.
+3. DIRECT & FOCUSED ANSWERS FOR SPECIFIC INQUIRIES (CRITICAL):
+   - When the operator asks about a SPECIFIC parameter or metric (e.g. "What is the Power Right Now in DG Set - 1 ?", "Fuel kitna hai?", "What is the TDS right now?", "Battery voltage check karo", "Are there any alarms on DG 2?"):
+     -> ANSWER THAT PARTICULAR PARAMETER DIRECTLY and concisely first. Give its exact live reading and unit (e.g., "The active power of **DG SET1** right now is **0.0 kW**.").
+     -> Provide concise, relevant operational context (e.g., "The generator is currently in **STANDBY (STOPPED)** mode, which is why active power generation is 0 kW.").
+     -> DO NOT dump the full laundry list of other unrelated telemetry parameters! (e.g., if the user asked about Power, DO NOT list Battery Voltage, Fuel Level, Coolant Temp, Oil Pressure, Frequency!). Give ONLY the particular details requested!
+     -> Mention an active alarm ONLY if it is directly relevant to the asked parameter (e.g., offline/stopped status explaining 0 kW).
+   - When the operator asks for a GENERAL STATUS / FULL OVERVIEW (e.g. "Status of DG 1", "Full report", "Overall summary", "Summary do", "How is RO Plant performing?"):
+     -> Provide the comprehensive structured breakdown:
+        • Operational State (e.g. Standby / Running)
+        • ⚠️ Alarms (if any active, or reassure if normal)
+        • 📊 Key Telemetry readings grouped with units
+        • Practical operational advice or next steps.
 4. No Developer Jargon: NEVER mention ThingsBoard, REST, API, JWT, JSON, telemetry keys, payload, DB, or backend. Speak only of live sensors, dashboards, control panels, alarms, and machines.
 5. Absolute Truthfulness: Ground every single number in the provided context. If a parameter is not reporting, explain that it is in standby or offline. Never hallucinate fake values.
 
@@ -95,7 +102,23 @@ def build_messages(
             "Respond in natural, conversational, friendly Hindi/Hinglish."
         )
 
-    full_system_prompt = f"{SYSTEM_PROMPT}\n\n{lang_directive}"
+    specific_keywords = [
+        "power", "kw", "load", "watt", "fuel", "diesel", "battery", "voltage", "current", "amp",
+        "rpm", "speed", "oil", "coolant", "temp", "temperature", "tds", "flow", "pressure",
+        "salinity", "conductivity", "ph", "cylinder", "breaker", "trip"
+    ]
+    is_specific = any(re.search(rf"\b{re.escape(k)}\b", user_message.lower()) for k in specific_keywords)
+    is_general = any(re.search(rf"\b{re.escape(k)}\b", user_message.lower()) for k in ["summary", "all", "sare", "sabhi", "overall", "full", "report", "complete"])
+
+    specific_directive = ""
+    if is_specific and not is_general:
+        specific_directive = (
+            "\nFOCUSED ANSWER DIRECTIVE: The operator is asking specifically about a particular parameter in: '" + user_message + "'. "
+            "Directly answer THAT parameter's exact live value and operational meaning first. "
+            "DO NOT dump unrelated parameters (e.g. if asking for Power, do NOT dump battery, fuel, coolant, oil pressure, frequency)."
+        )
+
+    full_system_prompt = f"{SYSTEM_PROMPT}\n\n{lang_directive}{specific_directive}"
     msgs: list[dict[str, str]] = [{"role": "system", "content": full_system_prompt}]
     for item in history[-8:]:
         role = "assistant" if item.role.upper() == "ASSISTANT" else "user"
@@ -104,7 +127,8 @@ def build_messages(
         f"Intent: {intent.value}\n\n"
         f"Grounding context:\n{grounding}\n\n"
         f"Manual/SOP excerpts:\n{rag_snippets or '(none)'}\n\n"
-        f"{lang_directive}\n\n"
+        f"{lang_directive}\n"
+        f"{specific_directive}\n\n"
         f"Operator question: {user_message}"
     )
     msgs.append({"role": "user", "content": context})

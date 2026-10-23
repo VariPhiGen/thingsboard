@@ -71,7 +71,7 @@ class DeviceResolver:
 
         query = (device_query or "").strip()
         if not query and message:
-            query = self._extract_device_mention(message, devices) or ""
+            query = self._extract_device_mention(message, devices, dashboard_id=dashboard_id) or ""
 
         # Contextual dashboard matching: if user didn't mention another machine, use current dashboard device
         if not query and dashboard_id:
@@ -127,56 +127,65 @@ class DeviceResolver:
                 partial.append(d)
         return exact or partial
 
-    def _extract_device_mention(self, message: str, devices: list[DeviceInfo]) -> str | None:
+    def _extract_device_mention(
+        self,
+        message: str,
+        devices: list[DeviceInfo],
+        dashboard_id: str | UUID | None = None,
+    ) -> str | None:
         text = message.lower()
         dev_map = {d.name.lower(): d.name for d in devices if d.name}
 
         # Specific alias detection for Delhivery / Virtuoso facility devices:
         # 1. Fire Suppression UPS Room 2
-        if re.search(r"\b(ups\s*room\s*2|ups\s*2|fire\s*ups\s*2|fire\s*suppression\s*ups\s*room\s*2|ups-2)\b", text):
+        if re.search(r"\b(ups\s*room\s*[-–—#]?\s*2|ups\s*[-–—#]?\s*2|fire\s*ups\s*[-–—#]?\s*2|fire\s*suppression\s*ups\s*room\s*[-–—#]?\s*2)\b", text):
             for d in devices:
                 if "ups room 2" in (d.name or "").lower():
                     return d.name
 
         # 2. RO Plant System
-        if re.search(r"\b(ro|ro\s*plant|ro\s*system|water\s*purifier|water\s*treatment|tds|water\s*plant|osmosis|permeate)\b", text):
+        if re.search(r"\b(ro|ro\s*[-–—]?\s*plant|ro\s*[-–—]?\s*system|water\s*purifier|water\s*treatment|tds|water\s*plant|osmosis|permeate)\b", text):
             for d in devices:
                 if "ro plant" in (d.name or "").lower() or (d.type and re.search(r"\bro\b", d.type.lower())):
                     return d.name
 
         # 3. Fire Suppression (Room 1)
-        if re.search(r"\b(fire\s*suppression|fire\s*system|gas\s*suppression|ups\s*room\s*1\s*fire|cylinder\s*pressure|cylinders)\b", text):
-            if "ups room 2" not in text and "ups 2" not in text:
+        if re.search(r"\b(fire\s*suppression|fire\s*system|gas\s*suppression|ups\s*room\s*[-–—#]?\s*1|cylinder\s*pressure|cylinders)\b", text):
+            if "ups room 2" not in text and "ups 2" not in text and "ups-2" not in text:
                 for d in devices:
                     if (d.name or "").lower() == "fire suppression":
                         return d.name
 
         # 4. LT Panels Gateway
-        if re.search(r"\b(lt\s*panel|lt\s*panels|gateway|electrical\s*room|transformer|evm\s*charger|evm|fire\s*fighting\s*wall|sub\s*panels|panels)\b", text):
+        if re.search(r"\b(lt\s*[-–—]?\s*panel|lt\s*[-–—]?\s*panels|gateway|electrical\s*room|transformer|evm\s*charger|evm|fire\s*fighting\s*wall|sub\s*panels|panels)\b", text):
             for d in devices:
                 if "lt panel" in (d.name or "").lower() or "gateway" in (d.name or "").lower():
                     return d.name
 
-        # 5. DG Set 3
-        if re.search(r"\b(dg\s*3|dg\s*set\s*3|dgset3|dg3|generator\s*3|set\s*3|set3)\b", text):
+        # 5. DG Set 3 (Supports DG Set - 3, DG-3, DG 3, DG Set 3, Set 3, Set - 3, Generator 3, etc.)
+        if re.search(r"\b(?:dg\s*set|dg|generator|genset|set)\s*[-–—#]?\s*3\b|\bdg[-–—#]?3\b", text):
             for d in devices:
                 if "dg set 3" in (d.name or "").lower():
                     return d.name
 
-        # 6. DG Set 2
-        if re.search(r"\b(dg\s*2|dg\s*set\s*2|dgset2|dg2|generator\s*2|set\s*2|set2)\b", text):
+        # 6. DG Set 2 (Supports DG Set - 2, DG-2, DG 2, DG Set 2, Set 2, Set - 2, Generator 2, etc.)
+        if re.search(r"\b(?:dg\s*set|dg|generator|genset|set)\s*[-–—#]?\s*2\b|\bdg[-–—#]?2\b", text):
             for d in devices:
                 if "dg set 2" in (d.name or "").lower():
                     return d.name
 
-        # 7. DG SET1
-        if re.search(r"\b(dg\s*1|dg\s*set\s*1|dgset1|dg1|generator\s*1|set\s*1|set1|dg\s*set1)\b", text):
+        # 7. DG SET1 (Supports DG Set - 1, DG-1, DG 1, DG Set 1, DG SET1, Set 1, Set - 1, Generator 1, etc.)
+        if re.search(r"\b(?:dg\s*set|dg|generator|genset|set)\s*[-–—#]?\s*1\b|\bdg[-–—#]?1\b|\bdgset1\b", text):
             for d in devices:
                 if "dg set1" in (d.name or "").lower() or "dg set 1" in (d.name or "").lower():
                     return d.name
 
-        # Generic DG fallback if only "dg" or "generator" is mentioned
+        # Generic DG fallback if only "dg" or "generator" is mentioned without a specific set number
         if re.search(r"\b(dg|generator|genset)\b", text):
+            if dashboard_id:
+                dash_key = str(dashboard_id).lower().strip()
+                if dash_key in DASHBOARD_DEVICE_MAP and "dg" in DASHBOARD_DEVICE_MAP[dash_key]:
+                    return DASHBOARD_DEVICE_MAP[dash_key]
             for d in devices:
                 if "dg set1" in (d.name or "").lower():
                     return d.name
