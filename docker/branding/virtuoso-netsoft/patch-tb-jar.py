@@ -1129,6 +1129,37 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
 
       window.triggerKeycloakLogout = doKeycloakLogout;
 
+      // Check if already authenticated when visiting /login
+      function checkExistingAuth() {
+        try {
+          if (window.location.pathname === '/login' && !isLoggingOut) {
+            var tok = localStorage.getItem('jwt_token');
+            var exp = localStorage.getItem('jwt_token_expiration');
+            if (tok && exp && Number(exp) > (Date.now() + 5000)) {
+              window.location.replace('/home');
+            }
+          }
+        } catch(e) {}
+      }
+
+      // Sync browser autofill into Angular form controls
+      function syncAutofill() {
+        try {
+          var u = document.getElementById('username-input');
+          var p = document.getElementById('password-input');
+          if (u && u.value && !u.getAttribute('data-synced')) {
+            u.dispatchEvent(new Event('input', { bubbles: true }));
+            u.dispatchEvent(new Event('change', { bubbles: true }));
+            u.setAttribute('data-synced', 'true');
+          }
+          if (p && p.value && !p.getAttribute('data-synced')) {
+            p.dispatchEvent(new Event('input', { bubbles: true }));
+            p.dispatchEvent(new Event('change', { bubbles: true }));
+            p.setAttribute('data-synced', 'true');
+          }
+        } catch(e) {}
+      }
+
       // Listen for click on logout menu item / button
       document.addEventListener("click", function(e) {
         var el = e.target && e.target.closest ? e.target.closest("button, a, mat-list-item, [role='menuitem']") : null;
@@ -1144,13 +1175,33 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
         }
       }, true);
 
-      // Intercept XHR to /api/auth/logout
+      // Force autofill sync on interaction with login submit button or inputs
+      document.addEventListener("pointerdown", function(e) {
+        var btn = e.target && e.target.closest ? e.target.closest('button[type="submit"], .tb-action-button, input') : null;
+        if (btn) {
+          syncAutofill();
+        }
+      }, true);
+
+      // Intercept XHR to handle /api/auth/logout and auto-redirect on successful /api/auth/login
       var origOpen = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function(method, url) {
-        if (url && (url === "/api/auth/logout" || (typeof url === "string" && url.indexOf("/api/auth/logout") !== -1))) {
-          this.addEventListener("loadend", function() {
-            setTimeout(doKeycloakLogout, 50);
-          });
+        if (url && typeof url === "string") {
+          if (url === "/api/auth/logout" || url.indexOf("/api/auth/logout") !== -1) {
+            this.addEventListener("loadend", function() {
+              setTimeout(doKeycloakLogout, 50);
+            });
+          } else if (url === "/api/auth/login" || url.indexOf("/api/auth/login") !== -1) {
+            this.addEventListener("loadend", function() {
+              if (this.status === 200) {
+                setTimeout(function() {
+                  if (window.location.pathname === '/login') {
+                    window.location.replace('/home');
+                  }
+                }, 150);
+              }
+            });
+          }
         }
         return origOpen.apply(this, arguments);
       };
@@ -1174,10 +1225,18 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
       function handleDom() {
         if (window.location.pathname === '/login') {
           injectVirtuosoLoginHeader();
+          syncAutofill();
         }
       }
 
+      checkExistingAuth();
       handleDom();
+      setInterval(function() {
+        if (window.location.pathname === '/login') {
+          syncAutofill();
+        }
+      }, 500);
+
       window.addEventListener('popstate', handleDom);
       var obs = new MutationObserver(function() {
         handleDom();
