@@ -126,12 +126,12 @@ DISPLAY_MAP: dict[str, str] = {
     "tds_ppm": "TDS (ppm)",
     "tds": "TDS (ppm)",
     "salinity_ppm": "Salinity (ppm)",
-    "ec_us_cm": "Electrical Conductivity (µS/cm)",
+    "ec_us_cm": "EC (uS/cm)",
     "ph": "Water pH",
-    "water_flow": "Permeate Flow Rate (m³/h)",
+    "water_flow": "Water Flow (L/min)",
     "flow_total": "Cumulative Water Volume (m³)",
-    "pressure": "RO System Pressure (bar)",
-    "temperature_c": "Water Temperature (°C)",
+    "pressure": "Pressure (psi)",
+    "temperature_c": "Temperature (°C)",
     "tds_online": "TDS Sensor Status",
     "flow_online": "Flow Sensor Status",
 
@@ -244,9 +244,11 @@ def get_unit_for_key(key: str) -> str:
         return "kWh"
     if "temp" in k or "temperature" in k:
         return "°C"
+    if k == "pressure" or "ro_pressure" in k or "psi" in k:
+        return "psi"
     if any(x in k for x in ("fuel_pressure", "manifold_pressure", "coolant_pressure", "boost_pressure", "barometric", "kpa")):
         return "kPa"
-    if "oil_pressure" in k or "cylinder_pressure" in k or k == "pressure" or "bar" in k:
+    if "oil_pressure" in k or "cylinder_pressure" in k or "bar" in k:
         return "bar"
     if "rpm" in k or "speed" in k:
         return "RPM"
@@ -254,16 +256,16 @@ def get_unit_for_key(key: str) -> str:
         return "%"
     if k in ("fuel_level_l", "fuel_consumed_l") or (k.endswith("_l") and not k.endswith("_v_l")):
         return "L"
+    if "water_flow" in k:
+        return "L/min"
     if "lph" in k or "rate" in k:
         return "L/h"
-    if "water_flow" in k:
-        return "m³/h"
     if "flow_total" in k:
         return "m³"
     if "tds" in k or "salinity" in k:
         return "ppm"
     if "ec_us_cm" in k or "conductivity" in k:
-        return "µS/cm"
+        return "uS/cm"
     if k == "ph":
         return "pH"
     if "hours" in k or "run_hours" in k or "rul" in k or k.endswith("_h"):
@@ -387,6 +389,8 @@ def normalize_value(key_or_raw: Any, raw_val: Any = None) -> str:
             return f"{num:.1f} °C"
         if unit == "kPa":
             return f"{num:.1f} kPa"
+        if unit == "psi":
+            return f"{int(num)} psi" if num.is_integer() else f"{num:.1f} psi"
         if unit == "bar":
             return f"{num:.1f} bar"
         if unit == "RPM":
@@ -397,14 +401,16 @@ def normalize_value(key_or_raw: Any, raw_val: Any = None) -> str:
             return f"{num:,.1f} L" if not num.is_integer() else f"{int(num):,} L"
         if unit == "L/h":
             return f"{num:.1f} L/h"
+        if unit == "L/min":
+            return f"{int(num)} L/min" if num.is_integer() else f"{num:.1f} L/min"
         if unit == "m³/h":
             return f"{num:.2f} m³/h"
         if unit == "m³":
             return f"{num:,.2f} m³"
         if unit == "ppm":
             return f"{int(round(num))} ppm"
-        if unit == "µS/cm":
-            return f"{num:.1f} µS/cm"
+        if unit in ("uS/cm", "µS/cm"):
+            return f"{num:.1f} uS/cm"
         if unit == "pH":
             return f"{num:.2f} pH"
         if unit == "hours":

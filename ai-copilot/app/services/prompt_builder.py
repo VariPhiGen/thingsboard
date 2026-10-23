@@ -70,11 +70,11 @@ CRITICAL CHATBOT BEHAVIOR & STYLE GUIDELINES:
      • Frequency: Hz (e.g. 50.0 Hz, 50.02 Hz)
      • Energy: kWh (e.g. 416,390 kWh, 91,417.5 kWh)
      • Temperature: °C (e.g. 85.0 °C, 93.4 °C, 26.2 °C)
-     • Pressure: bar or kPa (e.g. 5.0 bar, 4.5 bar, 348.0 kPa)
+     • Pressure: psi for RO Plant (e.g. 5 psi), bar or kPa for engines/cylinders (e.g. 4.5 bar, 348.0 kPa)
      • Speed: RPM (e.g. 1500 RPM, 47,800 RPM)
      • Fuel: % (Level, e.g. 94.1%, 100%), L (Volume, e.g. 7,235.0 L), L/h (Rate, e.g. 41.0 L/h)
      • Water Quality: ppm (TDS / Salinity, e.g. 101 ppm), µS/cm (Conductivity, e.g. 203.4 µS/cm), pH (e.g. 7.4 pH)
-     • Flow Rate: m³/h (Water Flow, e.g. 0.0 m³/h), m³ (Cumulative Volume)
+     • Flow Rate: L/min for RO Plant water flow (e.g. 0 L/min), L/h for fuel consumption (e.g. 41.0 L/h), m³ (Cumulative Volume)
      • Durations: hours (Run Hours, RUL, e.g. 160.1 hours, 1,211.5 hours)
      • Fire Suppression: Gas cylinders and pressure switches must be described as "Normal (Pressurized)" or "Discharged / Low Pressure Alert" (NEVER raw "0" or "1").
    - When speaking in Hindi/Hinglish, keep all technical units in standard notation (e.g. "DG SET1 ka battery voltage abhi **26.4 V** hai aur current active power **0.0 kW** hai...").
@@ -90,7 +90,7 @@ Facility Overview & 7 Key Monitored Systems:
    - 8 Electrical sub-panels: Electrical Room 1, UPS Room 1, EVM Charger, Transformers 1-3, UPS Panel 2, Fire Fighting Wall.
    - Parameters: Power (kW), Voltage (V), Current (A), Frequency (Hz).
 3. RO Plant System (Reverse Osmosis Water Purification):
-   - Status (FILTERING / STANDBY), TDS (ppm, good: < 150-200 ppm), Flow Rate (m³/h), Operating Pressure (bar), Water pH (~7.0-7.8).
+   - Status (FILTERING / STANDBY), Pressure (psi, e.g. 5 psi), Water Flow (L/min, e.g. 0 L/min), TDS (ppm, good: < 150-200 ppm), Salinity (ppm), EC (uS/cm), Water pH (~7.0-7.8), Temperature (°C).
 4. Fire Suppression (Main / UPS Room 1):
    - 9 FM-200/Novec gas cylinders, Relay Gateway, Low & High Pressure Lines (Normal: pressurized).
 5. Fire Suppression UPS Room 2:
