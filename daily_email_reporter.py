@@ -274,7 +274,7 @@ def generate_html_report(devices_summary):
 
             <!-- Footer -->
             <div style="background: #f0f4f8; padding: 15px; text-align: center; font-size: 12px; color: #777777; border-top: 1px solid #e0e0e0;">
-                Automated Daily Infrastructure Status Report • ThingsBoard IoT Operations • Virtuoso NetSoft
+                Automated Daily Infrastructure Status Report • Virtuoso NetSoft IoT Operations
             </div>
         </div>
     </body>
@@ -300,7 +300,8 @@ def send_email_report(html_content, recipients_override=None):
     sender_from = SMTP_FROM or SMTP_USER
     msg = MIMEMultipart("alternative")
     msg["Subject"] = f"📊 Daily Infrastructure Report — {datetime.now().strftime('%d %b %Y')}"
-    msg["From"] = f"ThingsBoard IoT Monitor <{sender_from}>"
+    from_name = os.getenv("INFRA_REPORT_FROM_NAME", "Virtuoso NetSoft IoT Monitor")
+    msg["From"] = f"{from_name} <{sender_from}>"
     msg["To"] = ", ".join(recipients)
 
     msg.attach(MIMEText(html_content, "html"))

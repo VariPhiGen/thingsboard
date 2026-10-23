@@ -697,7 +697,8 @@ def send_single_report_email(subject, html_content, recipients_override=None):
     sender_from = SMTP_FROM or SMTP_USER
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
-    msg["From"] = f"ThingsBoard Safety Monitor <{sender_from}>"
+    from_name = os.getenv("INFRA_REPORT_FROM_NAME", "Virtuoso NetSoft Safety Monitor")
+    msg["From"] = f"{from_name} <{sender_from}>"
     msg["To"] = ", ".join(recipients)
 
     msg.attach(MIMEText(html_content, "html"))

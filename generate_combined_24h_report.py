@@ -685,7 +685,8 @@ def send_combined_email_report(html_content, recipients_override=None, attach_pd
     date_fn = datetime.now().strftime('%Y%m%d')
 
     msg["Subject"] = f"📑 Daily 24-Hour Master Infrastructure Report — {date_str}"
-    msg["From"] = f"ThingsBoard Master Operations <{sender_from}>"
+    from_name = os.getenv("INFRA_REPORT_FROM_NAME", "Virtuoso NetSoft Master Operations")
+    msg["From"] = f"{from_name} <{sender_from}>"
     msg["To"] = ", ".join(recipients)
 
     msg_body = MIMEMultipart("alternative")
