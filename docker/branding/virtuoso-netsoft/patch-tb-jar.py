@@ -457,26 +457,65 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     pointer-events: auto;
     transform: translateY(0) scale(1);
   }
+  #tb-fc-window.tb-fc-dragging {
+    transition: none !important;
+    box-shadow: 0 32px 80px rgba(15, 23, 42, 0.4), 0 8px 32px rgba(0, 0, 0, 0.2);
+    user-select: none;
+  }
+  #tb-fc-window.tb-fc-minimized {
+    height: auto !important;
+    min-height: unset !important;
+    border-radius: 14px !important;
+    box-shadow: 0 14px 40px rgba(15, 23, 42, 0.26), 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  #tb-fc-window.tb-fc-minimized .tb-fc-thread,
+  #tb-fc-window.tb-fc-minimized .tb-fc-composer {
+    display: none !important;
+  }
+  #tb-fc-window.tb-fc-minimized .tb-fc-header {
+    border-bottom: none !important;
+    border-radius: 14px !important;
+  }
 
   /* Header */
   .tb-fc-header {
     background: #1F232C;
-    padding: 14px 16px;
+    padding: 12px 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     flex-shrink: 0;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .tb-fc-header:active,
+  .tb-fc-dragging .tb-fc-header {
+    cursor: grabbing !important;
   }
   .tb-fc-header-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+  .tb-fc-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: grab;
+    margin-right: 2px;
+  }
+  .tb-fc-drag-handle:active {
+    cursor: grabbing;
   }
   .tb-fc-avatar-badge {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
     background: linear-gradient(135deg, #0F766E 0%, #14B8A6 100%);
     display: flex;
     align-items: center;
@@ -485,32 +524,36 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
   }
   .tb-fc-title {
     color: #FFFFFF;
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 600;
     letter-spacing: -0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .tb-fc-header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
   .tb-fc-btn-action {
     background: rgba(255, 255, 255, 0.08);
     border: none;
     color: #CBD5E1;
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 6px 9px;
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     transition: all 0.2s;
   }
   .tb-fc-btn-action:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.18);
     color: #FFFFFF;
   }
 
@@ -707,11 +750,21 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
   </button>
 
   <div id="tb-fc-window" class="tb-fc-closed">
-    <!-- Header -->
-    <div class="tb-fc-header">
+    <!-- Header (Draggable) -->
+    <div class="tb-fc-header" id="tb-fc-header">
       <div class="tb-fc-header-left">
+        <div class="tb-fc-drag-handle" title="Drag to move left / right">
+          <svg width="10" height="15" viewBox="0 0 10 16" fill="currentColor">
+            <circle cx="2" cy="2" r="1.5"></circle>
+            <circle cx="8" cy="2" r="1.5"></circle>
+            <circle cx="2" cy="8" r="1.5"></circle>
+            <circle cx="8" cy="8" r="1.5"></circle>
+            <circle cx="2" cy="14" r="1.5"></circle>
+            <circle cx="8" cy="14" r="1.5"></circle>
+          </svg>
+        </div>
         <div class="tb-fc-avatar-badge">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2 2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"></path>
             <rect x="4" y="8" width="16" height="12" rx="3"></rect>
             <circle cx="9" cy="13" r="1.5" fill="#FFFFFF"></circle>
@@ -725,15 +778,20 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
       </div>
       <div class="tb-fc-header-actions">
         <button id="tb-fc-btn-reset" class="tb-fc-btn-action" title="Start New Conversation">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="1 4 1 10 7 10"></polyline>
             <polyline points="23 20 23 14 17 14"></polyline>
             <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
           </svg>
           <span>New</span>
         </button>
-        <button id="tb-fc-btn-close" class="tb-fc-btn-action" title="Minimize">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <button id="tb-fc-btn-min" class="tb-fc-btn-action" title="Minimize / Collapse">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+        <button id="tb-fc-btn-close" class="tb-fc-btn-action" title="Close">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"></line>
             <line x1="6" y1="6" x2="18" y2="18"></line>
           </svg>
@@ -831,19 +889,173 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     }
   }
 
+  var isMinimized = false;
+  var isDragging = false;
+  var dragStartX = 0;
+  var dragStartY = 0;
+  var winStartLeft = 0;
+  var winStartTop = 0;
+
+  function clampPosition(x, y, win) {
+    var winW = (win && win.offsetWidth) || 440;
+    var winH = isMinimized ? 52 : ((win && win.offsetHeight > 100) ? win.offsetHeight : 600);
+    var pad = 8;
+    var maxX = Math.max(pad, window.innerWidth - winW - pad);
+    var maxY = Math.max(pad, window.innerHeight - winH - pad);
+    var cx = Math.max(pad, Math.min(x, maxX));
+    var cy = Math.max(pad, Math.min(y, maxY));
+    return { x: cx, y: cy };
+  }
+
+  function applyWinPosition(x, y) {
+    var win = document.getElementById('tb-fc-window');
+    if (!win) return;
+    var c = clampPosition(x, y, win);
+    win.style.left = c.x + 'px';
+    win.style.top = c.y + 'px';
+    win.style.right = 'auto';
+    win.style.bottom = 'auto';
+    try {
+      localStorage.setItem('tb_copilot_pos', JSON.stringify({ x: c.x, y: c.y }));
+    } catch(e) {}
+  }
+
+  function restoreSavedPosition() {
+    var win = document.getElementById('tb-fc-window');
+    if (!win) return;
+    try {
+      var saved = JSON.parse(localStorage.getItem('tb_copilot_pos') || 'null');
+      if (saved && typeof saved.x === 'number' && typeof saved.y === 'number') {
+        applyWinPosition(saved.x, saved.y);
+        return;
+      }
+    } catch(e) {}
+    var defW = 440;
+    var defH = 600;
+    var defX = Math.max(8, window.innerWidth - defW - 26);
+    var defY = Math.max(8, window.innerHeight - defH - 96);
+    applyWinPosition(defX, defY);
+  }
+
+  function toggleMinimize(force) {
+    var win = document.getElementById('tb-fc-window');
+    var minBtn = document.getElementById('tb-fc-btn-min');
+    if (!win) return;
+    if (typeof force === 'boolean') {
+      isMinimized = force;
+    } else {
+      isMinimized = !isMinimized;
+    }
+
+    if (isMinimized) {
+      win.classList.add('tb-fc-minimized');
+      if (minBtn) {
+        minBtn.title = 'Expand / Restore';
+        minBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>';
+      }
+    } else {
+      win.classList.remove('tb-fc-minimized');
+      if (minBtn) {
+        minBtn.title = 'Minimize / Collapse';
+        minBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+      }
+      scrollThread();
+      var inp = document.getElementById('tb-fc-input');
+      if (inp) inp.focus();
+    }
+    var rect = win.getBoundingClientRect();
+    applyWinPosition(rect.left, rect.top);
+  }
+
+  function initDragHandlers() {
+    var header = document.getElementById('tb-fc-header');
+    var win = document.getElementById('tb-fc-window');
+    if (!header || !win) return;
+
+    function onDragStart(clientX, clientY, target) {
+      if (target && target.closest && target.closest('button')) return;
+      isDragging = true;
+      dragStartX = clientX;
+      dragStartY = clientY;
+      var rect = win.getBoundingClientRect();
+      winStartLeft = rect.left;
+      winStartTop = rect.top;
+      win.classList.add('tb-fc-dragging');
+    }
+
+    function onDragMove(clientX, clientY) {
+      if (!isDragging) return;
+      var dx = clientX - dragStartX;
+      var dy = clientY - dragStartY;
+      applyWinPosition(winStartLeft + dx, winStartTop + dy);
+    }
+
+    function onDragEnd() {
+      if (!isDragging) return;
+      isDragging = false;
+      win.classList.remove('tb-fc-dragging');
+    }
+
+    header.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      onDragStart(e.clientX, e.clientY, e.target);
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (isDragging) {
+        onDragMove(e.clientX, e.clientY);
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('mouseup', onDragEnd);
+
+    header.addEventListener('touchstart', function(e) {
+      if (e.touches && e.touches.length === 1) {
+        onDragStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (isDragging && e.touches && e.touches.length === 1) {
+        onDragMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', onDragEnd);
+
+    header.addEventListener('dblclick', function(e) {
+      if (e.target && e.target.closest && !e.target.closest('button')) {
+        toggleMinimize();
+      }
+    });
+
+    window.addEventListener('resize', function() {
+      if (state.isOpen) {
+        var rect = win.getBoundingClientRect();
+        applyWinPosition(rect.left, rect.top);
+      }
+    });
+  }
+
   function toggleWindow(open) {
     var win = document.getElementById('tb-fc-window');
     if (!win) return;
     if (typeof open === 'boolean') {
       state.isOpen = open;
     } else {
+      if (state.isOpen && isMinimized) {
+        toggleMinimize(false);
+        return;
+      }
       state.isOpen = !state.isOpen;
     }
     if (state.isOpen) {
       win.classList.remove('tb-fc-closed');
       win.classList.add('tb-fc-open');
+      restoreSavedPosition();
       var inp = document.getElementById('tb-fc-input');
-      if (inp) setTimeout(function() { inp.focus(); }, 150);
+      if (inp && !isMinimized) setTimeout(function() { inp.focus(); }, 150);
       scrollThread();
       loadDevices();
     } else {
@@ -1060,10 +1272,20 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     if (fab) fab.addEventListener('click', function() { toggleWindow(); });
 
     var closeBtn = document.getElementById('tb-fc-btn-close');
-    if (closeBtn) closeBtn.addEventListener('click', function() { toggleWindow(false); });
+    if (closeBtn) closeBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleWindow(false);
+    });
+
+    var minBtn = document.getElementById('tb-fc-btn-min');
+    if (minBtn) minBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleMinimize();
+    });
 
     var resetBtn = document.getElementById('tb-fc-btn-reset');
-    if (resetBtn) resetBtn.addEventListener('click', function() {
+    if (resetBtn) resetBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       state.conversationId = generateUUID();
       state.selectedDeviceId = null;
       state.selectedDeviceName = null;
@@ -1085,6 +1307,8 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
         }
       });
     }
+
+    initDragHandlers();
 
     // Check visibility on navigation
     window.addEventListener('popstate', updateVisibility);
