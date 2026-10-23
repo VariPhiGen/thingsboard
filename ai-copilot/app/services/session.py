@@ -517,61 +517,25 @@ class CopilotOrchestrator:
     def _generate_greeting_response(self, lang: str = "en") -> str:
         if lang == "en":
             return (
-                "Hello! 👋 Welcome to **Virtuoso AI Copilot** — your real-time intelligence assistant for Delhivery Facility Operations.\n\n"
-                "I am here to assist you with live equipment monitoring, real-time telemetry, active alarms, and operational diagnostics across all facility systems:\n\n"
-                "• ⚡ **DG Sets (DG 1, DG 2, DG 3)**: Active power (kW), RPM, fuel level, battery voltage, coolant temperature, and operational state.\n"
-                "• 💧 **RO Water Plant**: Real-time TDS (ppm), permeate flow rate, operating pressure, and water quality analysis.\n"
-                "• 🔌 **LT Electrical Panels**: Live load, current, and voltage across Transformers (1-3), Electrical Rooms, UPS panels, and EV chargers.\n"
-                "• 🧯 **Fire Suppression**: Monitored gas cylinder pressures in the Main Room and UPS Room 2.\n"
-                "• 🚨 **Active Alarms & SOPs**: Instant safety alerts, root-cause diagnostics, and emergency procedures.\n\n"
-                "How can I assist you with the facility today? Feel free to ask about any specific machine or current readings!"
+                "Hello! 👋 I'm **Virtuoso AI Copilot**, your facility intelligence assistant for Delhivery.\n\n"
+                "How can I help you with your equipment, live telemetry, or alarms today?"
             )
         else:
             return (
-                "Namaste! 🙏 **Virtuoso AI Copilot** me aapka swagat hai — Delhivery facility operations ke liye aapka smart industrial assistant.\n\n"
-                "Aap mujhse facility ke sabhi equipment ka live data, telemetry, aur operational status jaan sakte hain:\n\n"
-                "• ⚡ **DG Sets (DG 1, DG 2, DG 3)**: Live active power (kW), fuel level, battery voltage, temperature, aur operational status.\n"
-                "• 💧 **RO Plant System**: Real-time TDS (ppm), water flow rate, operating pressure, aur water quality.\n"
-                "• 🔌 **LT Panels Gateway**: Transformers aur electrical rooms ka live load, current, aur voltage.\n"
-                "• 🧯 **Fire Suppression**: Main Fire Room aur UPS Room 2 ke gas cylinders ka live pressure monitoring.\n"
-                "• 🚨 **Active Alarms**: Real-time alerts aur step-by-step troubleshooting SOPs.\n\n"
-                "Bataiye, aaj main aapki kya madad kar sakta hoon?"
+                "Namaste! 🙏 Main **Virtuoso AI Copilot** hoon — Delhivery facility intelligence assistant.\n\n"
+                "Aaj main facility equipment, live telemetry, ya alarms me aapki kya madad kar sakta hoon?"
             )
 
     def _generate_identity_response(self, lang: str = "en") -> str:
         if lang == "en":
             return (
-                "I am **Virtuoso AI Copilot**, an advanced industrial AI assistant developed by **Virtuoso NetSoft** specifically for **Delhivery's Facility Intelligence & Industrial IoT Operations**.\n\n"
-                "### 🛠️ What I Do:\n"
-                "I connect directly to your live IoT controllers and ThingsBoard telemetry streams to give facility operators, engineers, and plant managers instant, real-time insights:\n\n"
-                "1. ⚡ **Diesel Generators (DG Set 1, 2, 3)**:\n"
-                "   - Monitor live active power (kW), frequency (Hz), RPM, fuel level (%), battery voltage (V), coolant temperature, and oil pressure.\n"
-                "   - Detect standby vs. running states immediately.\n\n"
-                "2. 💧 **RO Water Purification Plant**:\n"
-                "   - Live TDS (ppm), permeate flow rate (m³/h), operating pressure, and water quality diagnostics.\n\n"
-                "3. 🔌 **LT Electrical Panels Gateway**:\n"
-                "   - Real-time power load, voltage, current, and breaker status across 8 sub-panels (Transformers 1-3, Electrical Room, UPS panels, EVM chargers).\n\n"
-                "4. 🧯 **Fire Suppression Systems**:\n"
-                "   - Monitored cylinder pressures for FM-200 / Novec gas systems in Main Room and UPS Room 2.\n\n"
-                "5. 🚨 **Active Alarms & Diagnostic Guidance**:\n"
-                "   - Instant alarm detection with practical root-cause analysis and safety SOP steps.\n\n"
-                "💬 **How to interact:**\n"
-                "You can ask me anything in **English or Hindi** (e.g. *\"What is the Power Right Now in DG Set - 1 ?\"*, *\"RO Plant ka TDS kitna hai?\"*, or *\"Show fleet summary\"*). How can I assist you today?"
+                "I am **Virtuoso AI Copilot**, an industrial AI assistant developed by **Virtuoso NetSoft** for Delhivery Facility Operations.\n\n"
+                "I help operators and engineers monitor live telemetry, operational status, and alarms across facility systems — including DG sets, RO water plants, LT electrical panels, and fire suppression.\n\n"
+                "How can I assist you today?"
             )
         else:
             return (
-                "Main **Virtuoso AI Copilot** hoon — ek advanced industrial AI assistant jise **Virtuoso NetSoft** ne Delhivery ke facility intelligence aur industrial IoT monitoring ke liye banaya hai.\n\n"
-                "### 🛠️ Main Kya Kar Sakta Hoon:\n"
-                "Main aapke ThingsBoard IoT controllers aur live sensor streams se directly connected hoon, jisse aapko facility ka instant real-time data milta hai:\n\n"
-                "1. ⚡ **DG Sets (DG Set 1, 2, aur 3)**:\n"
-                "   - Live Active Power (kW), fuel level (%), battery voltage, coolant temp, oil pressure, aur engine running/standby status.\n\n"
-                "2. 💧 **RO Water Plant System**:\n"
-                "   - Real-time TDS (ppm), permeate water flow rate, operating pressure, aur water quality analysis.\n\n"
-                "3. 🔌 **LT Panels Gateway**:\n"
-                "   - Transformers 1-3, Electrical Rooms, UPS panels, aur EVM chargers ka live load, voltage, aur current.\n\n"
-                "4. 🧯 **Fire Suppression Systems**:\n"
-                "   - Main Fire Room aur UPS Room 2 ke sabhi gas cylinders ka live pressure monitoring.\n\n"
-                "5. 🚨 **Active Alarms & Safety SOPs**:\n"
-                "   - Kisi bhi critical alert ka instant notification aur step-by-step troubleshooting guide.\n\n"
-                "💬 Aap mujhse **English ya Hindi/Hinglish** dono me pooch sakte hain (jaise: *\"DG Set - 1 me abhi power kitna hai?\"*, *\"RO Plant TDS kitna hai?\"* ya *\"Sabhi systems ka summary do\"*). Bataiye, abhi aapko kis system ki jankari chahiye?"
+                "Main **Virtuoso AI Copilot** hoon — **Virtuoso NetSoft** dwara Delhivery facility operations ke liye design kiya gaya industrial AI assistant.\n\n"
+                "Main facility ke generators (DG Sets), RO water plant, LT electrical panels aur safety systems ka live telemetry, status aur alarms monitor karne me aapki madad karta hoon.\n\n"
+                "Bataiye, aaj main aapki kya madad kar sakta hoon?"
             )
