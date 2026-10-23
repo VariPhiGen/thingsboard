@@ -1039,6 +1039,8 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
       var isLoggingOut = false;
 
       function doKeycloakLogout() {
+        if (isLoggingOut) return;
+        isLoggingOut = true;
         try {
           localStorage.clear();
           sessionStorage.clear();
@@ -1051,6 +1053,7 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
           f.submit();
         } catch(e) {
           console.error("SSO logout error", e);
+          window.location.href = "/login";
         }
       }
 
@@ -1061,8 +1064,12 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
         var el = e.target && e.target.closest ? e.target.closest("button, a, mat-list-item, [role='menuitem']") : null;
         if (el) {
           var txt = (el.innerText || "").trim().toLowerCase();
-          if (txt.includes("log out") || txt.includes("logout")) {
-            isLoggingOut = true;
+          if (txt === "log out" || txt === "logout" || txt.indexOf("logout") !== -1 || txt.indexOf("log out") !== -1) {
+            setTimeout(function() {
+              if (!isLoggingOut) {
+                doKeycloakLogout();
+              }
+            }, 600);
           }
         }
       }, true);
@@ -1071,7 +1078,6 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
       var origOpen = XMLHttpRequest.prototype.open;
       XMLHttpRequest.prototype.open = function(method, url) {
         if (url && (url === "/api/auth/logout" || (typeof url === "string" && url.indexOf("/api/auth/logout") !== -1))) {
-          isLoggingOut = true;
           this.addEventListener("loadend", function() {
             setTimeout(doKeycloakLogout, 50);
           });
@@ -1086,7 +1092,7 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
             var header = document.createElement('div');
             header.id = 'vp-login-header';
             header.className = 'tb-login-custom-header';
-            header.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:14px;"><img src="assets/virtuoso-logo.png" style="width:92px;height:92px;object-fit:contain;" alt="Virtuoso NetSoft"/></div><div class="tb-login-title">Virtuoso NetSoft</div><div class="tb-login-sub">Sign in to your account</div>';
+            header.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;margin-bottom:14px;"><img src="assets/virtuoso-logo.png" style="width:160px;max-height:56px;object-fit:contain;" alt="Virtuoso NetSoft"/></div><div class="tb-login-title">Virtuoso NetSoft</div><div class="tb-login-sub">Sign in to your account</div>';
             var form = card.querySelector('.tb-login-form') || card.querySelector('form');
             if (form) {
               card.insertBefore(header, form);
@@ -1095,29 +1101,16 @@ SSO_REDIRECT_JS = """<!-- BEGIN SSO REDIRECT -->
         } catch(e) {}
       }
 
-      function checkLogin() {
-        if (isLoggingOut) {
-          doKeycloakLogout();
-          return;
+      function handleDom() {
+        if (window.location.pathname === '/login') {
+          injectVirtuosoLoginHeader();
         }
-        if (window.location.pathname === '/login' && 
-            !window.location.search.includes('localLogin=true') && 
-            !window.location.search.includes('accessToken') && 
-            !window.location.search.includes('loginError')) {
-          window.location.replace('/oauth2/authorization/68b2bc20-5e98-11f1-bade-0bee8153e08f');
-          return;
-        }
-        injectVirtuosoLoginHeader();
       }
 
-      checkLogin();
-      window.addEventListener('popstate', checkLogin);
-      var lastPath = location.pathname;
+      handleDom();
+      window.addEventListener('popstate', handleDom);
       var obs = new MutationObserver(function() {
-        if (location.pathname !== lastPath) {
-          lastPath = location.pathname;
-        }
-        checkLogin();
+        handleDom();
       });
       obs.observe(document, {subtree: true, childList: true});
     })();
