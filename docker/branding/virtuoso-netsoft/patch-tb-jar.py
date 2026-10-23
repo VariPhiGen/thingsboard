@@ -284,62 +284,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
     scroll-behavior: smooth;
   }
 
-  /* Welcome Screen */
-  .tb-fc-welcome {
-    margin: auto 0;
-    text-align: center;
-    padding: 12px 6px;
-  }
-  .tb-fc-welcome-icon {
-    font-size: 32px;
-    margin-bottom: 8px;
-  }
-  .tb-fc-welcome-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #0F172A;
-    margin-bottom: 6px;
-  }
-  .tb-fc-welcome-desc {
-    font-size: 12.5px;
-    color: #64748B;
-    line-height: 1.5;
-    margin-bottom: 16px;
-  }
-  .tb-fc-prompts-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #94A3B8;
-    margin-bottom: 8px;
-    text-align: left;
-  }
-  .tb-fc-prompts-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-  .tb-fc-prompt-card {
-    background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 10px;
-    padding: 9px 12px;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 12.5px;
-    color: #1E293B;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .tb-fc-prompt-card:hover {
-    border-color: #0F766E;
-    background: #F0FDFA;
-    transform: translateX(2px);
-  }
-
   /* Rows */
   .tb-fc-row {
     display: flex;
@@ -556,34 +500,7 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
 
 
     <!-- Message Thread -->
-    <div class="tb-fc-thread" id="tb-fc-thread" role="log" aria-live="polite">
-      <div class="tb-fc-welcome" id="tb-fc-welcome">
-        <div class="tb-fc-welcome-icon">🤖</div>
-        <div class="tb-fc-welcome-title">Delhivery Facility Copilot</div>
-        <div class="tb-fc-welcome-desc">
-          Ask in <strong>English or Hindi</strong> about generator telemetry, RO plant TDS & water quality, panel breakers, or active alarms.
-        </div>
-        <div class="tb-fc-prompts-label">Quick Actions:</div>
-        <div class="tb-fc-prompts-grid">
-          <button class="tb-fc-prompt-card" data-prompt="What is TDS right now ?">
-            <span>💧</span>
-            <span>What is TDS right now ?</span>
-          </button>
-          <button class="tb-fc-prompt-card" data-prompt="DG Set 1 live telemetry and alarms">
-            <span>⚡</span>
-            <span>DG Set 1 live status</span>
-          </button>
-          <button class="tb-fc-prompt-card" data-prompt="Are there any active alarms across Delhivery fleet?">
-            <span>🚨</span>
-            <span>Any active alarms?</span>
-          </button>
-          <button class="tb-fc-prompt-card" data-prompt="Sare devices ka summary status batao">
-            <span>📊</span>
-            <span>Sare devices ka summary do</span>
-          </button>
-        </div>
-      </div>
-    </div>
+    <div class="tb-fc-thread" id="tb-fc-thread" role="log" aria-live="polite"></div>
 
     <!-- Composer -->
     <div class="tb-fc-composer">
@@ -739,12 +656,10 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
 
   function renderThread() {
     var thread = document.getElementById('tb-fc-thread');
-    var welcome = document.getElementById('tb-fc-welcome');
     if (!thread) return;
 
+    thread.innerHTML = '';
     if (!state.messages || state.messages.length === 0) {
-      thread.innerHTML = '';
-      if (welcome) thread.appendChild(welcome);
       return;
     }
 
@@ -926,15 +841,6 @@ FLOATING_COPILOT_SNIPPET = r"""<!-- BEGIN FLOATING COPILOT -->
         }
       });
     }
-
-    // Quick prompt cards delegation
-    document.addEventListener('click', function(e) {
-      var card = e.target.closest('.tb-fc-prompt-card');
-      if (card) {
-        var p = card.getAttribute('data-prompt');
-        if (p) sendQuery(p);
-      }
-    });
 
     // Check visibility on navigation
     window.addEventListener('popstate', updateVisibility);
