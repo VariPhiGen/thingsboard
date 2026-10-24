@@ -126,11 +126,33 @@ def worker_loop():
         except Exception as e:
             logging.error(f"Error in Telegram worker loop: {e}")
 
+def resolve_device_name(alarm_data: dict) -> str:
+    for field in ["originatorName", "originatorDisplayName", "originatorLabel", "deviceName"]:
+        val = alarm_data.get(field)
+        if val and str(val).strip():
+            return str(val).strip()
+    orig = alarm_data.get("originator")
+    if isinstance(orig, dict) and orig.get("name"):
+        return str(orig["name"]).strip()
+    candidate = alarm_data.get("name")
+    if candidate and candidate != alarm_data.get("type"):
+        return str(candidate).strip()
+    return "Unknown Device"
+
+DUMMY_KEYWORDS = ("test", "demo", "mock", "simul", "sample", "dummy", "fake")
+
+def is_dummy_or_test(device_name: str, alarm_type: str) -> bool:
+    d_low = str(device_name).lower()
+    a_low = str(alarm_type).lower()
+    if d_low.startswith("[test]") or a_low.startswith("[test]"):
+        return True
+    return any(k in d_low for k in DUMMY_KEYWORDS) or any(k in a_low for k in DUMMY_KEYWORDS)
+
 def clean_sensor_value(val):
     if val is None:
         return "N/A"
     try:
-        num = float(str(val).replace('°C', '').replace('RPM', '').replace('kPa', '').strip())
+        num = float(str(val).replace('°C', '').replace('RPM', '').replace('kPa', '').replace('V', '').replace('A', '').strip())
         if num == 32767 or num >= 30000:
             return "Sensor Fault (32767)"
     except Exception:
@@ -144,16 +166,7 @@ def format_alarm_message(alarm_data: dict, action: str) -> str:
     alarm_type = alarm_data.get("type", "Unknown Alarm")
     severity = str(alarm_data.get("severity") or "UNKNOWN").upper()
     status = alarm_data.get("status", "UNKNOWN")
-    
-    device_name = (
-        alarm_data.get("originatorName") or 
-        alarm_data.get("name") or 
-        alarm_data.get("deviceName") or 
-        "Unknown Device"
-    )
-    orig = alarm_data.get("originator")
-    if isinstance(orig, dict):
-        device_name = orig.get("name") or device_name
+    device_name = resolve_device_name(alarm_data)
 
     details = alarm_data.get("details")
     is_cleared = (action == "CLEARED") or ("CLEARED" in status)
@@ -223,16 +236,18 @@ def format_alarm_message(alarm_data: dict, action: str) -> str:
     telemetry_items = {}
 
     if isinstance(details, dict):
-        detail_msg = details.get("message") or details.get("description") or details.get("summary") or ""
-        recommendation = details.get("recommendation") or details.get("action") or ""
+        detail_msg = details.get("data") or details.get("message") or details.get("description") or details.get("summary") or ""
+        recommendation = details.get("recommendation") or details.get("action") or details.get("recommended_action") or ""
         for k, v in details.items():
-            if k not in ["message", "description", "summary", "recommendation", "action", "ai_mode"]:
+            if k not in ["message", "data", "description", "summary", "recommendation", "action", "recommended_action", "ai_mode", "severity", "dg_status"]:
                 telemetry_items[k] = clean_sensor_value(v)
     elif isinstance(details, str) and details.strip():
         detail_msg = details.strip()
 
     if detail_msg:
-        clean_dt = str(detail_msg).replace("32767", "Sensor Fault (32767)").strip()
+        import re
+        clean_dt = re.sub(r"\$\{\s*([^}]+)\s*\}", r"\1", str(detail_msg))
+        clean_dt = clean_dt.replace("32767", "Sensor Fault (32767)").strip()
         msg_parts.append(f"\n📋 <b>Incident Context:</b>\n<blockquote>{escape(clean_dt)}</blockquote>")
 
     if telemetry_items:
@@ -291,11 +306,20 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 action = "CREATED"
             
             alarm_type = alarm_data.get("type", "Unknown")
-            device_name = alarm_data.get("originatorName") or alarm_data.get("name") or "Unknown Device"
-            orig = alarm_data.get("originator")
-            if isinstance(orig, dict):
-                device_name = orig.get("name") or device_name
+            device_name = resolve_device_name(alarm_data)
 
+            # 1. Anti-Dummy & Test Filter: Discard any test/mock/demo/simulation devices from real channel
+            if is_dummy_or_test(device_name, alarm_type):
+                logging.info(f"Filtered out test/dummy alarm: '{device_name}' - '{alarm_type}'")
+                if TELEGRAM_TEST_CHAT_ID:
+                    message = format_alarm_message(alarm_data, action)
+                    MESSAGE_QUEUE.put(("🧪 <b>[TEST DEVICE ALERT]</b>\n\n" + message, [TELEGRAM_TEST_CHAT_ID], None, action, time.time()))
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"DUMMY_FILTERED")
+                return
+
+            # 2. Skip normal operational events (e.g. DG Offline on normal engine stop)
             if alarm_type in SKIP_ALARM_TYPES:
                 logging.info(f"Skipped normal operational event: '{device_name}' - '{alarm_type}' ({action})")
                 self.send_response(200)
@@ -303,7 +327,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b"SKIPPED")
                 return
 
-            # Smart Deduplication Cache:
+            # 3. Smart Deduplication Cache:
             # Prevents alarm flapping/spamming, but ALWAYS allows state changes (CREATED <-> CLEARED)
             cache_key = (str(device_name), str(alarm_type))
             now = time.time()
@@ -321,15 +345,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 return
 
             message = format_alarm_message(alarm_data, action)
-            
-            # Route test devices vs production devices
-            if str(device_name).startswith(TEST_DEVICE_PREFIX):
-                if TELEGRAM_TEST_CHAT_ID:
-                    MESSAGE_QUEUE.put(("🧪 <b>[TEST DEVICE ALERT]</b>\n\n" + message, [TELEGRAM_TEST_CHAT_ID], cache_key, action, now))
-                else:
-                    logging.info(f"Test device alarm (logged, not dispatched):\n{message}")
-            else:
-                MESSAGE_QUEUE.put((message, None, cache_key, action, now))
+            MESSAGE_QUEUE.put((message, None, cache_key, action, now))
             
             self.send_response(200)
             self.end_headers()
@@ -338,6 +354,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
             logging.error("Received invalid JSON payload")
             self.send_response(400)
             self.end_headers()
+
         except Exception as e:
             logging.error(f"Error processing webhook request: {e}")
             self.send_response(500)
