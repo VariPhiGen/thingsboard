@@ -3,7 +3,7 @@ import requests, json
 BASE_URL = 'http://localhost:9091'
 SYSADMIN_USER = 'sysadmin@thingsboard.org'
 SYSADMIN_PASS = 'sysadmin'
-NEW_URL = 'http://172.24.0.1:5051'
+NEW_URL = 'http://172.23.0.1:5051'
 
 def login(username, password):
     res = requests.post(f"{BASE_URL}/api/auth/login", json={"username": username, "password": password})
