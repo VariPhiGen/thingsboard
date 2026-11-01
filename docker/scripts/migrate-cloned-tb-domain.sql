@@ -1,5 +1,5 @@
 -- Post-clone migration: re-point copied TB database to viot.virtuosonetsoft.com
--- Run: PGPASSWORD=... psql -h 13.206.196.162 -U variphi -d tb_virtuoso -f migrate-cloned-tb-domain.sql
+-- Run: PGPASSWORD=... psql -h 13.233.134.124 -U variphi -d tb_virtuoso -f migrate-cloned-tb-domain.sql
 
 -- Base URL (admin_settings → general)
 UPDATE admin_settings
