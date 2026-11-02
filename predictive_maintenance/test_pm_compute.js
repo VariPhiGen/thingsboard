@@ -131,14 +131,71 @@ t('RO healthy, flow sensor offline is INFO only', function () {
     {baseline: {tds_ppm: {median: 57}}});
   assert.strictEqual(r.msg.pm_severity_raw, 'OK');
   assert.ok(/Flow sensor offline/.test(r.msg.pm_issues));
+  assert.ok(/pH sensor not reporting/.test(r.msg.pm_issues));
 });
 
-t('RO TDS rising trend gives membrane RUL', function () {
-  var r = runN(400, 'RO System Profile', function (i) {
-    return {tds_ppm: L(57 + i * 0.05), temperature_c: L(30)};
-  }, {baseline: {tds_ppm: {median: 57}}});
-  assert.notStrictEqual(r.msg.pm_rul_days, '--');
-  assert.ok(r.msg.pm_tds_trend_ppm_day > 0);
+t('RO TDS rising trend (daily averages) gives membrane RUL', function () {
+  var today = Math.floor((NOW + 19800000) / 86400000);
+  var days = [];
+  for (var d = 6; d >= 1; d--) {
+    days.push({d: today - d, s: (100 + (6 - d) * 2) * 288, n: 288});   // 100, 102 ... 110 ppm/day averages
+  }
+  var r = run('RO System Profile', {tds_ppm: L(112), temperature_c: L(30)},
+    {baseline: {tds_ppm: {median: 100}}, state: {m: {tds: {f: 112, s: 0, t: NOW - 300000, n: 500}}, tdsDays: days}});
+  assert.strictEqual(r.msg.pm_tds_trend_ppm_day, 2);
+  assert.strictEqual(r.msg.pm_tds_trend_days, 6);
+  assert.strictEqual(r.msg.pm_rul_days, 44);   // (200 - 112) / 2 ppm per day
+  assert.ok(!/TDS rising/.test(r.msg.pm_issues), 'no warning when more than 30 days remain');
+});
+
+t('RO rise-and-fall over 14 days (real site pattern) is not extrapolated', function () {
+  var today = Math.floor((NOW + 19800000) / 86400000);
+  var avgs = [47.4, 56.5, 59.3, 76.0, 89.9, 103.1, 106.5, 109.1, 104.3, 100.9, 111.3, 82.6, 57.2, 46.4];
+  var days = [];
+  for (var d = 0; d < avgs.length; d++) {
+    days.push({d: today - avgs.length + d, s: avgs[d] * 288, n: 288});
+  }
+  var r = run('RO System Profile', {tds_ppm: L(53), temperature_c: L(31.8)},
+    {baseline: {tds_ppm: {median: 102}}, state: {m: {tds: {f: 45.6, s: 0, t: NOW - 300000, n: 500}}, tdsDays: days}});
+  assert.strictEqual(r.msg.pm_tds_trend_ppm_day, '--');
+  assert.ok(r.msg.pm_tds_trend_r2 < 0.5);
+  assert.strictEqual(r.msg.pm_rul_days, '--');
+});
+
+t('RO swings inside one day are not reported as a ppm/day trend', function () {
+  var r = runN(150, 'RO System Profile', function (i) {
+    return {tds_ppm: L(i < 75 ? 34 : 56), temperature_c: L(30)};
+  }, {baseline: {tds_ppm: {median: 40}}});
+  assert.strictEqual(r.msg.pm_tds_trend_ppm_day, '--');
+  assert.strictEqual(r.msg.pm_rul_days, '--');
+});
+
+t('RO pH / pressure sensors silent for days are reported and lower data quality', function () {
+  var r = run('RO System Profile', {tds_ppm: L(53), temperature_c: L(31.8), ph: L(7.4, 34 * 1440), pressure: L(5, 34 * 1440)},
+    {baseline: {tds_ppm: {median: 102}}});
+  assert.ok(/pH sensor not reporting \(last reading 34 days ago\)/.test(r.msg.pm_issues), r.msg.pm_issues);
+  assert.ok(/Pressure sensor not reporting/.test(r.msg.pm_issues));
+  assert.strictEqual(r.msg.pm_data_quality_pct, 50);
+  assert.strictEqual(r.msg.pm_severity_raw, 'OK');
+});
+
+t('DG without a real service record shows service due as unknown', function () {
+  var r = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.4), fuel_level: L(100), run_hours: L(166.18)});
+  assert.strictEqual(r.msg.pm_service_due_h, '--');
+  assert.strictEqual(r.msg.rul_hours, '--');
+  assert.ok(/Service history not entered/.test(r.msg.pm_issues));
+  assert.strictEqual(r.msg.pm_severity_raw, 'OK');
+  var r2 = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.4), fuel_level: L(100), run_hours: L(166.18)},
+    {config: {last_service_run_hours: 0}});
+  assert.strictEqual(r2.msg.pm_service_due_h, 83.8);
+});
+
+t('DG run-hour counter nudge of 0.02 h while stopped is not a run', function () {
+  var st = {lastRunTs: NOW - 3 * 86400000, lastRh: 119.86};
+  var r = run('woodward_kg1500', {dg_status: L('OFF'), engine_rpm: L(32767), battery_voltage: L(26.7), fuel_level: L(100), run_hours: L(119.88)}, {state: st});
+  assert.strictEqual(r.msg.pm_days_since_run, 3);
+  var r2 = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.7), fuel_level: L(100), run_hours: L(120.4)}, {state: st});
+  assert.strictEqual(r2.msg.pm_days_since_run, 0);
 });
 
 t('Fire: flapping and low channels detected, stale channels skipped', function () {

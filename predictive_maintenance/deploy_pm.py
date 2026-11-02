@@ -210,9 +210,9 @@ def prepare_devices(tb, dry):
             lr, rh = last_run_ts(tb, did, now)
             defaults.update({"service_interval_h": 250, "exercise_days": 7, "fuel_tank_capacity_l": None,
                              "fuel_low_pct": 30, "fuel_critical_pct": 15, "fuel_drop_alarm_pct": 5,
-                             "fuel_refuel_detect_pct": 5, "required_autonomy_h": None})
-            if rh is not None:
-                defaults["last_service_run_hours"] = int(rh // 250 * 250)
+                             "fuel_refuel_detect_pct": 5, "required_autonomy_h": None,
+                             # Real service record only: left empty until the site enters it (no guessed value).
+                             "last_service_run_hours": None})
             if state is None:
                 state = {"m": {}, "sev": {"confirmed": "OK", "cand": "OK", "n": 0}}
                 if lr:

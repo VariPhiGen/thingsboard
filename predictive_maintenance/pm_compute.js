@@ -70,6 +70,16 @@ function str(key) {
   var r = fresh(key);
   return r ? ('' + r.v) : null;
 }
+// Days since a known sensor last reported, when its newest value is older than STALE_MS (else null).
+function staleDays(key) {
+  var r = raw(key);
+  if (!r || NOW - r.ts <= STALE_MS) return null;
+  return (NOW - r.ts) / (24 * HOUR);
+}
+function ageText(days) {
+  if (days >= 1) return Math.round(days) + ' day' + (Math.round(days) === 1 ? '' : 's');
+  return Math.max(1, Math.round(days * 24)) + ' h';
+}
 function base(key, stat) {
   var b = BASE[key];
   if (!b || b[stat] === undefined || b[stat] === null) return null;
@@ -226,20 +236,32 @@ if (kind === 'DG') {
   var ca = num('common_alarm', 0, 29999);
   if (ca !== null && ca !== 0) add('WARNING', 'Controller common alarm active (code ' + ca + ')', 'Read the alarm list on the Woodward controller.');
 
-  // Service due (run hours)
+  // Service due (run hours). Only computed from the real last-service record entered in pm_config;
+  // without it the due time is unknown and is shown as '--' (no assumed service history).
   var rh = expect(num('run_hours', 0, 200000));
-  if (rh !== null) {
+  var lastSvcCfg = CFG.last_service_run_hours;
+  var lastSvc = (lastSvcCfg === undefined || lastSvcCfg === null || lastSvcCfg === '') ? null : Number(lastSvcCfg);
+  if (lastSvc !== null && !isFinite(lastSvc)) lastSvc = null;
+  if (rh !== null && lastSvc !== null) {
     var interval = Number(CFG.service_interval_h) || 250;
-    var last = CFG.last_service_run_hours !== undefined ? Number(CFG.last_service_run_hours) : Math.floor(rh / interval) * interval;
-    var due = last + interval - rh;
+    var due = lastSvc + interval - rh;
     out.pm_service_due_h = r1(due);
     out.rul_hours = Math.max(0, r1(due));
     if (due < -100) add('CRITICAL', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Carry out the scheduled service (oil, filters) now.');
     else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and update pm_config.last_service_run_hours.');
     else if (due < 25) add('INFO', 'Service due in ' + Math.round(due) + ' run-hours', 'Plan the next service.', 2);
-    // Exercise (standby DG must run regularly)
-    if (S.lastRh === undefined || rh > S.lastRh + 0.01) {
-      if (S.lastRh !== undefined) S.lastRunTs = NOW;
+  } else {
+    out.pm_service_due_h = '--';
+    out.rul_hours = '--';
+    if (lastSvc === null) add('INFO', 'Service history not entered - service due time unknown', 'Enter the run-hours reading of the last DG service in pm_config.last_service_run_hours.', 0);
+  }
+  // Exercise (standby DG must run regularly). The controller sometimes nudges the run-hour counter by
+  // 0.01-0.02 h with the engine stopped, so only a rise of at least 0.1 h (6 min) counts as a run.
+  if (rh !== null) {
+    if (running || S.lastRh === undefined || rh < S.lastRh) {
+      S.lastRh = rh;
+    } else if (rh >= S.lastRh + 0.1) {
+      S.lastRunTs = NOW;
       S.lastRh = rh;
     }
   }
@@ -331,13 +353,69 @@ if (kind === 'DG') {
   if (tds !== null) {
     var tt = trend('tds', tds, 0.05);
     out.pm_tds_avg = r1(tt.f);
-    out.pm_tds_trend_ppm_day = r2(tt.s * 24);
     if (tt.f > critT) add('CRITICAL', 'Product water TDS ' + Math.round(tt.f) + ' ppm (limit ' + critT + ')', 'Stop drinking-water supply; inspect RO membrane and O-rings.');
     else if (tt.f > warnT) add('WARNING', 'Product water TDS ' + Math.round(tt.f) + ' ppm (normal ~' + Math.round(med || 0) + ')', 'Clean (CIP) or plan membrane replacement.');
-    var ht = hoursTo(tt, warnT, 288);
-    if (ht !== null && tt.s > 0) {
-      rulHours.push(ht);
-      if (ht < 24 * 30) add('WARNING', 'TDS rising ' + r1(tt.s * 24) + ' ppm/day - reaches ' + warnT + ' ppm in ~' + Math.round(ht / 24) + ' days', 'Plan membrane cleaning / replacement.', 10);
+    // Long-term TDS trend = least-squares slope of the daily average TDS (IST days) over the last 14
+    // completed days. Short swings within a day are not a membrane trend, so the trend stays '--'
+    // until at least 3 full days (each with 4 h or more of readings) are available.
+    var tdsDay = Math.floor((NOW + 19800000) / (24 * HOUR));
+    if (!S.tdsDays) S.tdsDays = [];
+    var curB = S.tdsDays.length ? S.tdsDays[S.tdsDays.length - 1] : null;
+    if (!curB || curB.d !== tdsDay) {
+      curB = {d: tdsDay, s: 0, n: 0};
+      S.tdsDays.push(curB);
+    }
+    curB.s += tds;
+    curB.n++;
+    var keptDays = [];
+    for (var di = 0; di < S.tdsDays.length; di++) {
+      if (S.tdsDays[di].d > tdsDay - 15) keptDays.push(S.tdsDays[di]);
+    }
+    S.tdsDays = keptDays;
+    var xs = [], ys = [];
+    for (var dj = 0; dj < S.tdsDays.length; dj++) {
+      var bd = S.tdsDays[dj];
+      if (bd.d < tdsDay && bd.n >= 48) {
+        xs.push(bd.d);
+        ys.push(bd.s / bd.n);
+      }
+    }
+    var slope = null;
+    if (xs.length >= 3) {
+      var mx = 0, my = 0;
+      for (var a1 = 0; a1 < xs.length; a1++) {
+        mx += xs[a1];
+        my += ys[a1];
+      }
+      mx /= xs.length;
+      my /= xs.length;
+      var sxy = 0, sxx = 0;
+      for (var a2 = 0; a2 < xs.length; a2++) {
+        sxy += (xs[a2] - mx) * (ys[a2] - my);
+        sxx += (xs[a2] - mx) * (xs[a2] - mx);
+      }
+      if (sxx > 0) {
+        slope = sxy / sxx;
+        // Fit quality: a rise-and-fall is not a steady trend, so it is not extrapolated (R2 below 0.5)
+        var ssTot = 0, ssRes = 0;
+        for (var a3 = 0; a3 < xs.length; a3++) {
+          var fit = my + slope * (xs[a3] - mx);
+          ssRes += (ys[a3] - fit) * (ys[a3] - fit);
+          ssTot += (ys[a3] - my) * (ys[a3] - my);
+        }
+        var fitR2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+        out.pm_tds_trend_r2 = r2(fitR2);
+        if (fitR2 < 0.5) slope = null;
+      }
+    }
+    out.pm_tds_trend_ppm_day = slope === null ? '--' : r2(slope);
+    out.pm_tds_trend_days = xs.length;
+    if (slope !== null && slope > 0.5 && tt.f < warnT) {
+      var ht = (warnT - tt.f) / slope * 24;
+      if (ht > 0 && ht <= 24 * 365) {
+        rulHours.push(ht);
+        if (ht < 24 * 30) add('WARNING', 'TDS rising ' + r1(slope) + ' ppm/day over ' + xs.length + ' days - reaches ' + warnT + ' ppm in ~' + Math.round(ht / 24) + ' days', 'Plan membrane cleaning / replacement.', 10);
+      }
     }
   }
   var tc = expect(num('temperature_c', -5, 90));
@@ -346,11 +424,18 @@ if (kind === 'DG') {
     else if (tc > 38) add('WARNING', 'Water temperature high: ' + tc + ' C', 'Check feed water source / plant room ventilation.');
   }
   var ph = num('ph', 0, 14);
+  if (raw('ph') !== null) expect(ph);
   if (ph !== null) {
     if (ph < 6 || ph > 9) add('CRITICAL', 'pH ' + ph, 'Stop supply and check dosing.');
     else if (ph < 6.5 || ph > 8.5) add('WARNING', 'pH out of range: ' + ph, 'Check dosing / remineralisation.');
   }
   var pr = num('pressure', 0, 100);
+  if (raw('pressure') !== null) expect(pr);
+  var roSensors = [['ph', 'pH sensor'], ['pressure', 'Pressure sensor'], ['temperature_c', 'Temperature sensor']];
+  for (var rs = 0; rs < roSensors.length; rs++) {
+    var sdays = staleDays(roSensors[rs][0]);
+    if (sdays !== null) add('INFO', roSensors[rs][1] + ' not reporting (last reading ' + ageText(sdays) + ' ago)', 'Check the ' + roSensors[rs][1] + ' wiring / transmitter; its checks are paused.', 5);
+  }
   var prMed = base('pressure', 'median');
   if (pr !== null && prMed) {
     var prt = trend('pressure', pr, 0.2);
