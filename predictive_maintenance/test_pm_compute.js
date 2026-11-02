@@ -183,7 +183,7 @@ t('DG without a real service record shows service due as unknown', function () {
   var r = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.4), fuel_level: L(100), run_hours: L(166.18)});
   assert.strictEqual(r.msg.pm_service_due_h, '--');
   assert.strictEqual(r.msg.rul_hours, '--');
-  assert.ok(/Service history not entered/.test(r.msg.pm_issues));
+  assert.ok(/Service schedule not set up/.test(r.msg.pm_issues));
   assert.strictEqual(r.msg.pm_severity_raw, 'OK');
   var r2 = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.4), fuel_level: L(100), run_hours: L(166.18)},
     {config: {last_service_run_hours: 0}});

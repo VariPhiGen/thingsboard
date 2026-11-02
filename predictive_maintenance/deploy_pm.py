@@ -302,15 +302,19 @@ return details;
 """
 
 LLM_SYSTEM = (
-    "You are a maintenance engineer assistant for a facility with diesel generators (Woodward KG1500), "
+    "You are a maintenance engineer assistant for a facility with diesel generators (DG sets), "
     "LT electrical panels / UPS feeders, an RO water plant and fire-suppression cylinders. "
     "You receive the output of a deterministic predictive-maintenance engine (fields pm_*; pm_issues is a JSON list of "
     "{sev,text,action}). That output is authoritative: never change the severity, never invent readings or issues "
-    "that are not in the input. Write for site operators in plain English.\n"
+    "that are not in the input.\n"
+    "Your text is shown to the facility's client on a dashboard: write short, plain English for a site manager. "
+    "Never mention field names, configuration keys, variables or code (nothing with underscores such as pm_config, "
+    "last_service_run_hours, pm_rul_days, rated_a), and do not mention the engine, JSON or AI. Use the issue texts and "
+    "actions as written; for service records refer to the Maintenance Log.\n"
     "Respond with ONE JSON object only, no markdown, with keys:\n"
     "summary: max 220 characters - overall condition, the most important numbers from the issues, and the predicted "
-    "time to a threshold (pm_rul_days, in days) when it is not '--'. If pm_severity is OK say the equipment is healthy "
-    "and mention any INFO items briefly.\n"
+    "number of days until a limit is reached (pm_rul_days) only when it is not '--'. If pm_severity is OK say the "
+    "equipment is healthy and mention any INFO items briefly.\n"
     "recommendation: max 160 characters - one concrete next action for the most severe issue."
 )
 LLM_USER = "Equipment: ${deviceName} (${deviceType}). Predictive engine result JSON: $[*]"
@@ -322,7 +326,11 @@ LLM_OUT_JS = """function clean(v, n) {
 // Gemini sometimes varies the key names; accept the common variants
 var s = clean(msg.summary || msg.Summary || msg.condition, 300);
 var r = clean(msg.recommendation || msg.Recommendation || msg.maintenance_recommendation || msg.action, 300);
-if (!s || !r) return {msg: {pm_summary_source: 'ai_invalid'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};
+// Client-facing text: reject an answer that leaks internal names (snake_case keys such as pm_config)
+var internal = /[A-Za-z0-9]+_[A-Za-z0-9_]+|json/i;
+if (!s || !r || internal.test(s) || internal.test(r)) {
+  return {msg: {pm_summary_source: 'ai_invalid'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};
+}
 var out = {pm_summary: s, pm_recommendation: r, pm_summary_source: 'ai'};
 if (metadata.deviceType === 'woodward_kg1500') {
   out.summary = s;
@@ -561,7 +569,7 @@ for (var i = 0; i < rows.length; i++) {
     il += '<div style="display:flex;gap:6px;align-items:flex-start;margin-top:3px;"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:' + ic + ';margin-top:5px;"></span><span>' + esc(it.text) + '</span></div>';
   }
   if (!il) il = '<div style="color:#78909c;margin-top:3px;">No issues detected</div>';
-  var rul = (r.RUL === undefined || r.RUL === '' || r.RUL === '--') ? '--' : esc(r.RUL) + ' d';
+  var rul = (r.RUL === undefined || r.RUL === '' || r.RUL === '--') ? 'No trend' : esc(r.RUL) + ' days';
   var risk = (r.Risk === undefined || r.Risk === '' || r.Risk === '--') ? '--' : esc(r.Risk) + '%';
   cards += '<div style="flex:1 1 360px;max-width:calc(33.33% - 12px);min-width:320px;background:#fff;border-radius:10px;border:1px solid #e0e0e0;border-top:4px solid ' + c + ';padding:12px 14px;box-sizing:border-box;box-shadow:0 1px 3px rgba(0,0,0,.08);">' +
     '<div style="display:flex;gap:12px;align-items:center;">' + ring +
@@ -569,7 +577,7 @@ for (var i = 0; i < rows.length; i++) {
     '<div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' +
     '<span style="background:' + bg + ';color:' + c + ';border:1px solid ' + c + ';border-radius:12px;padding:1px 9px;font-size:11px;font-weight:700;">' + esc(sev) + '</span>' +
     (r.Mode ? '<span style="font-size:11px;color:#607d8b;">' + esc(r.Mode) + '</span>' : '') + '</div></div>' +
-    '<div style="text-align:right;font-size:11px;color:#607d8b;line-height:1.5;">Risk <b style="color:#263238;font-size:13px;">' + risk + '</b><br>RUL <b style="color:#263238;font-size:13px;">' + rul + '</b><br>Data <b style="color:#263238;">' + esc(r.Quality === undefined ? '--' : r.Quality) + '%</b></div></div>' +
+    '<div style="text-align:right;font-size:11px;color:#607d8b;line-height:1.5;">Risk <b style="color:#263238;font-size:13px;">' + risk + '</b><br>Days left <b style="color:#263238;font-size:13px;">' + rul + '</b><br>Data quality <b style="color:#263238;">' + esc(r.Quality === undefined ? '--' : r.Quality) + '%</b></div></div>' +
     '<div style="font-size:12px;color:#37474f;margin-top:8px;">' + il + '</div>' +
     '<div style="font-size:12px;color:#455a64;margin-top:8px;padding-top:8px;border-top:1px dashed #e0e0e0;">' + esc(r.Summary) + '</div>' +
     '<div style="font-size:12px;color:#1565c0;margin-top:4px;"><b>Action:</b> ' + esc(r.Recommendation) + '</div>' +
@@ -580,7 +588,7 @@ var keys = ['CRITICAL', 'WARNING', 'OK', 'NO DATA'];
 for (var k = 0; k < keys.length; k++) {
   head += '<div style="background:' + BG[keys[k]] + ';color:' + COL[keys[k]] + ';border-radius:8px;padding:6px 14px;font-weight:700;font-size:13px;">' + keys[k] + ': ' + counts[keys[k]] + '</div>';
 }
-head += '<div style="margin-left:auto;font-size:11px;color:#78909c;align-self:center;">Health 80-100 OK, 40-79 Warning, 0-39 Critical. RUL = predicted days until a limit is reached.</div></div>';
+head += '<div style="margin-left:auto;font-size:11px;color:#78909c;align-self:center;">Health 80-100 OK, 40-79 Warning, 0-39 Critical. Days left = forecast days until a reading reaches its limit (shown when a steady trend is found).</div></div>';
 return '<div style="padding:12px;font-family:Roboto,sans-serif;box-sizing:border-box;">' + head +
   '<div style="display:flex;flex-wrap:wrap;gap:12px;">' + cards + '</div></div>';
 """

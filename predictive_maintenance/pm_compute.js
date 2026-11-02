@@ -216,8 +216,8 @@ if (kind === 'DG') {
     if (vv !== null) {
       var vn = vv > 300 ? 415 : 230;
       var dv = Math.abs(vv - vn) / vn;
-      if (dv > 0.12) add('CRITICAL', 'Output voltage ' + vv + ' V (nominal ' + vn + ' V)', 'Check AVR / excitation.');
-      else if (dv > 0.08) add('WARNING', 'Output voltage ' + vv + ' V off nominal', 'Check AVR settings.');
+      if (dv > 0.12) add('CRITICAL', 'Output voltage ' + vv + ' V (nominal ' + vn + ' V)', 'Check the alternator voltage regulator (AVR).');
+      else if (dv > 0.08) add('WARNING', 'Output voltage ' + vv + ' V off nominal', 'Check the alternator voltage regulator (AVR) settings.');
     }
     var pf = num('power_factor', 0, 1);
     var pkw = num('power_kw', 0, 5000);
@@ -234,7 +234,7 @@ if (kind === 'DG') {
 
   // Controller alarm
   var ca = num('common_alarm', 0, 29999);
-  if (ca !== null && ca !== 0) add('WARNING', 'Controller common alarm active (code ' + ca + ')', 'Read the alarm list on the Woodward controller.');
+  if (ca !== null && ca !== 0) add('WARNING', 'Controller common alarm active (code ' + ca + ')', 'Check the alarm list on the DG control panel.');
 
   // Service due (run hours). Only computed from the real last-service record entered in pm_config;
   // without it the due time is unknown and is shown as '--' (no assumed service history).
@@ -248,12 +248,12 @@ if (kind === 'DG') {
     out.pm_service_due_h = r1(due);
     out.rul_hours = Math.max(0, r1(due));
     if (due < -100) add('CRITICAL', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Carry out the scheduled service (oil, filters) now.');
-    else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and update pm_config.last_service_run_hours.');
+    else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and record it in the Maintenance Log.');
     else if (due < 25) add('INFO', 'Service due in ' + Math.round(due) + ' run-hours', 'Plan the next service.', 2);
   } else {
     out.pm_service_due_h = '--';
     out.rul_hours = '--';
-    if (lastSvc === null) add('INFO', 'Service history not entered - service due time unknown', 'Enter the run-hours reading of the last DG service in pm_config.last_service_run_hours.', 0);
+    if (lastSvc === null) add('INFO', 'Service schedule not set up - last service not yet logged', 'Record the last DG service in the Maintenance Log (Reports & Maintenance dashboard) to start the service countdown.', 0);
   }
   // Exercise (standby DG must run regularly). The controller sometimes nudges the run-hour counter by
   // 0.01-0.02 h with the engine stopped, so only a rise of at least 0.1 h (6 min) counts as a run.
@@ -302,7 +302,7 @@ if (kind === 'DG') {
     expect(V);
     if (V === null) {
       fsum[fd] = 'NO DATA';
-      add('INFO', label + ': meter not reporting', 'Check the meter / Modbus link of ' + label + '.', 2);
+      add('INFO', label + ': meter not reporting', 'Check the energy meter of ' + label + ' and its communication cable.', 2);
       continue;
     }
     var nominal = (CFG.nominal_v && CFG.nominal_v[fd]) || ((base(fd + '_voltage', 'median') || V) > 300 ? 415 : 230);
@@ -326,7 +326,7 @@ if (kind === 'DG') {
         if (lp > 100) { add('CRITICAL', label + ' overloaded: ' + Math.round(it.f) + ' A (' + Math.round(lp) + '% of ' + rated + ' A)', 'Shed or redistribute load.'); fstate = 'CRITICAL'; }
         else if (lp > 90) { add('WARNING', label + ' load ' + Math.round(lp) + '% of rating', 'Plan load redistribution.'); if (fstate === 'OK') fstate = 'WARNING'; }
       } else if (p95 !== null && p95 > 5 && it.n >= 6 && it.f > p95 * 1.3) {
-        add('WARNING', label + ' current ' + Math.round(it.f) + ' A is ' + Math.round((it.f / p95 - 1) * 100) + '% above its normal peak (' + Math.round(p95) + ' A)', 'Check added load or a developing fault; set pm_config.rated_a to get exact overload checks.');
+        add('WARNING', label + ' current ' + Math.round(it.f) + ' A is ' + Math.round((it.f / p95 - 1) * 100) + '% above its normal peak (' + Math.round(p95) + ' A)', 'Check this feeder: newly added load or a developing fault.');
         if (fstate === 'OK') fstate = 'WARNING';
       }
       // Power factor from P, V, I
@@ -354,7 +354,7 @@ if (kind === 'DG') {
     var tt = trend('tds', tds, 0.05);
     out.pm_tds_avg = r1(tt.f);
     if (tt.f > critT) add('CRITICAL', 'Product water TDS ' + Math.round(tt.f) + ' ppm (limit ' + critT + ')', 'Stop drinking-water supply; inspect RO membrane and O-rings.');
-    else if (tt.f > warnT) add('WARNING', 'Product water TDS ' + Math.round(tt.f) + ' ppm (normal ~' + Math.round(med || 0) + ')', 'Clean (CIP) or plan membrane replacement.');
+    else if (tt.f > warnT) add('WARNING', 'Product water TDS ' + Math.round(tt.f) + ' ppm (normal ~' + Math.round(med || 0) + ')', 'Clean the RO membrane or plan its replacement.');
     // Long-term TDS trend = least-squares slope of the daily average TDS (IST days) over the last 14
     // completed days. Short swings within a day are not a membrane trend, so the trend stays '--'
     // until at least 3 full days (each with 4 h or more of readings) are available.
@@ -434,7 +434,7 @@ if (kind === 'DG') {
   var roSensors = [['ph', 'pH sensor'], ['pressure', 'Pressure sensor'], ['temperature_c', 'Temperature sensor']];
   for (var rs = 0; rs < roSensors.length; rs++) {
     var sdays = staleDays(roSensors[rs][0]);
-    if (sdays !== null) add('INFO', roSensors[rs][1] + ' not reporting (last reading ' + ageText(sdays) + ' ago)', 'Check the ' + roSensors[rs][1] + ' wiring / transmitter; its checks are paused.', 5);
+    if (sdays !== null) add('INFO', roSensors[rs][1] + ' not reporting (last reading ' + ageText(sdays) + ' ago)', 'Check the ' + roSensors[rs][1] + ' and its wiring; related checks resume once it reports again.', 5);
   }
   var prMed = base('pressure', 'median');
   if (pr !== null && prMed) {
@@ -443,7 +443,7 @@ if (kind === 'DG') {
     if (Math.abs(pd) > 25) add('WARNING', 'Pressure ' + r1(prt.f) + ' bar (' + Math.round(pd) + '% from normal ' + prMed + ')', pd > 0 ? 'Membrane/pre-filter may be fouling - check differential pressure.' : 'Check pump and pre-filters.');
   }
   if (bool('tds_online') === false) add('WARNING', 'TDS sensor offline', 'Check the TDS sensor connection.');
-  if (bool('flow_online') === false) add('INFO', 'Flow sensor offline - flow based checks unavailable', 'Repair the flow sensor to enable recovery/fouling prediction.', 5);
+  if (bool('flow_online') === false) add('INFO', 'Flow sensor offline - water flow checks unavailable', 'Repair the flow sensor to restore water flow and membrane checks.', 5);
 
 // =====================================================================================
 } else if (kind === 'FIRE') {
@@ -473,7 +473,7 @@ if (kind === 'DG') {
     for (var q = 1; q < vals.length; q++) {
       if (vals[q] !== vals[q - 1]) changes++;
     }
-    if (changes >= 4) flapList.push(ch.n + ' (' + changes + 'x)');
+    if (changes >= 4) flapList.push(ch.n + ' (' + changes + ' changes)');
     else if (!vals[vals.length - 1]) lowList.push(ch.n);
     else okCount++;
   }
@@ -481,7 +481,7 @@ if (kind === 'DG') {
   out.pm_cylinders_low = lowList.length;
   out.pm_cylinders_unstable = flapList.length;
   if (lowList.length) add('WARNING', 'Low pressure on cylinder(s) ' + lowList.join(', '), 'Inspect and recharge these cylinders; check the pressure switch if the cylinder gauge reads normal.', Math.min(45, 12 * lowList.length));
-  if (flapList.length) add('WARNING', 'Unstable pressure signal on cylinder(s) ' + flapList.join(', ') + ' in 15 min', 'Check pressure-switch wiring and whether two gateways send data to this device.', Math.min(45, 10 * flapList.length));
+  if (flapList.length) add('WARNING', 'Unstable pressure signal on cylinder(s) ' + flapList.join(', ') + ' in the last 15 min', 'Check the pressure switch, its wiring and connections.', Math.min(45, 10 * flapList.length));
   for (var rr = 0; rr <= 2; rr++) {
     var rk = rr === 0 ? 'relay_online' : 'relay_' + rr + '_online';
     if (bool(rk) === false) add('WARNING', 'Relay ' + (rr || '') + ' offline', 'Check the relay module power / network.');
@@ -565,11 +565,11 @@ out.pm_summary_auto = autoSummary.substring(0, 300);
 out.pm_recommendation_auto = autoAction.substring(0, 300);
 
 // Template summary stands in until the LLM writes one, and whenever the facts behind the last LLM text
-// change: severity, presence of a predicted RUL, or the list of issues (numbers ignored, so live readings
+// change: severity, presence of a predicted RUL, or the issues and their actions (numbers ignored, so live readings
 // inside an issue text keep the LLM text until the next 15-min summary).
 var sigParts = [out.pm_severity, out.pm_rul_days === '--' ? 'norul' : 'rul'];
 for (var g = 0; g < issues.length; g++) {
-  sigParts.push(issues[g].sev + ':' + issues[g].text.replace(/[0-9.,+-]+/g, '#'));
+  sigParts.push(issues[g].sev + ':' + (issues[g].text + ' / ' + issues[g].action).replace(/[0-9.,+-]+/g, '#'));
 }
 var sig = sigParts.join('|');
 var llm = raw('pm_summary');
