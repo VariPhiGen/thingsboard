@@ -564,9 +564,17 @@ out.pm_issues = JSON.stringify(il);
 out.pm_summary_auto = autoSummary.substring(0, 300);
 out.pm_recommendation_auto = autoAction.substring(0, 300);
 
-// Template summary stands in until the LLM writes one, and whenever severity changes
+// Template summary stands in until the LLM writes one, and whenever the facts behind the last LLM text
+// change: severity, presence of a predicted RUL, or the list of issues (numbers ignored, so live readings
+// inside an issue text keep the LLM text until the next 15-min summary).
+var sigParts = [out.pm_severity, out.pm_rul_days === '--' ? 'norul' : 'rul'];
+for (var g = 0; g < issues.length; g++) {
+  sigParts.push(issues[g].sev + ':' + issues[g].text.replace(/[0-9.,+-]+/g, '#'));
+}
+var sig = sigParts.join('|');
 var llm = raw('pm_summary');
-var llmStale = !llm || NOW - llm.ts > 40 * 60 * 1000 || S.lastSev !== out.pm_severity;
+var llmStale = !llm || NOW - llm.ts > 40 * 60 * 1000 || S.lastSev !== out.pm_severity || S.lastSig !== sig;
+S.lastSig = sig;
 if (llmStale) {
   out.pm_summary = out.pm_summary_auto;
   out.pm_recommendation = out.pm_recommendation_auto;

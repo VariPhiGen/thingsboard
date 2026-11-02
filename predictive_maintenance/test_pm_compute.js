@@ -231,11 +231,29 @@ t('Severity relaxes only after 3 runs', function () {
   assert.strictEqual(r.msg.pm_severity, 'OK');
 });
 
-t('LLM summary kept while fresh and severity unchanged', function () {
-  var r = run('RO System Profile', {tds_ppm: L(57), temperature_c: L(30), pm_summary: L('LLM text', 10)}, {state: {lastSev: 'OK'}});
+t('LLM summary kept while fresh and the facts are unchanged', function () {
+  var lat = {tds_ppm: L(57), temperature_c: L(30), pm_summary: L('LLM text', 10)};
+  var first = run('RO System Profile', lat, {state: {lastSev: 'OK'}});
+  var st = JSON.parse(first.metadata.pm_state_out);
+  var r = run('RO System Profile', lat, {state: st});
   assert.strictEqual(r.msg.pm_summary, undefined);
-  r = run('RO System Profile', {tds_ppm: L(57), temperature_c: L(30), pm_summary: L('LLM text', 10)}, {state: {lastSev: 'WARNING'}});
+  r = run('RO System Profile', lat, {state: Object.assign({}, st, {lastSev: 'WARNING'})});
   assert.ok(r.msg.pm_summary);
+});
+
+t('LLM summary replaced at once when the issues or RUL behind it change', function () {
+  var lat = {tds_ppm: L(57), temperature_c: L(30), pm_summary: L('LLM text with 140 days', 10)};
+  var st = JSON.parse(run('RO System Profile', lat, {state: {lastSev: 'OK'}}).metadata.pm_state_out);
+  // a sensor goes silent: new INFO issue -> rules summary immediately
+  var r = run('RO System Profile', {tds_ppm: L(57), temperature_c: L(30), ph: L(7.4, 3000), pm_summary: L('LLM text with 140 days', 10)}, {state: st});
+  assert.strictEqual(r.msg.pm_summary_source, 'rules');
+  assert.ok(!/140 days/.test(r.msg.pm_summary));
+  // a live number changing inside the same issue does not discard the LLM text
+  var lv = function (v) { return {dg_status: L('OFF'), battery_voltage: L(v), fuel_level: L(80), run_hours: L(10), pm_summary: L('LLM', 5)}; };
+  var s1 = JSON.parse(run('woodward_kg1500', lv(23.8), {config: {last_service_run_hours: 0},
+    state: {sev: {confirmed: 'WARNING', cand: 'WARNING', n: 0}, lastSev: 'WARNING'}}).metadata.pm_state_out);
+  var r2 = run('woodward_kg1500', lv(23.7), {state: s1, config: {last_service_run_hours: 0}});
+  assert.strictEqual(r2.msg.pm_summary, undefined);
 });
 
 t('DG fuel uses the filtered level and warns when autonomy is below the requirement', function () {
