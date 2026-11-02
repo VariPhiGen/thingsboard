@@ -30,26 +30,28 @@ CHAIN_NAME = 'Predictive Maintenance'
 DASHBOARD_TITLE = 'Predictive Maintenance'
 AI_MODEL_ID = 'd78b28f0-810f-11f1-a760-b3ba4cbe1b98'
 TELEGRAM_URL = 'http://172.23.0.1:5051'
-KINDS = {'woodward_kg1500': 'DG', 'LT Panels Profile': 'LT', 'RO System Profile': 'RO', 'LT Panel Fire Profile': 'FIRE'}
+SEED = json.load(open(os.path.join(HERE, 'pm_seed.json')))
+KINDS = SEED['profiles']   # device profile -> equipment kind (template; each device keeps its kind in pm_config)
 ALARM_CRITICAL = 'Predictive Maintenance - Critical'
 ALARM_WARNING = 'Predictive Maintenance - Warning'
 ALARM_FUEL_DROP = 'Fuel Drop While DG Off'
-FIRST_NODE = 21   # 'Route': every message to the PM path, DG fuel messages also to the fuel path
+FIRST_NODE = 30   # 'Fetch PM Config' -> 'Route': configured equipment to the PM path, DG fuel messages also to the fuel path
 # Nodes of the previous DG-only AI path in the Root Rule Chain (replaced by the new chain)
 OLD_AI_NODES = {'Save AI Predictive Telemetry', 'DG AI Dedup 1m', 'Only DG Telemetry', 'DG SET1 AI Predictive',
                 'Clamp AI Outputs', 'If CRITICAL Equipment', 'AI Predictive Alert', 'Sanitize DG Sensors',
                 'Core Sensors Valid', 'Sensor Fault Fallback'}
 
-DG_KEYS = ['dg_status', 'engine_rpm', 'battery_voltage', 'fuel_level', 'fuel_level_pct', 'fuel_runtime_h', 'fuel_status', 'coolant_temp', 'oil_pressure', 'frequency',
-           'voltage', 'power_factor', 'power_kw', 'common_alarm', 'run_hours', 'engine_starts']
-RO_KEYS = ['tds_ppm', 'ec_us_cm', 'temperature_c', 'ph', 'pressure', 'tds_online', 'flow_online']
-FIRE_KEYS = ['relay_online', 'relay_1_online', 'relay_2_online']
+# Telemetry keys fetched by the rule chain, from the template (pm_seed.json)
+_K = SEED['kinds']
+DG_KEYS = sorted(set(_K['DG']['keys'].values()))
+RO_KEYS = sorted(set(_K['RO']['keys'].values()))
+FIRE_KEYS = list(_K['FIRE']['relay_keys'])
 BASELINE_KEYS = {
-    'DG': ['battery_voltage', 'fuel_level', 'run_hours'],
-    'RO': ['tds_ppm', 'ec_us_cm', 'temperature_c', 'ph', 'pressure'],
+    'DG': [_K['DG']['keys'][k] for k in ('battery', 'fuel_raw', 'run_hours', 'voltage')],
+    'RO': [_K['RO']['keys'][k] for k in ('tds', 'temperature', 'ph', 'pressure')],
 }
-LT_KEY = re.compile(r'^(.+)_(voltage|current|power|frequency)$')
-FIRE_CHANNEL = re.compile(r'^(cylinder_pressure_\d+|fire_suppression_\d+_pressure)$')
+LT_KEY = re.compile(r'^(.+)(' + '|'.join(re.escape(v) for v in _K['LT']['feeder_suffix'].values()) + r')$')
+FIRE_CHANNEL = re.compile('|'.join('(?:%s)' % p for p in _K['FIRE']['channel_patterns']))
 
 
 def load_env():
@@ -64,12 +66,12 @@ def load_env():
 
 
 class TB:
+    """Tenant session via infra_reports (TB_TENANT_USER/PASS, or sysadmin impersonation of the tenant)."""
     def __init__(self):
-        env = load_env()
-        self.base = env['TB_BASE_URL']
-        token = requests.post(f"{self.base}/api/auth/login",
-                              json={"username": env['TB_TENANT_USER'], "password": env['TB_TENANT_PASS']}).json()['token']
-        self.h = {"X-Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        from infra_reports.config import load_settings
+        from infra_reports.tb_client import ThingsBoardClient
+        c = ThingsBoardClient.connect(load_settings())
+        self.base, self.h = c.base_url, dict(c._headers, **{"Content-Type": "application/json"})
 
     def get(self, path, **params):
         r = requests.get(self.base + path, headers=self.h, params=params, timeout=120)
@@ -90,7 +92,8 @@ def node(type_, name, config, x, y, config_version=0):
 
 
 def is_sentinel(v):
-    return v in (32767, 65535) or v >= 30000
+    """Controller 'not available' codes, from the engine configuration of the template."""
+    return v in SEED['engine']['invalid_codes'] or v >= SEED['engine']['invalid_at_or_above']
 
 
 # ------------------------------------------------------------------ step 1: device data
@@ -119,30 +122,30 @@ def baseline(tb, did, keys, now):
     return out
 
 
-def last_run_ts(tb, did, now, days=60):
-    """(exact time of the newest real running sample, latest valid run_hours) or (None, ...).
-    Running = dg_status RUNNING or engine_rpm > 300, scanned day by day from today backwards. A 3-hourly
-    run_hours average was used before; it placed the last run up to 3 h late (bucket start)."""
+def last_run_ts(tb, did, now, limits, days=60):
+    """(exact time of the newest running sample, latest valid run-hour reading) from the device's own history.
+    Running = configured running status, or rpm above the configured running rpm."""
+    k = limits['keys']
     last = None
     for d in range(days):
-        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys='dg_status,engine_rpm',
+        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys=f"{k['status']},{k['rpm']}",
                    startTs=now - (d + 1) * 86400000, endTs=now - d * 86400000, limit=50000, agg='NONE', orderBy='DESC') or {}
-        hits = [v['ts'] for v in r.get('dg_status', []) if v['value'] == 'RUNNING']
-        for v in r.get('engine_rpm', []):
+        hits = [v['ts'] for v in r.get(k['status'], []) if v['value'] == limits['running_status']]
+        for v in r.get(k['rpm'], []):
             try:
                 rpm = float(v['value'])
             except (TypeError, ValueError):
                 continue
-            if 300 < rpm and not is_sentinel(rpm):
+            if rpm > limits['running_rpm'] and not is_sentinel(rpm):
                 hits.append(v['ts'])
         if hits:
             last = max(hits)
             break
-    # Latest valid run-hour reading (AVG, not MAX: the gateway sometimes sends the text 'error')
-    data = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys='run_hours',
+    # Latest valid run-hour reading (AVG, not MAX: the gateway sometimes sends text)
+    data = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys=k['run_hours'],
                   startTs=now - 7 * 86400000, endTs=now, interval=3 * 3600000, agg="AVG", limit=1000)
     pts = []
-    for v in (data or {}).get('run_hours', []):
+    for v in (data or {}).get(k['run_hours'], []):
         try:
             n = float(v['value'])
         except (TypeError, ValueError):
@@ -158,18 +161,19 @@ def fuel_replay(tb, did, name, config, days=14):
     import subprocess
     import tempfile
     now = int(time.time() * 1000)
+    K = config['limits']['keys']
     rows = []
     for d in range(days, 0, -1):
-        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys='fuel_level,engine_rpm,dg_status',
+        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys=f"{K['fuel_raw']},{K['rpm']},{K['status']}",
                    startTs=now - d * 86400000, endTs=now - (d - 1) * 86400000, limit=50000, agg='NONE', orderBy='ASC')
         rows += [(v['ts'], k, v['value']) for k, vs in (r or {}).items() for v in vs]
     rows.sort()
     status = rpm = None
     samples = []
     for ts, k, v in rows:
-        if k == 'dg_status':
+        if k == K['status']:
             status = v
-        elif k == 'engine_rpm':
+        elif k == K['rpm']:
             rpm = v
         else:
             samples.append([ts, v, status, rpm])
@@ -197,6 +201,27 @@ def server_attrs(tb, did, keys):
     return out
 
 
+class _MigrateTb:
+    """Adapter giving migrate_config.new_config the calls it needs on top of TB."""
+    def __init__(self, tb):
+        self.tb = tb
+
+    def attrs(self, eid, keys, etype="DEVICE"):
+        return server_attrs(self.tb, eid, keys)
+
+    def history_values(self, eid, key, days):
+        now = int(time.time() * 1000)
+        r = self.tb.get(f"/api/plugins/telemetry/DEVICE/{eid}/values/timeseries", keys=key, startTs=now - days * 86400000,
+                        endTs=now, limit=50000, agg='NONE') or {}
+        out = []
+        for p in r.get(key, []):
+            try:
+                out.append(float(p['value']))
+            except (TypeError, ValueError):
+                pass
+        return out
+
+
 def prepare_devices(tb, dry):
     now = int(time.time() * 1000)
     devices = [d for d in tb.get('/api/tenant/deviceInfos', pageSize=500, page=0)['data'] if d['type'] in KINDS]
@@ -215,35 +240,25 @@ def prepare_devices(tb, dry):
             bkeys = [k for k in BASELINE_KEYS.get(kind, []) if k in keys]
         bl = baseline(tb, did, bkeys, now)
         existing = server_attrs(tb, did, ['pm_config', 'pm_state', 'fuel_state'])
-        cfg = existing.get('pm_config') if isinstance(existing.get('pm_config'), dict) else {}
-        defaults = {"kind": kind}
+        if not dry:
+            tb.post(f"/api/plugins/telemetry/DEVICE/{did}/attributes/SERVER_SCOPE", {"pm_baseline": json.dumps(bl)})
+        cfg, notes = new_config(_MigrateTb(tb), {"id": did, "name": d['name']}, kind, existing.get('pm_config'))
         state = existing.get('pm_state') if isinstance(existing.get('pm_state'), dict) else None
-        note = ''
+        attrs = {"pm_config": json.dumps(cfg)}
+        note = '; '.join(notes)
         if kind == 'DG':
-            lr, rh = last_run_ts(tb, did, now)
-            defaults.update({"service_interval_h": 250, "exercise_days": 7, "fuel_tank_capacity_l": None,
-                             "fuel_low_pct": 30, "fuel_critical_pct": 15, "fuel_drop_alarm_pct": 5,
-                             "fuel_refuel_detect_pct": 5, "required_autonomy_h": None,
-                             # Real service record only: left empty until the site enters it (no guessed value).
-                             "last_service_run_hours": None})
+            lr, rh = last_run_ts(tb, did, now, cfg['limits'])
             if state is None:
                 state = {"m": {}, "sev": {"confirmed": "OK", "cand": "OK", "n": 0}}
                 if lr:
                     state["lastRunTs"] = lr
                 if rh is not None:
                     state["lastRh"] = rh
-            note = f"run_hours={rh} last_run={time.strftime('%Y-%m-%d %H:%M', time.localtime(lr / 1000)) if lr else 'unknown'}"
-        elif kind == 'LT':
-            defaults.update({"rated_a": {}, "nominal_v": {}})
-        elif kind == 'FIRE':
-            defaults.update({"ignore_channels": []})
-        merged = dict(defaults)
-        merged.update(cfg)
-        attrs = {"pm_baseline": json.dumps(bl), "pm_config": json.dumps(merged)}
+            note += f" | run_hours={rh} last_run={time.strftime('%Y-%m-%d %H:%M', time.localtime(lr / 1000)) if lr else 'unknown'}"
         if state is not None and 'pm_state' not in existing:
             attrs["pm_state"] = json.dumps(state)
         if kind == 'DG' and 'fuel_state' not in existing:
-            fr = fuel_replay(tb, did, d['name'], merged)
+            fr = fuel_replay(tb, did, d['name'], cfg)
             attrs["fuel_state"] = json.dumps(fr['state'])
             if not dry and fr['events']:
                 # Fuel event log from history, at the original timestamps
@@ -251,24 +266,18 @@ def prepare_devices(tb, dry):
                         [{"ts": ts, "values": {"fuel_event": text}} for ts, text in fr['events']])
             note += (f" | fuel bootstrap: burn={fr['state'].get('burn')}%/h from {fr['state'].get('burnN')} runs,"
                      f" refuels={sum(1 for e in fr['events'] if e[1].startswith('Refuel'))}, drops={len(fr['alarms'])}")
-        report.append(f"  {d['name']:<30} {kind:<5} baseline keys={len(bl):<3} config={json.dumps(merged)} {note}")
+        report.append(f"  {d['name']:<30} {kind:<5} baseline keys={len(bl):<3} {note}")
         if not dry:
             tb.post(f"/api/plugins/telemetry/DEVICE/{did}/attributes/SERVER_SCOPE", attrs)
     return devices, keysets, report
 
 
 # ------------------------------------------------------------------ step 2: PM rule chain
-SWITCH_JS = """var KINDS = %s;
-return [KINDS[metadata.deviceType] || 'Other'];
-""" % json.dumps(KINDS)
+from predictive_maintenance.migrate_config import ROUTE_JS, SWITCH_JS, new_config   # routing by pm_config.kind
 
 STATE_JS = """return {msg: {pm_state: metadata.pm_state_out}, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};
 """
 
-ROUTE_JS = """var out = ['PM'];
-if (metadata.deviceType === 'woodward_kg1500' && msg.fuel_level !== undefined) out.push('FUEL');
-return out;
-"""
 
 FUEL_STATE_JS = """return {msg: {fuel_state: metadata.fuel_state_out}, metadata: metadata, msgType: 'POST_ATTRIBUTES_REQUEST'};
 """
@@ -332,7 +341,9 @@ if (!s || !r || internal.test(s) || internal.test(r)) {
   return {msg: {pm_summary_source: 'ai_invalid'}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};
 }
 var out = {pm_summary: s, pm_recommendation: r, pm_summary_source: 'ai'};
-if (metadata.deviceType === 'woodward_kg1500') {
+var pmCfg = {};
+try { pmCfg = JSON.parse(metadata.ss_pm_config || '{}'); } catch (e) { pmCfg = {}; }
+if (pmCfg.kind === 'DG') {
   out.summary = s;
   out.maintenance_recommendation = r;
 }
@@ -365,7 +376,7 @@ def build_pm_chain(keysets):
         fetch_node('Fetch RO Data', RO_KEYS, 820, 230),  # 4
         fetch_node('Fetch Fire Data', FIRE_KEYS, 820, 330),  # 5
         node('org.thingsboard.rule.engine.metadata.TbGetTelemetryNode', 'Fire Channels Last 15 min', {
-            "startInterval": 15, "endInterval": 0, "startIntervalPattern": "", "endIntervalPattern": "",
+            "startInterval": _K['FIRE']['window_minutes'], "endInterval": 0, "startIntervalPattern": "", "endIntervalPattern": "",
             "useMetadataIntervalPatterns": False, "startIntervalTimeUnit": "MINUTES", "endIntervalTimeUnit": "MINUTES",
             "fetchMode": "ALL", "orderBy": "ASC", "aggregation": "NONE", "limit": 1000,
             "latestTsKeyNames": sorted(keysets['FIRE_CH'])}, 1080, 330, 2),  # 6
@@ -416,7 +427,7 @@ def build_pm_chain(keysets):
              {"scriptLang": "JS", "jsScript": ROUTE_JS, "tbelScript": "return ['PM'];"}, 60, 300),  # 21
         node('org.thingsboard.rule.engine.metadata.TbGetAttributesNode', 'Fetch Fuel Context', {
             "fetchTo": "METADATA", "clientAttributeNames": [], "sharedAttributeNames": [],
-            "serverAttributeNames": ["fuel_state", "pm_config"], "latestTsKeyNames": ["dg_status", "engine_rpm"],
+            "serverAttributeNames": ["fuel_state", "pm_config"], "latestTsKeyNames": [_K['DG']['keys']['status'], _K['DG']['keys']['rpm']],
             "tellFailureIfAbsent": False, "getLatestValueWithTs": False}, 300, 760, 1),  # 22
         js_transform('DG Fuel', fuel_js, 560, 760),  # 23
         node('org.thingsboard.rule.engine.telemetry.TbMsgTimeseriesNode', 'Save Fuel Telemetry',
@@ -435,8 +446,11 @@ def build_pm_chain(keysets):
         node('org.thingsboard.rule.engine.action.TbClearAlarmNode', 'Clear Fuel Drop Alarm', {
             "scriptLang": "JS", "alarmDetailsBuildJs": CLEAR_DETAILS_JS, "alarmDetailsBuildTbel": "return {};",
             "alarmType": ALARM_FUEL_DROP}, 1080, 920),  # 29
+        node('org.thingsboard.rule.engine.metadata.TbGetAttributesNode', 'Fetch PM Config', {
+            "fetchTo": "METADATA", "clientAttributeNames": [], "sharedAttributeNames": [], "serverAttributeNames": ["pm_config"],
+            "latestTsKeyNames": [], "tellFailureIfAbsent": False, "getLatestValueWithTs": False}, 60, 520, 1),  # 30
     ]
-    C = [(21, 0, 'PM'), (21, 22, 'FUEL'), (22, 23, 'Success'), (23, 24, 'Success'), (23, 25, 'Success'),
+    C = [(30, 21, 'Success'), (21, 0, 'PM'), (21, 22, 'FUEL'), (22, 23, 'Success'), (23, 24, 'Success'), (23, 25, 'Success'),
          (25, 26, 'Success'), (23, 27, 'Success'), (27, 28, 'DROP'), (27, 29, 'CLEAR_DROP'),
          (28, 16, 'Created'), (29, 16, 'Cleared'),
          (0, 1, 'Success'), (1, 2, 'DG'), (1, 3, 'LT'), (1, 4, 'RO'), (1, 5, 'FIRE'), (5, 6, 'Success'),
@@ -697,8 +711,8 @@ def patch_dg_dashboards(tb, dry):
         if chart:
             for ds in chart['config'].get('datasources', []):
                 for dk in ds.get('dataKeys', []):
-                    if dk['name'] in ('fuel_level', 'fuel_level_pct'):
-                        dk['name'] = 'fuel_level_pct'
+                    if dk['name'] in (_K['DG']['keys']['fuel_raw'], _K['DG']['keys']['fuel_pct']):
+                        dk['name'] = _K['DG']['keys']['fuel_pct']
                         dk['label'] = 'Fuel Level (filtered)'
                         changes.append('chart fuel series')
         if dry:
@@ -731,7 +745,7 @@ def main():
     args = ap.parse_args()
     dry = args.dry_run
     tb = TB()
-    print("1. Devices (baselines from last 7 days, pm_config defaults):")
+    print("1. Devices (baselines from last 7 days, pm_config from pm_seed.json + device history):")
     devices, keysets, report = prepare_devices(tb, dry)
     print("\n".join(report))
     print(f"   LT keys: {len(keysets['LT'])}, fire channels: {sorted(keysets['FIRE_CH'])}")

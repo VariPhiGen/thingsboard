@@ -80,3 +80,12 @@
 .mp-kpi .v { font-size: 24px; font-weight: 700; color: #0d2b55; } .mp-kpi .l { font-size: 11px; color: #607d8b; text-transform: uppercase; letter-spacing: .4px; }
 .mp-kpi .h { font-size: 11px; color: #90a4ae; margin-top: 2px; }
 .mp-kpi.bad .v { color: #c62828; } .mp-kpi.good .v { color: #2e7d32; }
+/* priority pills follow the order of the configured priorities (1 = most urgent) */
+.mp .pill.pr-1 { background: #ffebee; color: #c62828; } .mp .pill.pr-2 { background: #fff3e0; color: #b45309; }
+.mp .pill.pr-3 { background: #e3f2fd; color: #1565c0; } .mp .pill.pr-4, .mp .pill.pr-5, .mp .pill.pr-6, .mp .pill.pr-0 { background: #eceff1; color: #546e7a; }
+.mp .req { color: #c62828; }
+.mp-grid label.chk, .mp label.chk { flex-direction: row; align-items: center; gap: 8px; text-transform: none; font-size: 13px; font-weight: 500; letter-spacing: 0; color: #37474f; }
+.mp-fs { border: 1px solid #d9dee4; border-radius: 6px; padding: 8px 10px 10px; margin: 8px 0; background: #fff; }
+.mp-fs legend { font-size: 11px; font-weight: 700; color: #0d2b55; text-transform: uppercase; letter-spacing: .4px; padding: 0 4px; }
+.mp-fs .mp-fs { background: #fafbfc; }
+.mp-set h5.wide { grid-column: 1 / -1; margin: 10px 0 0; }

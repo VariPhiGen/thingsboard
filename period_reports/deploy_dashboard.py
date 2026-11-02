@@ -13,8 +13,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 BUNDLE_ALIAS, BUNDLE_TITLE = "virtuoso_reports", "Virtuoso Reports"
 DASHBOARD_TITLE = "Reports & Maintenance"
 LIBRARY_ASSET, LIBRARY_TYPE = "Maintenance Document Library", "Maintenance Library"
-API_URL = "https://n8n.variphi.com/reports-api/v1/period-reports"
-EQUIPMENT_TYPES = ["woodward_kg1500", "LT Panels Profile", "RO System Profile", "LT Panel Fire Profile"]
+SETTINGS_ASSET, SETTINGS_TYPE = "Maintenance Settings", "Maintenance Settings"
+SETTINGS_SEED = os.path.join(os.path.dirname(HERE), "cmms", "settings_seed.json")
 
 
 def read(name):
@@ -52,8 +52,44 @@ def widget_type(api, alias, name, wtype, css, js, size, default_config, descript
     return api.post("/api/widgetType", body)
 
 
+def ensure_settings(api):
+    """Asset 'Maintenance Settings' with cmms_settings; the seed file is written only when nothing is configured yet."""
+    asset = api.get("/api/tenant/assets", assetName=SETTINGS_ASSET)
+    if not asset:
+        asset = api.post("/api/asset", {"name": SETTINGS_ASSET, "type": SETTINGS_TYPE,
+                                        "label": "Maintenance and predictive-maintenance configuration"})
+    sid = asset["id"]["id"]
+    cur = api.get(f"/api/plugins/telemetry/ASSET/{sid}/values/attributes/SERVER_SCOPE", keys="cmms_settings") or []
+    if cur:
+        settings = json.loads(cur[0]["value"]) if isinstance(cur[0]["value"], str) else cur[0]["value"]
+        print("maintenance settings: existing configuration kept")
+    else:
+        settings = {k: v for k, v in json.load(open(SETTINGS_SEED)).items() if not k.startswith("_")}
+        api.post(f"/api/plugins/telemetry/ASSET/{sid}/attributes/SERVER_SCOPE",
+                 {"cmms_settings": json.dumps(settings), "cmms_settings_rev": 1})
+        print("maintenance settings: seeded from", SETTINGS_SEED)
+    return settings
+
+
+def report_api_url(api):
+    """PERIOD_REPORTS_API_URL, else the URL already configured in the live Equipment Reports widget."""
+    url = os.environ.get("PERIOD_REPORTS_API_URL")
+    if url:
+        return url
+    dash = next((d for d in api.get("/api/tenant/dashboards", pageSize=200, page=0)["data"] if d["title"] == DASHBOARD_TITLE), None)
+    if dash:
+        full = api.get(f"/api/dashboard/{dash['id']['id']}")
+        w = (full["configuration"].get("widgets") or {}).get("reports")
+        if w and (w["config"].get("settings") or {}).get("apiUrl"):
+            return w["config"]["settings"]["apiUrl"]
+    raise SystemExit("Set PERIOD_REPORTS_API_URL (URL of the period-report download API)")
+
+
 def main():
     api = Api()
+    settings = ensure_settings(api)
+    API_URL = report_api_url(api)
+    EQUIPMENT_TYPES = settings["equipment_profiles"]
     bundles = api.get("/api/widgetsBundles", pageSize=100, page=0) or {"data": []}
     bundle = next((b for b in bundles["data"] if b.get("alias") == BUNDLE_ALIAS), None)
     if not bundle:
@@ -82,7 +118,8 @@ def main():
     if not lib:
         lib = api.post("/api/asset", {"name": LIBRARY_ASSET, "type": LIBRARY_TYPE, "label": "Manuals, SOPs and checklists for all equipment"})
     print("document library asset:", lib["id"]["id"])
-    run_hours_key = [{"name": "run_hours", "type": "timeseries", "label": "Run Hours", "color": "#607d8b", "settings": {}}]
+    meter = settings["meter"]
+    run_hours_key = [{"name": meter["key"], "type": "timeseries", "label": meter["key"].replace("_", " ").title(), "color": "#607d8b", "settings": {}}]
     live_tw = {"realtime": {"realtimeType": 0, "interval": 1000, "timewindowMs": 60000}}
 
     alias_id = "reports-all-equipment"
@@ -92,8 +129,7 @@ def main():
     widgets = {
         "planner": {"typeFullFqn": f"tenant.{mp['fqn']}", "type": "latest", "sizeX": 24, "sizeY": 16, "row": 0, "col": 0,
                     "id": "planner",
-                    "config": dict(planner_cfg, datasources=[{"type": "entity", "name": "", "entityAliasId": alias_id,
-                                                              "dataKeys": run_hours_key}], timewindow=live_tw)},
+                    "config": dict(planner_cfg, datasources=[], timewindow=live_tw)},
         "reports": {"typeFullFqn": f"tenant.{rd['fqn']}", "type": "static", "sizeX": 9, "sizeY": 10, "row": 16,
                     "col": 0, "id": "reports", "config": report_cfg},
         "maintenance": {"typeFullFqn": f"tenant.{ml['fqn']}", "type": "latest", "sizeX": 15, "sizeY": 20, "row": 16,

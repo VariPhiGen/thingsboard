@@ -5,6 +5,34 @@ var assert = require('assert');
 var body = fs.readFileSync(path.join(__dirname, 'pm_compute.js'), 'utf8');
 var compute = new Function('msg', 'metadata', 'msgType', body);
 
+
+// ---- configuration as migrate_config.py writes it: seed template + values derived from the device baseline
+var SEED = JSON.parse(fs.readFileSync(path.join(__dirname, 'pm_seed.json'), 'utf8'));
+var MAP = {fuel_low_pct: 'fuel.low_pct', fuel_critical_pct: 'fuel.critical_pct', fuel_tank_capacity_l: 'fuel.tank_capacity_l',
+           required_autonomy_h: 'fuel.required_autonomy_h', service_interval_h: 'service.interval_h',
+           last_service_run_hours: 'service.last_service_run_hours', exercise_days: 'exercise.days', ignore_channels: 'ignore_channels',
+           rated_kw: 'load.rated_kw'};
+function setPath(o, p, v) { var a = p.split('.'); var c = o; for (var i = 0; i < a.length - 1; i++) { c = c[a[i]] = c[a[i]] || {}; } c[a[a.length - 1]] = v; }
+function buildCfg(type, overrides, baseline) {
+  var kind = SEED.profiles[type];
+  if (!kind) return {};
+  var lim = JSON.parse(JSON.stringify(SEED.kinds[kind]));
+  baseline = baseline || {};
+  if (kind === 'DG') {
+    var bm = baseline.battery_voltage && baseline.battery_voltage.median;
+    var D = SEED.derive, NV = D.nominal_voltage;
+    if (bm && bm <= D.battery_12v_if_median_at_or_below_v) { ['crit_v', 'warn_v', 'trend_floor_v', 'overcharge_v'].forEach(function (k) { lim.battery[k] = lim.battery[k] / 2; }); lim.battery.falling_v_per_h /= 2; }
+    var vm = baseline.voltage && baseline.voltage.median;
+    if (vm) lim.voltage.nominal_v = vm > NV.three_phase_if_median_above_v ? NV.three_phase_v : NV.single_phase_v;
+  }
+  if (kind === 'LT') {
+    Object.keys(baseline).forEach(function (k) { var m = /^(.+)_voltage$/.exec(k); var NV2 = SEED.derive.nominal_voltage; if (m && baseline[k].median) lim.nominal_v[m[1]] = baseline[k].median > NV2.three_phase_if_median_above_v ? NV2.three_phase_v : NV2.single_phase_v; });
+  }
+  if (kind === 'RO' && baseline.tds_ppm && baseline.tds_ppm.median) { var TW = SEED.derive.tds_warn; lim.tds.warn_ppm = Math.min(TW.max_ppm, Math.max(TW.min_ppm, baseline.tds_ppm.median * TW.factor_of_median)); }
+  Object.keys(overrides || {}).forEach(function (k) { setPath(lim, MAP[k] || k, overrides[k]); });
+  return {kind: kind, engine: JSON.parse(JSON.stringify(SEED.engine)), limits: lim};
+}
+
 var NOW = 1793520000000;
 var CUR = NOW;   // evaluation time of the current run; latest values are stamped relative to it
 function L(v, ageMin) { return JSON.stringify({ts: CUR - (ageMin || 0) * 60000, value: v}); }
@@ -14,7 +42,7 @@ function run(type, latest, opts) {
   for (var k in latest) md[k] = latest[k];
   if (opts.state) md.ss_pm_state = JSON.stringify(opts.state);
   if (opts.baseline) md.ss_pm_baseline = JSON.stringify(opts.baseline);
-  if (opts.config) md.ss_pm_config = JSON.stringify(opts.config);
+  md.ss_pm_config = JSON.stringify(opts.rawConfig !== undefined ? opts.rawConfig : buildCfg(type, opts.config, opts.baseline));
   return compute(opts.msg || {}, md, 'POST_TELEMETRY_REQUEST');
 }
 // Repeat runs carrying state forward (5 min apart)
@@ -58,6 +86,38 @@ t('DG standby healthy (sensors 32767 are not a fault)', function () {
   assert.strictEqual(r.msg.ai_status, 'ACTIVE');
   assert.strictEqual(r.msg.health_score, r.msg.pm_health_score);
   assert.strictEqual(r.metadata.pm_alarm, 'OK');
+  assert.ok(!/not configured/.test(r.msg.pm_issues), 'a fully configured DG reports no missing limits: ' + r.msg.pm_issues);
+});
+
+t('every check of every kind finds its limits in the seed configuration', function () {
+  var samples = {
+    woodward_kg1500: {dg_status: L('RUNNING'), engine_rpm: L(1500), coolant_temp: L(80), oil_pressure: L(400), battery_voltage: L(27.5),
+      fuel_level: L(70), fuel_level_pct: L(70), fuel_runtime_h: L(5), frequency: L(50), voltage: L(415), power_factor: L(0.9), power_kw: L(100),
+      common_alarm: L(0), run_hours: L(100), engine_starts: L(5)},
+    'LT Panels Profile': {A_voltage: L(415), A_current: L(100), A_power: L(60), A_frequency: L(50)},
+    'RO System Profile': {tds_ppm: L(60), temperature_c: L(30), ph: L(7.2), pressure: L(5), tds_online: L(true), flow_online: L(true)},
+    'LT Panel Fire Profile': {cylinder_pressure_1: JSON.stringify([{ts: NOW, value: '1'}]), relay_1_online: L(true)}
+  };
+  Object.keys(samples).forEach(function (type) {
+    var r = run(type, samples[type], {baseline: {voltage: {median: 415}, A_voltage: {median: 415}, tds_ppm: {median: 60}, pressure: {median: 5}}});
+    assert.ok(!/not configured/.test(r.msg.pm_issues), type + ': ' + r.msg.pm_issues);
+    assert.strictEqual(r.msg.pm_status, 'ACTIVE', type);
+  });
+});
+
+t('no configuration -> NOT CONFIGURED, nothing assumed; a missing limit skips only its check', function () {
+  var r = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(20)}, {rawConfig: {}});
+  assert.strictEqual(r.msg.pm_status, 'NOT CONFIGURED');
+  assert.strictEqual(r.metadata.pm_alarm, 'SKIP');
+  var cfg = buildCfg('woodward_kg1500', {});
+  delete cfg.limits.battery.crit_v; delete cfg.limits.battery.warn_v;
+  var r2 = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(20), fuel_level: L(80), run_hours: L(10)}, {rawConfig: cfg});
+  assert.ok(!/Battery 20 V on standby/.test(r2.msg.pm_issues), 'no battery check without its limits');
+  assert.ok(/Some checks are not configured: battery.crit_v, battery.warn_v/.test(r2.msg.pm_issues), r2.msg.pm_issues);
+  var cfg3 = buildCfg('woodward_kg1500', {});
+  cfg3.limits.battery.crit_v = 21;
+  var r3 = runN(2, 'woodward_kg1500', function () { return {dg_status: L('OFF'), battery_voltage: L(22), fuel_level: L(80), run_hours: L(10)}; }, {rawConfig: cfg3});
+  assert.ok(!/Battery 22 V on standby \(min/.test(r3.msg.pm_issues) && /Battery low on standby: 22 V/.test(r3.msg.pm_issues), 'edited limit is used: ' + r3.msg.pm_issues);
 });
 
 t('DG low battery needs 2 runs before CRITICAL is confirmed', function () {
@@ -75,7 +135,7 @@ t('DG running: coolant high + oil pressure low', function () {
   var r = runN(3, 'woodward_kg1500', function () {
     return {dg_status: L('RUNNING'), engine_rpm: L(1500), coolant_temp: L(97), oil_pressure: L(200),
       battery_voltage: L(27.5), fuel_level: L(70), frequency: L(50.1), voltage: L(238), run_hours: L(100)};
-  });
+  }, {baseline: {voltage: {median: 238}}});   // this DG's nominal output (230 V) comes from its own history
   assert.strictEqual(r.msg.pm_severity, 'WARNING');
   assert.ok(/Coolant high/.test(r.msg.pm_issues));
   assert.ok(/Oil pressure low/.test(r.msg.pm_issues));

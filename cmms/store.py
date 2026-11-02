@@ -13,10 +13,10 @@ import time
 
 log = logging.getLogger(__name__)
 
+# Data-model identifiers (schema names, not business values)
 PLAN_TYPE, WO_TYPE, LIBRARY_NAME, LIBRARY_TYPE = "Maintenance Plan", "Work Order", "Maintenance Document Library", "Maintenance Library"
+SETTINGS_NAME, SETTINGS_TYPE, SETTINGS_KEY = "Maintenance Settings", "Maintenance Settings", "cmms_settings"
 RELATION = "Maintenance"
-EQUIPMENT_TYPES = ["woodward_kg1500", "LT Panels Profile", "RO System Profile", "LT Panel Fire Profile"]
-DG_TYPE = "woodward_kg1500"
 
 WO_KEYS = ["wo_title", "wo_type", "wo_priority", "wo_status", "wo_source", "wo_plan_id", "wo_alarm_id", "wo_equipment_id",
            "wo_equipment_name", "wo_due_date", "wo_due_rh", "wo_interval_rh", "wo_assignee", "wo_created_ts",
@@ -121,8 +121,7 @@ class Store:
                                                  "to": {"entityType": "ASSET", "id": asset_id},
                                                  "type": RELATION, "typeGroup": "COMMON"})
 
-    def create_work_order(self, fields, detail):
-        year = time.strftime("%Y", time.gmtime(time.time() + 19800))
+    def create_work_order(self, fields, detail, year):
         asset = self._create_numbered(WO_TYPE, f"WO-{year}-", 5, fields["title"])
         aid = asset["id"]["id"]
         values = {"wo_" + k: v for k, v in fields.items()}
@@ -140,34 +139,62 @@ class Store:
         values = dict(values, wo_rev=int(cur or 0) + 1)
         self.save_attrs("ASSET", wo["id"], values)
 
-    # ------------------------------------------------------------------ equipment data
-    def equipment(self):
-        res = self._req("GET", "/api/tenant/deviceInfos", params={"pageSize": 500, "page": 0})
-        return [{"id": d["id"]["id"], "name": d["name"], "type": d["type"]} for d in res["data"] if d["type"] in EQUIPMENT_TYPES]
+    # ------------------------------------------------------------------ configuration
+    def _asset_id(self, name):
+        try:
+            res = self._req("GET", "/api/tenant/assets", params={"assetName": name})
+        except StoreError as exc:
+            if "HTTP 404" in str(exc):
+                return None
+            raise
+        return res["id"]["id"] if res else None
 
-    def run_hours(self, device_id):
-        """Latest valid run-hour reading (the controller sometimes sends 'error' or 32767)."""
+    def settings(self):
+        """Raw cmms_settings dict from the 'Maintenance Settings' asset, or None when it is not configured."""
+        sid = self._asset_id(SETTINGS_NAME)
+        return self.attrs("ASSET", sid, [SETTINGS_KEY]).get(SETTINGS_KEY) if sid else None
+
+    def library(self):
+        return self._asset_id(LIBRARY_NAME)
+
+    # ------------------------------------------------------------------ equipment data
+    def equipment(self, settings):
+        """Devices of the device profiles configured in the settings."""
+        out = []
+        for profile in settings.raw["equipment_profiles"]:
+            page = 0
+            while True:
+                res = self._req("GET", "/api/tenant/devices", params={"pageSize": 500, "page": page, "type": profile})
+                out += [{"id": d["id"]["id"], "name": d["name"], "type": d["type"]} for d in res.get("data", [])]
+                if not res.get("hasNext"):
+                    break
+                page += 1
+        return out
+
+    def meter_reading(self, device_id, settings):
+        """Latest valid reading of the configured meter key (e.g. run hours) in the last 3 days, or None.
+        Controllers sometimes send text ('error') or 'not available' codes; those are outside the configured valid range."""
         now = int(time.time() * 1000)
         res = self._req("GET", f"/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries",
-                        params={"keys": "run_hours", "startTs": now - 3 * 86400000, "endTs": now, "limit": 200,
+                        params={"keys": settings.meter_key, "startTs": now - 3 * 86400000, "endTs": now, "limit": 200,
                                 "agg": "NONE", "orderBy": "DESC"}) or {}
-        for p in res.get("run_hours", []):
+        for p in res.get(settings.meter_key, []):
             try:
                 v = float(p["value"])
             except (TypeError, ValueError):
                 continue
-            if 0 <= v < 30000:
+            if settings.valid_meter(v):
                 return round(v, 1)
         return None
 
-    def active_alarms(self, severity="CRITICAL"):
-        res = self._req("GET", "/api/v2/alarms", params={"pageSize": 500, "page": 0, "statusList": "ACTIVE",
-                                                          "severityList": severity})
-        return res.get("data", [])
-
-    def library(self):
-        res = self._req("GET", "/api/tenant/assets", params={"assetName": LIBRARY_NAME})
-        return res["id"]["id"] if res else None
+    def active_alarms(self):
+        out, page = [], 0
+        while True:
+            res = self._req("GET", "/api/v2/alarms", params={"pageSize": 500, "page": page, "statusList": "ACTIVE"})
+            out += res.get("data", [])
+            if not res.get("hasNext"):
+                return out
+            page += 1
 
     def documents(self, equipment):
         out = []

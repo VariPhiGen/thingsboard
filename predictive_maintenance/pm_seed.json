@@ -1,0 +1,88 @@
+{
+  "_note": "Initial predictive-maintenance configuration. migrate_config.py writes it ONCE into each device's server attribute pm_config (engine + limits; values already present on a device are kept) and stores this template on the asset 'Maintenance Settings' (attribute pm_templates) for new equipment. After that every value is edited on the dashboard (Maintenance Management > Settings). pm_compute.js / dg_fuel.js contain no thresholds. Values marked 'from_baseline' are derived per device from its own 7-day history during migration.",
+  "profiles": {"woodward_kg1500": "DG", "LT Panels Profile": "LT", "RO System Profile": "RO", "LT Panel Fire Profile": "FIRE"},
+  "derive": {
+    "_note": "Rules used once by migrate_config.py to set per-device values from the device's own history.",
+    "battery_12v_if_median_at_or_below_v": 18,
+    "nominal_voltage": {"three_phase_if_median_above_v": 300, "three_phase_v": 415, "single_phase_v": 230, "min_valid_v": 50, "history_days": 30},
+    "tds_warn": {"factor_of_median": 2, "min_ppm": 150, "max_ppm": 300}
+  },
+  "engine": {
+    "stale_minutes": 15,
+    "escalate_evals": 2,
+    "relax_evals": 3,
+    "penalty": {"CRITICAL": 45, "WARNING": 15, "INFO": 3},
+    "health_bands": {"ok_min": 80, "warning_min": 40},
+    "risk_max_pct": 99,
+    "invalid_codes": [32767, 65535],
+    "invalid_at_or_above": 30000,
+    "trend": {"reset_hours": 24, "slope_smoothing": 0.15, "min_interval_minutes": 1, "min_evals": 12, "slope_warmup_evals": 3},
+    "rul_max_days": 365,
+    "ai_summary_max_age_minutes": 40,
+    "timezone_offset_minutes": 330,
+    "max_issues": 12
+  },
+  "kinds": {
+    "DG": {
+      "keys": {"rpm": "engine_rpm", "status": "dg_status", "battery": "battery_voltage", "fuel_pct": "fuel_level_pct", "fuel_raw": "fuel_level",
+               "fuel_status": "fuel_status", "fuel_runtime": "fuel_runtime_h", "coolant": "coolant_temp", "oil": "oil_pressure",
+               "frequency": "frequency", "voltage": "voltage", "power_factor": "power_factor", "power": "power_kw",
+               "common_alarm": "common_alarm", "run_hours": "run_hours", "starts": "engine_starts"},
+      "running_status": "RUNNING",
+      "fuel_sensor_error_status": "SENSOR ERROR",
+      "valid": {"rpm": [0, 3000], "battery": [5, 40], "fuel": [0, 100], "fuel_runtime": [0, 100000], "coolant": [20, 130],
+                "oil": [0, 1000], "frequency": [1, 80], "voltage": [50, 600], "power_factor": [0, 1], "power": [0, 5000],
+                "common_alarm": [0, 29999], "run_hours": [0, 200000], "starts": [0, 1000000]},
+      "running_rpm": 300,
+      "battery": {"crit_v": 23.0, "warn_v": 24.4, "trend_floor_v": 24.0, "overcharge_v": 29.5, "_scale_from_baseline": "12 V systems (7-day median <= 18 V) use half of these values",
+                  "trend_alpha": 0.3, "falling_v_per_h": 0.01, "trend_min_evals": 24, "warn_within_h": 72},
+      "fuel": {"low_pct": 30, "critical_pct": 15, "full_pct": 99.95, "runtime_crit_h": 1.5, "runtime_warn_h": 4, "required_autonomy_h": null,
+               "sensor_error_penalty": 5, "tank_capacity_l": null, "drop_alarm_pct": 5, "refuel_detect_pct": 5,
+               "filter_window_min": 10, "filter_max_samples": 5, "sensor_timeout_min": 5, "spike_pct": 3, "spike_tolerance_pct": 1.5,
+               "spike_hold_stopped_min": 3, "spike_hold_running_min": 10, "full_scale_input": 100, "valid_input": [0, 110],
+               "burn_min_run_h": 0.1667, "burn_min_used_pct": 1, "burn_learn_min_h": 0.3333, "burn_learn_min_used_pct": 2,
+               "burn_learn_weight": 0.4, "settle_min": 10, "event_window_min": 60, "refuel_end_min": 10, "refuel_step_pct": 0.2, "drop_hold_min": 10},
+      "coolant": {"warn_c": 95, "crit_c": 103, "trend_alpha": 0.4, "predict_clamp": [-20, 150], "rul_min_evals": 3},
+      "oil": {"warn_kpa": 250, "crit_kpa": 150, "min_rpm": 1000},
+      "frequency": {"nominal_hz": 50, "warn_dev_hz": 1, "crit_dev_hz": 2},
+      "voltage": {"nominal_v": 415, "_from_baseline": "415 V when the 7-day median is above 300 V, else 230 V", "warn_pct": 8, "crit_pct": 12},
+      "power_factor": {"min": 0.8, "min_kw": 50},
+      "load": {"rated_kw": null, "warn_pct": 90, "crit_pct": 100},
+      "service": {"interval_h": 250, "last_service_run_hours": null, "overdue_crit_h": 100, "due_soon_h": 25, "due_soon_penalty": 2},
+      "exercise": {"days": 7, "min_run_increase_h": 0.1, "long_factor": 2, "penalty": 10, "long_penalty": 20},
+      "starts": {"max_per_day": 6}
+    },
+    "LT": {
+      "feeder_suffix": {"voltage": "_voltage", "current": "_current", "power": "_power", "frequency": "_frequency"},
+      "valid": {"voltage": [1, 1000], "current": [0, 100000], "power": [-100000, 100000], "frequency": [1, 100]},
+      "nominal_v": {}, "_nominal_from_baseline": "per feeder: 415 V when its 7-day median is above 300 V, else 230 V",
+      "rated_a": {},
+      "voltage": {"warn_pct": 7.5, "crit_pct": 10, "trend_alpha": 0.4},
+      "frequency": {"nominal_hz": 50, "warn_dev_hz": 0.6, "crit_dev_hz": 1, "trend_alpha": 0.4},
+      "current": {"trend_alpha": 0.3, "load_warn_pct": 90, "load_crit_pct": 100, "peak_factor": 1.3, "peak_min_a": 5, "peak_min_evals": 6},
+      "power_factor": {"min": 0.8, "min_current_a": 5, "min_share_of_peak": 0.1, "max_plausible": 1.05, "trend_alpha": 0.3, "min_evals": 3,
+                       "penalty": 10, "three_phase_above_v": 300},
+      "no_data_penalty": 2
+    },
+    "RO": {
+      "keys": {"tds": "tds_ppm", "temperature": "temperature_c", "ph": "ph", "pressure": "pressure", "tds_online": "tds_online", "flow_online": "flow_online"},
+      "valid": {"tds": [0, 5000], "temperature": [-5, 90], "ph": [0, 14], "pressure": [0, 100]},
+      "tds": {"warn_ppm": 204, "_warn_from_baseline": "2 x 7-day median, limited to 150..300 ppm", "crit_ppm": 500, "trend_alpha": 0.05,
+              "trend_days": 14, "trend_min_days": 3, "trend_min_samples_per_day": 48, "trend_min_r2": 0.5, "trend_min_ppm_per_day": 0.5,
+              "warn_within_days": 30, "trend_penalty": 10},
+      "temperature": {"warn_c": 38, "crit_c": 45},
+      "ph": {"warn_low": 6.5, "warn_high": 8.5, "crit_low": 6, "crit_high": 9},
+      "pressure": {"dev_pct": 25, "trend_alpha": 0.2},
+      "sensors_to_watch": {"ph": "pH sensor", "pressure": "Pressure sensor", "temperature": "Temperature sensor"},
+      "sensor_offline_penalty": 5
+    },
+    "FIRE": {
+      "channel_patterns": ["^cylinder_pressure_(\\d+)$", "^fire_suppression_(\\d+)_pressure$"],
+      "window_minutes": 15,
+      "flap_changes": 4,
+      "low_penalty_per_channel": 12, "flap_penalty_per_channel": 10, "max_penalty": 45,
+      "ignore_channels": [],
+      "relay_keys": ["relay_online", "relay_1_online", "relay_2_online"]
+    }
+  }
+}

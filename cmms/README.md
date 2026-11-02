@@ -4,6 +4,24 @@ Work orders, preventive maintenance plans, technical documents and maintenance K
 (DG sets, LT panels, RO plant, fire suppression). UI: widget **Maintenance Management** on the dashboard
 **Reports & Maintenance** (`period_reports/widgets/maintenance_planner.js`). Server side: `cmms/` (this package).
 
+## Configuration (nothing hardcoded)
+
+Every business value lives in ThingsBoard, on the asset **Maintenance Settings**, and is edited on the dashboard
+(**Maintenance Management > Settings**):
+
+- `cmms_settings` - equipment profiles in scope, meter key / unit / valid range, priorities with response days,
+  work-order types (planned, allowed in plans, failure codes required, restarts the PM service countdown), "due soon"
+  days, meter due window, failure codes, document categories, attachment categories, document expiry alert days, upload
+  limit, verification rule, condition-based alarm severities and type patterns, alert priorities, digest hour, KPI
+  periods, site time zone. `cmms_settings_rev` guards concurrent edits.
+- `pm_templates` - the predictive-maintenance template (`predictive_maintenance/pm_seed.json`) used to configure new
+  equipment.
+
+`cmms/settings_seed.json` is written once by `period_reports/deploy_dashboard.py` when no settings exist yet. The
+scheduler and the widget refuse to run with missing or incomplete settings instead of assuming values. Forms have no
+pre-filled values: the user enters every value (the due date of a manual work order is calculated from the configured
+response days of the chosen priority; the meter field shows the equipment's latest valid reading).
+
 ## Data model
 
 | Record | Stored as | Number |

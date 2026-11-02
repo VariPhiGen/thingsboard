@@ -1,18 +1,14 @@
 """CMMS domain rules: work-order lifecycle, PM due logic, KPIs (EN 13306 / ISO 14224 terminology).
 
-Kept free of I/O so the scheduler and the tests share one definition. The dashboard widget
-(period_reports/widgets/maintenance_planner.js) implements the same rules in JavaScript.
+No business values live here: priorities, SLA days, due windows, work-order types, failure codes, time zone, etc. come
+from the ThingsBoard configuration (asset "Maintenance Settings", attribute cmms_settings), wrapped by Settings below.
+Only the work-order lifecycle (states and allowed transitions) is defined in code, because it is the workflow itself.
+The dashboard widget (period_reports/widgets/maintenance_planner.js) implements the same rules in JavaScript.
 """
+import fnmatch
 from datetime import date, datetime, timedelta, timezone
 
-IST = timezone(timedelta(hours=5, minutes=30))
-
-# ----------------------------------------------------------------------------- vocabulary
-WO_TYPES = ["Preventive", "Inspection", "Corrective", "Statutory", "Calibration", "Condition-based"]
-PLANNED_TYPES = {"Preventive", "Inspection", "Statutory", "Calibration"}
-PRIORITIES = {"P1": "P1 - Emergency (24 h)", "P2": "P2 - Urgent (3 days)", "P3": "P3 - Normal (7 days)", "P4": "P4 - Low (30 days)"}
-PRIORITY_DAYS = {"P1": 1, "P2": 3, "P3": 7, "P4": 30}
-
+# ----------------------------------------------------------------------------- lifecycle (workflow definition)
 SCHEDULED, IN_PROGRESS, ON_HOLD, COMPLETED, CLOSED, CANCELLED = (
     "Scheduled", "In Progress", "On Hold", "Completed", "Closed", "Cancelled")
 OPEN = {SCHEDULED, IN_PROGRESS, ON_HOLD}          # work still to be done
@@ -26,33 +22,70 @@ TRANSITIONS = {
     CANCELLED: set(),
 }
 
-# Simplified ISO 14224 failure coding (failure mode / cause / maintenance action)
-FAILURE_PROBLEM = ["Fails to start", "Fails while running", "Overheating", "Abnormal noise / vibration", "Leakage",
-                   "Low output / performance", "Electrical fault", "Instrument / sensor fault", "Low pressure",
-                   "Structural damage", "Other"]
-FAILURE_CAUSE = ["Wear / ageing", "Lack of maintenance", "Contamination", "Operating error", "Design / installation",
-                 "Power supply", "Material defect", "External / environment", "Unknown"]
-FAILURE_ACTION = ["Replace", "Repair", "Adjust / calibrate", "Clean", "Refill / recharge", "Tighten / secure",
-                  "Settings / software change", "Temporary fix", "No fault found"]
+REQUIRED = ["timezone_offset_minutes", "equipment_profiles", "meter", "priorities", "wo_types", "due_soon_days",
+            "meter_due_window", "failure_codes", "doc_categories", "attachment_categories", "doc_expiry_alert_days",
+            "max_upload_mb", "verification", "condition_based", "alerts"]
+
+
+class SettingsError(ValueError):
+    pass
 
 
 class TransitionError(ValueError):
     pass
 
 
-def check_transition(current, target, wo=None, user=None):
+class Settings:
+    """Validated view of cmms_settings. Missing values raise SettingsError (nothing is assumed)."""
+
+    def __init__(self, raw):
+        if not isinstance(raw, dict):
+            raise SettingsError("Maintenance settings are not configured (asset 'Maintenance Settings', attribute cmms_settings)")
+        missing = [k for k in REQUIRED if raw.get(k) in (None, "", [], {})]
+        if missing:
+            raise SettingsError("Maintenance settings incomplete: " + ", ".join(missing))
+        self.raw = raw
+        self.tz = timezone(timedelta(minutes=int(raw["timezone_offset_minutes"])))
+        self.priorities = {p["code"]: p for p in raw["priorities"]}
+        self.types = {t["name"]: t for t in raw["wo_types"]}
+        self.planned_types = {n for n, t in self.types.items() if t.get("planned")}
+        self.corrective_types = {n for n, t in self.types.items() if t.get("failure_codes")}
+        self.meter_key = raw["meter"]["key"]
+        self.cbm = raw["condition_based"]
+        self.alerts = raw["alerts"]
+
+    def response_days(self, priority):
+        if priority not in self.priorities:
+            raise SettingsError(f"Priority {priority!r} is not configured")
+        return int(self.priorities[priority]["response_days"])
+
+    def meter_window(self, interval):
+        w = self.raw["meter_due_window"]
+        return max(float(w["min_units"]), float(interval or 0) * float(w["pct_of_interval"]) / 100.0)
+
+    def valid_meter(self, v):
+        m = self.raw["meter"]
+        return float(m["valid_min"]) <= v < float(m["valid_below"])
+
+    def cbm_alarm(self, alarm):
+        c = self.cbm
+        return bool(c.get("enabled")) and alarm.get("severity") in c.get("severities", []) and \
+            any(fnmatch.fnmatchcase(alarm.get("type") or "", pat) for pat in c.get("alarm_types", []))
+
+
+def check_transition(current, target, wo=None, user=None, settings=None):
     """Raise TransitionError when the lifecycle does not allow current -> target (or segregation is violated)."""
     if target not in TRANSITIONS.get(current, set()):
         raise TransitionError(f"A work order in status '{current}' cannot be moved to '{target}'")
-    if target == CLOSED and wo is not None:
+    if target == CLOSED and wo is not None and settings is not None and settings.raw["verification"].get("different_user"):
         done_by = ((wo.get("detail") or {}).get("completed_by") or {}).get("user")
         if done_by and user and done_by == user:
             raise TransitionError("The person who recorded the work cannot verify it; another user must verify and close")
 
 
 # ----------------------------------------------------------------------------- dates
-def today_ist(now=None):
-    return (now or datetime.now(IST)).astimezone(IST).date()
+def today_local(settings, now=None):
+    return (now or datetime.now(settings.tz)).astimezone(settings.tz).date()
 
 
 def parse_date(s):
@@ -63,15 +96,9 @@ def parse_date(s):
     return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
 
 
-def meter_window(interval_rh):
-    """Run-hours before the due point at which a meter-based job counts as due (10 % of the interval, min 10 h)."""
-    return max(10.0, float(interval_rh or 0) * 0.1)
-
-
 # ----------------------------------------------------------------------------- work-order due state
-def due_state(wo, run_hours=None, today=None):
+def due_state(wo, run_hours, today, settings):
     """'overdue' | 'due' | 'upcoming' | 'done' | 'closed' | 'unknown' for a work order."""
-    today = today or today_ist()
     status = wo.get("status")
     if status in (CLOSED, CANCELLED):
         return "closed"
@@ -84,37 +111,36 @@ def due_state(wo, run_hours=None, today=None):
         left = float(due_rh) - float(run_hours)
         if left < 0:
             return "overdue"
-        return "due" if left <= meter_window(wo.get("interval_rh") or 0) else "upcoming"
+        return "due" if left <= settings.meter_window(wo.get("interval_rh")) else "upcoming"
     due = parse_date(wo.get("due_date"))
     if not due:
         return "unknown"
     if due < today:
         return "overdue"
-    return "due" if (due - today).days <= 7 else "upcoming"
+    return "due" if (due - today).days <= int(settings.raw["due_soon_days"]) else "upcoming"
 
 
 # ----------------------------------------------------------------------------- plans
-def plan_generation_due(plan, run_hours=None, today=None):
+def plan_generation_due(plan, run_hours, today, settings):
     """True when the plan's next occurrence is inside its lead time (a work order should exist for it)."""
-    if not plan.get("active", True):
+    if plan.get("active") is False:
         return False
-    today = today or today_ist()
     if plan.get("strategy") == "meter":
         nxt = plan.get("next_due_rh")
         if nxt in (None, "") or run_hours is None:
             return False
-        return float(run_hours) >= float(nxt) - meter_window(plan.get("interval_rh"))
+        return float(run_hours) >= float(nxt) - settings.meter_window(plan.get("interval_rh"))
     nxt = parse_date(plan.get("next_due_date"))
-    if not nxt:
+    if not nxt or plan.get("lead_days") in (None, ""):
         return False
-    return (nxt - today).days <= int(plan.get("lead_days") or 7)
+    return (nxt - today).days <= int(plan["lead_days"])
 
 
 def next_due_after_completion(plan, done_date, done_rh=None):
-    """Plan fields to update after a work order of the plan is completed (time: from work date; meter: from run hours)."""
+    """Plan fields to update after a work order of the plan is completed (time: from work date; meter: from reading)."""
     if plan.get("strategy") == "meter":
         if done_rh is None:
-            raise ValueError("Run hours at completion are required for a run-hours plan")
+            raise ValueError("The meter reading at completion is required for a meter-based plan")
         return {"next_due_rh": round(float(done_rh) + float(plan["interval_rh"]), 1)}
     days = int(plan.get("interval_days") or 0)
     if days <= 0:
@@ -131,46 +157,42 @@ def next_due_after_skip(plan, wo):
     days = int(plan.get("interval_days") or 0)
     if days <= 0:
         return {"active": False}
-    base = parse_date(wo.get("due_date")) or parse_date(plan.get("next_due_date")) or today_ist()
+    base = parse_date(wo.get("due_date")) or parse_date(plan.get("next_due_date"))
     return {"next_due_date": (base + timedelta(days=days)).isoformat()}
 
 
-def due_date_for_priority(priority, created=None):
-    return ((created or today_ist()) + timedelta(days=PRIORITY_DAYS.get(priority, 7))).isoformat()
+def due_date_for_priority(priority, created, settings):
+    return (created + timedelta(days=settings.response_days(priority))).isoformat()
 
 
 # ----------------------------------------------------------------------------- KPIs
-def _day(ts_ms):
-    return datetime.fromtimestamp(ts_ms / 1000, IST).date() if ts_ms else None
-
-
-def kpis(work_orders, start, end, today=None, run_hours=None):
-    """SMRP-style KPIs over [start, end] (dates, inclusive).
+def kpis(work_orders, start, end, today, settings, run_hours=None):
+    """SMRP-style KPIs over [start, end] (dates, inclusive); None where there is no data.
 
     pm_compliance_pct  planned WOs due in the period that were completed on or before their due date
     backlog / overdue  open WOs now
-    mttr_h             mean time to complete corrective WOs (created -> completed) completed in the period
+    mttr_h             mean time to complete corrective WOs (raised -> completed) completed in the period
     planned_pct        share of planned work among WOs completed in the period
     """
-    today = today or today_ist()
     run_hours = run_hours or {}
-    due_in, on_time = 0, 0
-    done = []
+
+    def day(ts):
+        return datetime.fromtimestamp(ts / 1000, settings.tz).date() if ts else None
+    due_in, on_time, done = 0, 0, []
     for w in work_orders:
         if w.get("status") == CANCELLED:
             continue
-        due = parse_date(w.get("due_date"))
-        completed = _day(w.get("completed_ts"))
-        if w.get("type") in PLANNED_TYPES and due and start <= due <= end:
+        due, completed = parse_date(w.get("due_date")), day(w.get("completed_ts"))
+        if w.get("type") in settings.planned_types and due and start <= due <= end:
             due_in += 1
             if completed and completed <= due:
                 on_time += 1
         if completed and start <= completed <= end:
             done.append(w)
-    corrective = [w for w in done if w.get("type") in ("Corrective", "Condition-based")]
+    corrective = [w for w in done if w.get("type") in settings.corrective_types]
     mttr = [(w["completed_ts"] - w["created_ts"]) / 3600000 for w in corrective if w.get("created_ts") and w.get("completed_ts")]
     open_wos = [w for w in work_orders if w.get("status") in OPEN]
-    overdue = [w for w in open_wos if due_state(w, run_hours.get(w.get("equipment_id")), today) == "overdue"]
+    overdue = [w for w in open_wos if due_state(w, run_hours.get(w.get("equipment_id")), today, settings) == "overdue"]
     labour = sum(float((w.get("detail") or {}).get("labour_hours") or 0) for w in done)
     cost = sum(float((w.get("detail") or {}).get("cost_total") or 0) for w in done)
     return {

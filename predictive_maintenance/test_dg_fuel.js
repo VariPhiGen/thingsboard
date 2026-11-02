@@ -18,6 +18,34 @@ t('script passes the Nashorn braces check', function () {
   assert.deepStrictEqual(bad, []);
 });
 
+
+// ---- configuration as migrate_config.py writes it: seed template + values derived from the device baseline
+var SEED = JSON.parse(fs.readFileSync(path.join(__dirname, 'pm_seed.json'), 'utf8'));
+var MAP = {fuel_low_pct: 'fuel.low_pct', fuel_critical_pct: 'fuel.critical_pct', fuel_tank_capacity_l: 'fuel.tank_capacity_l',
+           required_autonomy_h: 'fuel.required_autonomy_h', service_interval_h: 'service.interval_h',
+           last_service_run_hours: 'service.last_service_run_hours', exercise_days: 'exercise.days', ignore_channels: 'ignore_channels',
+           rated_kw: 'load.rated_kw'};
+function setPath(o, p, v) { var a = p.split('.'); var c = o; for (var i = 0; i < a.length - 1; i++) { c = c[a[i]] = c[a[i]] || {}; } c[a[a.length - 1]] = v; }
+function buildCfg(type, overrides, baseline) {
+  var kind = SEED.profiles[type];
+  if (!kind) return {};
+  var lim = JSON.parse(JSON.stringify(SEED.kinds[kind]));
+  baseline = baseline || {};
+  if (kind === 'DG') {
+    var bm = baseline.battery_voltage && baseline.battery_voltage.median;
+    var D = SEED.derive, NV = D.nominal_voltage;
+    if (bm && bm <= D.battery_12v_if_median_at_or_below_v) { ['crit_v', 'warn_v', 'trend_floor_v', 'overcharge_v'].forEach(function (k) { lim.battery[k] = lim.battery[k] / 2; }); lim.battery.falling_v_per_h /= 2; }
+    var vm = baseline.voltage && baseline.voltage.median;
+    if (vm) lim.voltage.nominal_v = vm > NV.three_phase_if_median_above_v ? NV.three_phase_v : NV.single_phase_v;
+  }
+  if (kind === 'LT') {
+    Object.keys(baseline).forEach(function (k) { var m = /^(.+)_voltage$/.exec(k); var NV2 = SEED.derive.nominal_voltage; if (m && baseline[k].median) lim.nominal_v[m[1]] = baseline[k].median > NV2.three_phase_if_median_above_v ? NV2.three_phase_v : NV2.single_phase_v; });
+  }
+  if (kind === 'RO' && baseline.tds_ppm && baseline.tds_ppm.median) { var TW = SEED.derive.tds_warn; lim.tds.warn_ppm = Math.min(TW.max_ppm, Math.max(TW.min_ppm, baseline.tds_ppm.median * TW.factor_of_median)); }
+  Object.keys(overrides || {}).forEach(function (k) { setPath(lim, MAP[k] || k, overrides[k]); });
+  return {kind: kind, engine: JSON.parse(JSON.stringify(SEED.engine)), limits: lim};
+}
+
 var T0 = 1793520000000;
 // Feeds a sequence of [minute, fuel_level, running] samples, carrying state forward. Returns all results.
 function feed(samples, opts) {
@@ -27,7 +55,7 @@ function feed(samples, opts) {
     var s = samples[i];
     var md = {ts: '' + (T0 + s[0] * 60000), deviceName: 'DG Test', ss_fuel_state: state,
       dg_status: s[2] ? 'RUNNING' : 'OFF', engine_rpm: s[2] ? '1500' : '32767'};
-    if (opts.config) md.ss_pm_config = JSON.stringify(opts.config);
+    md.ss_pm_config = JSON.stringify(opts.rawConfig !== undefined ? opts.rawConfig : buildCfg('woodward_kg1500', opts.config));
     var r = fuel({fuel_level: s[1]}, md, 'POST_TELEMETRY_REQUEST');
     state = r.metadata.fuel_state_out;
     res.push(r);

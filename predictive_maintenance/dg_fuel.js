@@ -1,11 +1,12 @@
-// DG fuel processing (body of the "DG Fuel" transform node). Runs on every DG message carrying fuel_level.
+// DG fuel processing (body of the "DG Fuel" transform node). Runs on every DG message carrying the raw fuel level.
 // Inputs:
-//   msg.fuel_level                 raw controller value (% of the sensor's calibrated span, or 'error')
-//   metadata.dg_status / engine_rpm  latest run state
+//   msg.<keys.fuel_raw>            raw controller value (% of the sensor's calibrated span, or 'error')
+//   metadata.<keys.status/rpm>     latest run state
 //   metadata.ss_fuel_state         filter buffer, learned burn rate, refuel/drop tracking (server attribute)
-//   metadata.ss_pm_config          fuel_tank_capacity_l, fuel_low_pct, fuel_critical_pct, fuel_drop_alarm_pct,
-//                                  fuel_refuel_detect_pct
-// Output msg: fuel_* telemetry shown on the DG dashboards. The raw fuel_level is left untouched.
+//   metadata.ss_pm_config          engine (invalid codes) and limits: keys, valid ranges, running_status/rpm and
+//                                  limits.fuel (thresholds, filter and event-detection parameters, tank capacity)
+// No parameter is defined in this script; without the configuration the node reports fuel_status NOT CONFIGURED.
+// Output msg: fuel_* telemetry shown on the DG dashboards. The raw fuel level is left untouched.
 // Output metadata: fuel_state_out (saved back), fuel_alarm (DROP | CLEAR_DROP | NONE), fuel_alarm_message.
 // Written in ES5 with braces on every block: the Nashorn sandbox rejects the words f-o-r, w-h-i-l-e and d-o
 // in strings and comments, so texts avoid them (test_dg_fuel.js enforces this).
@@ -19,42 +20,66 @@ function parseJson(s, d) {
   if (typeof s === 'object') return s;
   try { return JSON.parse(s); } catch (e) { return d; }
 }
+var S = parseJson(metadata.ss_fuel_state, {});
+var CFG = parseJson(metadata.ss_pm_config, {});
+var E = CFG.engine || {};
+var L = CFG.limits || {};
+var K = L.keys || {};
+var F = L.fuel || {};
+var REQ = ['low_pct', 'critical_pct', 'full_pct', 'drop_alarm_pct', 'refuel_detect_pct', 'filter_window_min', 'filter_max_samples',
+           'sensor_timeout_min', 'spike_pct', 'spike_tolerance_pct', 'spike_hold_stopped_min', 'spike_hold_running_min',
+           'full_scale_input', 'valid_input', 'burn_min_run_h', 'burn_min_used_pct', 'burn_learn_min_h', 'burn_learn_min_used_pct',
+           'burn_learn_weight', 'settle_min', 'event_window_min', 'refuel_end_min', 'refuel_step_pct', 'drop_hold_min'];
+var miss = [];
+for (var qi = 0; qi < REQ.length; qi++) {
+  if (F[REQ[qi]] === undefined || F[REQ[qi]] === null || F[REQ[qi]] === '') miss.push('fuel.' + REQ[qi]);
+}
+if (!E.invalid_codes || E.invalid_at_or_above === undefined) miss.push('engine.invalid_codes');
+if (!K.fuel_raw || !K.status || !K.rpm || !L.valid || !L.valid.rpm || L.running_rpm === undefined || !L.running_status) miss.push('keys / running state');
+if (miss.length) {
+  metadata.fuel_state_out = JSON.stringify(S);
+  metadata.fuel_alarm = 'NONE';
+  metadata.fuel_alarm_message = '';
+  return {msg: {fuel_status: 'NOT CONFIGURED', fuel_sensor_ok: false, fuel_config_missing: miss.join(', ')}, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};
+}
+
 function num(v, lo, hi) {
   if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
   var n = Number(v);
-  if (!isFinite(n) || n === 32767 || n === 65535 || n >= 30000) return null;
+  if (!isFinite(n) || E.invalid_codes.indexOf(n) >= 0 || n >= Number(E.invalid_at_or_above)) return null;
   if (n < lo || n > hi) return null;
   return n;
 }
 function r1(x) { return Math.round(x * 10) / 10; }
 function r2(x) { return Math.round(x * 100) / 100; }
+function meta(k) {
+  var m = metadata[k];
+  var o = parseJson(m, null);
+  return o && typeof o === 'object' && o.value !== undefined ? o.value : m;
+}
 
-var S = parseJson(metadata.ss_fuel_state, {});
-var CFG = parseJson(metadata.ss_pm_config, {});
-var cap = Number(CFG.fuel_tank_capacity_l) || 0;
-var LOW = Number(CFG.fuel_low_pct) || 30;
-var CRIT = Number(CFG.fuel_critical_pct) || 15;
-var DROP_PCT = Number(CFG.fuel_drop_alarm_pct) || 5;
-var REFUEL_PCT = Number(CFG.fuel_refuel_detect_pct) || 5;
-var FULL = 99.95;
+var cap = Number(F.tank_capacity_l) || 0;
+var LOW = Number(F.low_pct), CRIT = Number(F.critical_pct), FULL = Number(F.full_pct);
+var DROP_PCT = Number(F.drop_alarm_pct), REFUEL_PCT = Number(F.refuel_detect_pct);
+var WIN = Number(F.filter_window_min) * MIN, EVT = Number(F.event_window_min) * MIN;
 if (!S.buf) S.buf = [];
 
 // ---------- run state ----------
-var rpm = num(msg.engine_rpm !== undefined ? msg.engine_rpm : metadata.engine_rpm, 0, 3000);
-var status = msg.dg_status || metadata.dg_status;
-var running = status === 'RUNNING' || (rpm !== null && rpm > 300);
+var rpm = num(msg[K.rpm] !== undefined ? msg[K.rpm] : meta(K.rpm), Number(L.valid.rpm[0]), Number(L.valid.rpm[1]));
+var status = msg[K.status] || meta(K.status);
+var running = status === L.running_status || (rpm !== null && rpm > Number(L.running_rpm));
 
-// ---------- filter: median of the valid readings of the last 10 min (max 5) ----------
-var raw = num(msg.fuel_level, 0, 110);
+// ---------- filter: median of the valid readings of the filter window ----------
+var raw = num(msg[K.fuel_raw], Number(F.valid_input[0]), Number(F.valid_input[1]));
 if (raw !== null) {
-  raw = Math.min(raw, 100);
+  raw = Math.min(raw, Number(F.full_scale_input));
   S.lastValidTs = NOW;
   // Spike rejection: the level cannot jump up quickly (a stopped DG is refuelled gradually, a running DG
-  // only consumes). Some senders read full scale (100) on a loose contact. An upward jump of more than 3%
-  // is held back until it has persisted 3 min (stopped) / 10 min (running).
-  if (S.level !== undefined && raw - S.level > 3) {
-    if (!S.pending || Math.abs(raw - S.pending.v) > 1.5) S.pending = {v: raw, since: NOW};
-    var hold = running ? 10 * MIN : 3 * MIN;
+  // only consumes). Some senders read full scale on a loose contact. An upward jump larger than spike_pct
+  // is held back until it has persisted the configured hold time (stopped / running).
+  if (S.level !== undefined && raw - S.level > Number(F.spike_pct)) {
+    if (!S.pending || Math.abs(raw - S.pending.v) > Number(F.spike_tolerance_pct)) S.pending = {v: raw, since: NOW};
+    var hold = (running ? Number(F.spike_hold_running_min) : Number(F.spike_hold_stopped_min)) * MIN;
     if (NOW - S.pending.since >= hold) {
       S.buf = [[NOW, raw]];
       S.pending = null;
@@ -68,13 +93,13 @@ if (raw !== null) {
 }
 var keep = [];
 for (var i = 0; i < S.buf.length; i++) {
-  if (NOW - S.buf[i][0] <= 10 * MIN) keep.push(S.buf[i]);
+  if (NOW - S.buf[i][0] <= WIN) keep.push(S.buf[i]);
 }
-S.buf = keep.slice(-5);
+S.buf = keep.slice(-Number(F.filter_max_samples));
 
 var out = {};
 var alarm = 'NONE', alarmMsg = '';
-var sensorOk = S.lastValidTs && NOW - S.lastValidTs <= 5 * MIN;
+var sensorOk = S.lastValidTs && NOW - S.lastValidTs <= Number(F.sensor_timeout_min) * MIN;
 
 if (!S.buf.length || !sensorOk) {
   out.fuel_sensor_ok = false;
@@ -96,7 +121,7 @@ if (!S.buf.length || !sensorOk) {
     if (!S.run || (S.run.capped && !full)) S.run = {t0: NOW, l0: level, capped: full};
     var elH = (NOW - S.run.t0) / HOUR;
     var used = S.run.l0 - level;
-    if (!S.run.capped && elH >= 1 / 6 && used >= 1) curBurn = used / elH;
+    if (!S.run.capped && elH >= Number(F.burn_min_run_h) && used >= Number(F.burn_min_used_pct)) curBurn = used / elH;
     S.refuel = null;
     S.dropCand = null;
     S.base = {v: level, ts: NOW};
@@ -105,9 +130,9 @@ if (!S.buf.length || !sensorOk) {
     if (S.run) {
       var eh = (NOW - S.run.t0) / HOUR;
       var u = S.run.l0 - level;
-      if (!S.run.capped && eh >= 1 / 3 && u >= 2) {
-        var rate = u / eh;
-        S.burn = S.burn ? r2(0.6 * S.burn + 0.4 * rate) : r2(rate);
+      if (!S.run.capped && eh >= Number(F.burn_learn_min_h) && u >= Number(F.burn_learn_min_used_pct)) {
+        var rate = u / eh, wgt = Number(F.burn_learn_weight);
+        S.burn = S.burn ? r2((1 - wgt) * S.burn + wgt * rate) : r2(rate);
         S.burnN = (S.burnN || 0) + 1;
         S.burnTs = NOW;
       }
@@ -115,24 +140,24 @@ if (!S.buf.length || !sensorOk) {
       S.base = {v: level, ts: NOW};
       S.high = {v: level, ts: NOW};
     }
-    var settled = !S.lastRunTs || NOW - S.lastRunTs > 10 * MIN;
+    var settled = !S.lastRunTs || NOW - S.lastRunTs > Number(F.settle_min) * MIN;
     if (!settled) {
       // The level settles in the first minutes after a stop: re-anchor instead of reporting an event
       S.base = {v: level, ts: NOW};
       S.high = {v: level, ts: NOW};
     }
-    if (!S.base || level < S.base.v || NOW - S.base.ts > HOUR) S.base = {v: level, ts: NOW};
-    if (!S.high || level > S.high.v || NOW - S.high.ts > HOUR) S.high = {v: level, ts: NOW};
+    if (!S.base || level < S.base.v || NOW - S.base.ts > EVT) S.base = {v: level, ts: NOW};
+    if (!S.high || level > S.high.v || NOW - S.high.ts > EVT) S.high = {v: level, ts: NOW};
 
-    // Refuel / drop events only once the engine has been stopped 10 min
+    // Refuel / drop events only once the engine has been stopped the settle time
     if (settled) {
       if (!S.refuel && level - S.base.v >= REFUEL_PCT) {
         S.refuel = {start: S.base.ts, from: S.base.v, to: level, last: NOW};
-      } else if (S.refuel && level > S.refuel.to + 0.2) {
+      } else if (S.refuel && level > S.refuel.to + Number(F.refuel_step_pct)) {
         S.refuel.to = level;
         S.refuel.last = NOW;
       }
-      if (S.refuel && NOW - S.refuel.last > 10 * MIN) {
+      if (S.refuel && NOW - S.refuel.last > Number(F.refuel_end_min) * MIN) {
         var added = S.refuel.to - S.refuel.from;
         S.lastRefuel = {ts: S.refuel.last, from: r1(S.refuel.from), to: r1(S.refuel.to), pct: r1(added), full: S.refuel.to >= FULL};
         out.fuel_event = 'Refuel ' + (S.lastRefuel.full ? '>= +' : '+') + r1(added) + '% (' + r1(S.refuel.from) + '% to ' + (S.lastRefuel.full ? 'FULL' : r1(S.refuel.to) + '%') + ')';
@@ -145,18 +170,18 @@ if (!S.buf.length || !sensorOk) {
         S.base = {v: level, ts: NOW};
         S.high = {v: level, ts: NOW};
       }
-      // A drop must hold 10 min with the DG still stopped (a start or a sensor recovering is not a drop)
+      // A drop must hold the configured time with the DG still stopped (a start or a sensor recovering is not a drop)
       if (!S.refuel && !S.dropActive && !S.dropCand && S.high.v - level >= DROP_PCT) {
         S.dropCand = {ts: NOW, from: S.high.v};
       }
       if (S.dropCand && S.dropCand.from - level < DROP_PCT) S.dropCand = null;
-      if (S.dropCand && NOW - S.dropCand.ts >= 10 * MIN) {
+      if (S.dropCand && NOW - S.dropCand.ts >= Number(F.drop_hold_min) * MIN) {
         var dropped = S.dropCand.from - level;
         S.dropActive = {ts: NOW, from: r1(S.dropCand.from), to: r1(level)};
         out.fuel_event = 'Fuel drop -' + r1(dropped) + '% with DG stopped (' + r1(S.dropCand.from) + '% to ' + r1(level) + '%)';
         alarm = 'DROP';
         alarmMsg = metadata.deviceName + ': fuel dropped ' + r1(dropped) + '% (' + r1(S.dropCand.from) + '% to ' + r1(level) +
-          '%) with the DG stopped and has stayed low 10 min. Possible leak or unauthorised draw.' + (cap ? ' About ' + Math.round(dropped * cap / 100) + ' L.' : '');
+          '%) with the DG stopped and has stayed low ' + F.drop_hold_min + ' min. Possible leak or unauthorised draw.' + (cap ? ' About ' + Math.round(dropped * cap / 100) + ' L.' : '');
         S.dropCand = null;
       }
     }

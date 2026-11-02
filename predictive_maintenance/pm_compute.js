@@ -2,10 +2,15 @@
 // Runs every 5 min per device (after dedup). Inputs:
 //   msg                      latest telemetry message of the device (partial payloads are fine)
 //   metadata.<key>           latest value of every relevant key as '{"ts":..,"value":..}'
-//   metadata.<key> (FIRE)    pressure channels: JSON array of the last 15 min of values
+//   metadata.<key> (FIRE)    pressure channels: JSON array of the recent values
 //   metadata.ss_pm_state     engine state (EWMA trends, hysteresis, counters) from the previous run
 //   metadata.ss_pm_baseline  per-key statistics from history (written by deploy_pm.py)
-//   metadata.ss_pm_config    per-device settings, editable in ThingsBoard (server attribute pm_config)
+//   metadata.ss_pm_config    per-device configuration (server attribute pm_config):
+//                              kind    DG | LT | RO | FIRE
+//                              engine  scoring, hysteresis, staleness, invalid codes, time zone
+//                              limits  telemetry keys, valid ranges and every threshold of the checks
+// No threshold is defined in this script: a limit that is not configured skips its check and is reported as an
+// INFO item; without engine/limits the device is reported as NOT CONFIGURED.
 // Output msg: pm_* telemetry (plus the legacy DG keys used by the DG dashboards).
 // Output metadata: pm_state_out (saved back as server attribute), pm_alarm (CRITICAL|WARNING|OK|SKIP)
 // and the alarm/LLM fields.
@@ -15,10 +20,8 @@
 
 var NOW = Number(metadata.ts);
 if (!isFinite(NOW) || NOW <= 0) NOW = Date.now();
-var STALE_MS = 15 * 60 * 1000;
 var HOUR = 3600000;
-var ESCALATE_EVALS = 2;   // raw severity must hold this many runs (~10 min) before it is confirmed upwards
-var RELAX_EVALS = 3;      // ... and this many runs (~15 min) before it is confirmed downwards
+var DAY = 24 * HOUR;
 
 function parseJson(s, d) {
   if (s === null || s === undefined || s === '') return d;
@@ -28,12 +31,100 @@ function parseJson(s, d) {
 var S = parseJson(metadata.ss_pm_state, {});
 var BASE = parseJson(metadata.ss_pm_baseline, {});
 var CFG = parseJson(metadata.ss_pm_config, {});
+var E = CFG.engine || null;
+var L = CFG.limits || null;
+var kind = CFG.kind || '';
 if (!S.m) S.m = {};
 if (!S.sev) S.sev = {confirmed: 'OK', cand: 'OK', n: 0};
+var name = metadata.deviceName || 'Device';
+var out = {};
+
+// ---------- configuration access ----------
+var missing = [];
+function path(obj, p) {
+  var parts = p.split('.');
+  var cur = obj;
+  for (var i = 0; i < parts.length; i++) {
+    if (cur === null || cur === undefined || typeof cur !== 'object') return undefined;
+    cur = cur[parts[i]];
+  }
+  return cur;
+}
+// Configured value (any type) or undefined; a missing value is recorded once.
+function cfgv(p) {
+  var v = path(L, p);
+  if (v === undefined || v === null || v === '') {
+    if (missing.indexOf(p) < 0) missing.push(p);
+    return undefined;
+  }
+  return v;
+}
+// Configured number or null (recorded as missing).
+function lim(p) {
+  var v = cfgv(p);
+  if (v === undefined) return null;
+  var n = Number(v);
+  if (!isFinite(n)) {
+    if (missing.indexOf(p) < 0) missing.push(p);
+    return null;
+  }
+  return n;
+}
+// Optional number (not an error when absent, e.g. the rated kW of a DG).
+function opt(p) {
+  var v = path(L, p);
+  if (v === undefined || v === null || v === '') return null;
+  var n = Number(v);
+  return isFinite(n) ? n : null;
+}
+var ENGINE_KEYS = ['stale_minutes', 'escalate_evals', 'relax_evals', 'penalty.CRITICAL', 'penalty.WARNING', 'penalty.INFO',
+                   'health_bands.ok_min', 'health_bands.warning_min', 'risk_max_pct', 'invalid_codes', 'invalid_at_or_above',
+                   'trend.reset_hours', 'trend.slope_smoothing', 'trend.min_interval_minutes', 'trend.min_evals',
+                   'trend.slope_warmup_evals', 'rul_max_days', 'ai_summary_max_age_minutes', 'timezone_offset_minutes', 'max_issues'];
+var engineMissing = [];
+if (E) {
+  for (var ek = 0; ek < ENGINE_KEYS.length; ek++) {
+    var evv = path(E, ENGINE_KEYS[ek]);
+    if (evv === undefined || evv === null || evv === '') engineMissing.push('engine.' + ENGINE_KEYS[ek]);
+  }
+}
+var configured = !!(E && L && kind) && !engineMissing.length;
+
+if (!configured) {
+  var why = !kind ? 'equipment kind' : (!E ? 'engine settings' : (!L ? 'limits' : engineMissing.join(', ')));
+  out.pm_status = 'NOT CONFIGURED';
+  out.pm_mode = kind || 'UNKNOWN';
+  out.pm_severity = 'NO DATA';
+  out.pm_severity_raw = 'NO DATA';
+  out.pm_health_score = '--';
+  out.pm_risk_pct = '--';
+  out.pm_rul_days = '--';
+  out.pm_issue_count = 0;
+  out.pm_top_issue = 'None';
+  out.pm_data_quality_pct = '--';
+  out.pm_issues = JSON.stringify([{sev: 'INFO', text: 'Predictive maintenance is not configured (' + why + ')',
+    action: 'Configure this equipment in Maintenance Management > Settings > Predictive maintenance.'}]);
+  out.pm_summary = out.pm_summary_auto = name + ': predictive maintenance is not configured (' + why + ').';
+  out.pm_recommendation = out.pm_recommendation_auto = 'Configure this equipment in Maintenance Management > Settings > Predictive maintenance.';
+  out.pm_summary_source = 'rules';
+  metadata.pm_state_out = JSON.stringify(S);
+  metadata.pm_alarm = 'SKIP';
+  metadata.pm_alarm_message = out.pm_summary;
+  metadata.pm_alarm_action = out.pm_recommendation;
+  metadata.pm_health = '--';
+  metadata.pm_risk = '--';
+  return {msg: out, metadata: metadata, msgType: 'POST_TELEMETRY_REQUEST'};
+}
+
+var STALE_MS = Number(E.stale_minutes) * 60000;
+var TZ_MS = Number(E.timezone_offset_minutes) * 60000;
+var INVALID = E.invalid_codes;
+var INVALID_MIN = Number(E.invalid_at_or_above);
 
 // ---------- value access ----------
 // Returns {v, ts} of the newest known value of key (message first, then fetched latest), or null.
 function raw(key) {
+  if (!key) return null;
   if (msg && msg[key] !== undefined && msg[key] !== null) return {v: msg[key], ts: NOW};
   var m = metadata[key];
   if (m === undefined || m === null || m === '') return null;
@@ -46,74 +137,78 @@ function fresh(key) {
   if (!r || NOW - r.ts > STALE_MS) return null;
   return r;
 }
-// Numeric reading that is fresh and not a controller "not available" code / out-of-range.
-function num(key, lo, hi) {
-  var r = fresh(key);
+function key(name) { return cfgv('keys.' + name); }
+// Numeric reading that is fresh, not a controller "not available" code and inside the configured valid range.
+function numKey(k, rangePath) {
+  var rg = cfgv(rangePath);
+  if (!rg || !(rg instanceof Array) || rg.length !== 2) return null;
+  var r = fresh(k);
   if (!r) return null;
   var v = r.v;
   if (v === null || v === '' || typeof v === 'boolean') return null;
   var n = Number(v);
-  if (!isFinite(n) || n === 32767 || n === 65535 || n >= 30000) return null;
-  if (lo !== undefined && n < lo) return null;
-  if (hi !== undefined && n > hi) return null;
+  if (!isFinite(n) || INVALID.indexOf(n) >= 0 || n >= INVALID_MIN) return null;
+  if (n < Number(rg[0]) || n > Number(rg[1])) return null;
   return n;
 }
-function bool(key) {
-  var r = fresh(key);
+function num(name) { return numKey(key(name), 'valid.' + name); }
+function bool(k) {
+  var r = fresh(k);
   if (!r) return null;
   var v = r.v;
   if (v === true || v === 1 || v === '1' || ('' + v).toLowerCase() === 'true') return true;
   if (v === false || v === 0 || v === '0' || ('' + v).toLowerCase() === 'false') return false;
   return null;
 }
-function str(key) {
-  var r = fresh(key);
+function str(k) {
+  var r = fresh(k);
   return r ? ('' + r.v) : null;
 }
-// Days since a known sensor last reported, when its newest value is older than STALE_MS (else null).
-function staleDays(key) {
-  var r = raw(key);
+// Days since a known sensor last reported, when its newest value is older than the staleness limit (else null).
+function staleDays(k) {
+  var r = raw(k);
   if (!r || NOW - r.ts <= STALE_MS) return null;
-  return (NOW - r.ts) / (24 * HOUR);
+  return (NOW - r.ts) / DAY;
 }
 function ageText(days) {
   if (days >= 1) return Math.round(days) + ' day' + (Math.round(days) === 1 ? '' : 's');
   return Math.max(1, Math.round(days * 24)) + ' h';
 }
-function base(key, stat) {
-  var b = BASE[key];
+function base(k, stat) {
+  var b = BASE[k];
   if (!b || b[stat] === undefined || b[stat] === null) return null;
   return Number(b[stat]);
 }
 function r1(x) { return Math.round(x * 10) / 10; }
 function r2(x) { return Math.round(x * 100) / 100; }
+function localDay() { return Math.floor((NOW + TZ_MS) / DAY); }
 
 // ---------- trends ----------
 // EWMA level + EWMA slope (units per hour). Returns {f, s, n}. alpha: level smoothing.
-function trend(name, value, alpha) {
-  var t = S.m[name];
-  if (!t || NOW - t.t > 24 * HOUR || !isFinite(t.f)) {
+function trend(tname, value, alpha) {
+  var t = S.m[tname];
+  if (!t || NOW - t.t > Number(E.trend.reset_hours) * HOUR || !isFinite(t.f)) {
     t = {f: value, s: 0, t: NOW, n: 1};
   } else {
     var dtH = (NOW - t.t) / HOUR;
     if (dtH <= 0) return t;
     var f = t.f + alpha * (value - t.f);
-    if (dtH >= 1 / 60) {
+    if (dtH >= Number(E.trend.min_interval_minutes) / 60) {
       var inst = (f - t.f) / dtH;
-      t.s = t.n < 3 ? inst : t.s + 0.15 * (inst - t.s);
+      t.s = t.n < Number(E.trend.slope_warmup_evals) ? inst : t.s + Number(E.trend.slope_smoothing) * (inst - t.s);
     }
     t.f = f;
     t.t = NOW;
     t.n = Math.min(t.n + 1, 100000);
   }
-  S.m[name] = t;
+  S.m[tname] = t;
   return t;
 }
 // Hours until the trend reaches limit (null when it is not heading there or the trend is too young).
 function hoursTo(t, limit, minEvals) {
-  if (!t || t.n < (minEvals || 12) || !isFinite(t.s) || t.s === 0) return null;
+  if (!t || t.n < (minEvals || Number(E.trend.min_evals)) || !isFinite(t.s) || t.s === 0) return null;
   var h = (limit - t.f) / t.s;
-  if (h <= 0 || h > 24 * 365) return null;
+  if (h <= 0 || h > Number(E.rul_max_days) * 24) return null;
   return h;
 }
 
@@ -121,221 +216,238 @@ function hoursTo(t, limit, minEvals) {
 var issues = [];
 var rulHours = [];   // calendar hours until a predicted threshold breach
 var expected = 0, present = 0;
-var out = {};
 function add(sev, text, action, penalty) {
-  var p = penalty !== undefined ? penalty : (sev === 'CRITICAL' ? 45 : (sev === 'WARNING' ? 15 : 3));
+  var p = penalty !== undefined && penalty !== null ? penalty : Number(E.penalty[sev]);
   issues.push({sev: sev, text: text, action: action || '', p: p});
 }
 function expect(v) { expected++; if (v !== null && v !== undefined) present++; return v; }
-
-var type = metadata.deviceType || '';
-var name = metadata.deviceName || 'Device';
-var KINDS = {'woodward_kg1500': 'DG', 'LT Panels Profile': 'LT', 'RO System Profile': 'RO', 'LT Panel Fire Profile': 'FIRE'};
-var kind = CFG.kind || KINDS[type] || '';
 var mode = '';
 
 // =====================================================================================
 if (kind === 'DG') {
-  var rpm = num('engine_rpm', 0, 3000);
-  var status = str('dg_status');
-  var running = status === 'RUNNING' || (rpm !== null && rpm > 300);
+  var rpm = num('rpm');
+  var status = str(key('status'));
+  var runRpm = lim('running_rpm');
+  var running = status === cfgv('running_status') || (rpm !== null && runRpm !== null && rpm > runRpm);
   mode = running ? 'RUNNING' : 'STANDBY';
   out.pm_dg_mode = mode;
 
-  // Battery (12/24 V system from history)
-  var bv = expect(num('battery_voltage', 5, 40));
-  var sys24 = (base('battery_voltage', 'median') || 24) > 18;
-  var k = sys24 ? 1 : 0.5;
+  // Battery
+  var bv = expect(num('battery'));
   if (bv !== null) {
     out.pm_battery_v = bv;
+    var bCrit = lim('battery.crit_v'), bWarn = lim('battery.warn_v'), bFloor = lim('battery.trend_floor_v'), bOver = lim('battery.overcharge_v');
     if (!running) {
-      var bt = trend('battery_off', bv, 0.3);
-      if (bv < 23.0 * k) add('CRITICAL', 'Battery ' + bv + ' V on standby (min ' + (23.0 * k) + ' V) - DG may fail to crank', 'Check battery charger and battery health now; arrange a replacement battery.');
-      else if (bv < 24.4 * k) add('WARNING', 'Battery low on standby: ' + bv + ' V', 'Check the battery charger output and electrolyte/terminals.');
-      var hb = hoursTo(bt, 24.0 * k, 24);
-      if (hb !== null && bt.s < -0.01 * k) {
-        rulHours.push(hb);
-        if (hb < 72 && bv >= 24.4 * k) add('WARNING', 'Battery falling ' + r2(-bt.s * 24) + ' V/day, reaches ' + (24.0 * k) + ' V in ~' + Math.round(hb) + ' h', 'Battery charger may be faulty - inspect before the next DG test.');
+      var bt = trend('battery_off', bv, lim('battery.trend_alpha') || 0);
+      if (bCrit !== null && bv < bCrit) add('CRITICAL', 'Battery ' + bv + ' V on standby (min ' + bCrit + ' V) - DG may fail to crank', 'Check battery charger and battery health now; arrange a replacement battery.');
+      else if (bWarn !== null && bv < bWarn) add('WARNING', 'Battery low on standby: ' + bv + ' V', 'Check the battery charger output and electrolyte/terminals.');
+      var fall = lim('battery.falling_v_per_h'), within = lim('battery.warn_within_h');
+      if (bFloor !== null && fall !== null) {
+        var hb = hoursTo(bt, bFloor, lim('battery.trend_min_evals'));
+        if (hb !== null && bt.s < -fall) {
+          rulHours.push(hb);
+          if (within !== null && hb < within && (bWarn === null || bv >= bWarn)) add('WARNING', 'Battery falling ' + r2(-bt.s * 24) + ' V/day, reaches ' + bFloor + ' V in ~' + Math.round(hb) + ' h', 'Battery charger may be faulty - inspect before the next DG test.');
+        }
       }
-    } else if (bv > 29.5 * k) {
+    } else if (bOver !== null && bv > bOver) {
       add('WARNING', 'Battery overcharging at ' + bv + ' V with the engine running', 'Check the charging alternator regulator.');
     }
   }
 
   // Fuel: filtered level, burn rate and autonomy come from the DG Fuel node (dg_fuel.js)
-  var fuel = num('fuel_level_pct', 0, 100);
-  if (fuel === null) fuel = num('fuel_level', 0, 100);
+  var fuel = numKey(key('fuel_pct'), 'valid.fuel');
+  if (fuel === null) fuel = numKey(key('fuel_raw'), 'valid.fuel');
   expect(fuel);
-  var fLow = Number(CFG.fuel_low_pct) || 30, fCrit = Number(CFG.fuel_critical_pct) || 15;
-  if (str('fuel_status') === 'SENSOR ERROR') add('INFO', 'Fuel level sensor not reporting', 'Check the fuel sender wiring and the controller input.', 5);
+  var fLow = lim('fuel.low_pct'), fCrit = lim('fuel.critical_pct'), fFull = lim('fuel.full_pct');
+  if (str(key('fuel_status')) === cfgv('fuel_sensor_error_status')) add('INFO', 'Fuel level sensor not reporting', 'Check the fuel sender wiring and the controller input.', lim('fuel.sensor_error_penalty'));
   if (fuel !== null) {
     out.pm_fuel_pct = fuel;
-    var fTxt = fuel >= 99.95 ? 'FULL (>=100%)' : fuel + '%';
-    if (fuel < fCrit) add('CRITICAL', 'Fuel very low: ' + fTxt, 'Refuel immediately - backup runtime is at risk.');
-    else if (fuel < fLow) add('WARNING', 'Fuel low: ' + fTxt, 'Schedule refuelling.');
-    var hf = num('fuel_runtime_h', 0, 100000);
+    var fTxt = fFull !== null && fuel >= fFull ? 'FULL (>=100%)' : fuel + '%';
+    if (fCrit !== null && fuel < fCrit) add('CRITICAL', 'Fuel very low: ' + fTxt, 'Refuel immediately - backup runtime is at risk.');
+    else if (fLow !== null && fuel < fLow) add('WARNING', 'Fuel low: ' + fTxt, 'Schedule refuelling.');
+    var hf = num('fuel_runtime');
     if (hf !== null) {
       out.pm_fuel_runtime_h = hf;
       if (running) {
         rulHours.push(hf);
-        if (hf < 1.5) add('CRITICAL', 'Fuel runs out in ~' + hf + ' h at current burn rate', 'Refuel now or transfer load.');
-        else if (hf < 4) add('WARNING', 'Fuel lasts ~' + hf + ' h at current burn rate', 'Arrange refuelling.');
-      } else if (CFG.required_autonomy_h && hf < Number(CFG.required_autonomy_h)) {
-        add('WARNING', 'Fuel autonomy ' + hf + ' h is below the required ' + CFG.required_autonomy_h + ' h', 'Top up the tank to restore the required backup runtime.');
+        var rc = lim('fuel.runtime_crit_h'), rw = lim('fuel.runtime_warn_h');
+        if (rc !== null && hf < rc) add('CRITICAL', 'Fuel runs out in ~' + hf + ' h at current burn rate', 'Refuel now or transfer load.');
+        else if (rw !== null && hf < rw) add('WARNING', 'Fuel lasts ~' + hf + ' h at current burn rate', 'Arrange refuelling.');
+      } else {
+        var req = opt('fuel.required_autonomy_h');
+        if (req !== null && hf < req) add('WARNING', 'Fuel autonomy ' + hf + ' h is below the required ' + req + ' h', 'Top up the tank to restore the required backup runtime.');
       }
     }
   }
 
   // Running-only engine and alternator checks
   if (running) {
-    var ct = num('coolant_temp', 20, 130);
-    expect(ct);
+    var ct = expect(num('coolant'));
     if (ct !== null) {
-      var ctt = trend('coolant_run', ct, 0.4);
-      var pred = ctt.n >= 3 ? ctt.f + ctt.s : ct;
-      out.predicted_coolant_1h = r1(Math.max(-20, Math.min(150, pred)));
-      if (ct >= 103) add('CRITICAL', 'Coolant ' + ct + ' C (limit 103 C)', 'Reduce load and inspect radiator, fan belt and coolant level.');
-      else if (ct >= 95) add('WARNING', 'Coolant high: ' + ct + ' C', 'Inspect radiator and coolant level.');
-      else if (pred >= 103) add('WARNING', 'Coolant rising, predicted ' + r1(pred) + ' C in 1 h', 'Inspect radiator airflow and coolant level.');
-      var hc = hoursTo(ctt, 103, 3);
-      if (hc !== null) rulHours.push(hc);
+      var cW = lim('coolant.warn_c'), cC = lim('coolant.crit_c'), clamp = cfgv('coolant.predict_clamp');
+      var ctt = trend('coolant_run', ct, lim('coolant.trend_alpha') || 0);
+      var pred = ctt.n >= Number(E.trend.slope_warmup_evals) ? ctt.f + ctt.s : ct;
+      if (clamp && clamp.length === 2) out.predicted_coolant_1h = r1(Math.max(Number(clamp[0]), Math.min(Number(clamp[1]), pred)));
+      if (cC !== null && ct >= cC) add('CRITICAL', 'Coolant ' + ct + ' C (limit ' + cC + ' C)', 'Reduce load and inspect radiator, fan belt and coolant level.');
+      else if (cW !== null && ct >= cW) add('WARNING', 'Coolant high: ' + ct + ' C', 'Inspect radiator and coolant level.');
+      else if (cC !== null && pred >= cC) add('WARNING', 'Coolant rising, predicted ' + r1(pred) + ' C in 1 h', 'Inspect radiator airflow and coolant level.');
+      if (cC !== null) {
+        var hc = hoursTo(ctt, cC, lim('coolant.rul_min_evals'));
+        if (hc !== null) rulHours.push(hc);
+      }
     }
-    var op = num('oil_pressure', 0, 1000);
-    expect(op);
-    if (op !== null && rpm !== null && rpm > 1000) {
-      if (op < 150) add('CRITICAL', 'Oil pressure ' + op + ' kPa at ' + rpm + ' rpm', 'Stop the DG and check oil level / oil pump.');
-      else if (op < 250) add('WARNING', 'Oil pressure low: ' + op + ' kPa', 'Check oil level and filter.');
+    var op = expect(num('oil'));
+    var oMin = lim('oil.min_rpm');
+    if (op !== null && rpm !== null && oMin !== null && rpm > oMin) {
+      var oC = lim('oil.crit_kpa'), oW = lim('oil.warn_kpa');
+      if (oC !== null && op < oC) add('CRITICAL', 'Oil pressure ' + op + ' kPa at ' + rpm + ' rpm', 'Stop the DG and check oil level / oil pump.');
+      else if (oW !== null && op < oW) add('WARNING', 'Oil pressure low: ' + op + ' kPa', 'Check oil level and filter.');
     }
-    var fq = num('frequency', 1, 80);
-    if (fq !== null) {
-      var df = Math.abs(fq - 50);
-      if (df > 2) add('CRITICAL', 'Frequency ' + fq + ' Hz', 'Check governor / engine speed control.');
-      else if (df > 1) add('WARNING', 'Frequency off-nominal: ' + fq + ' Hz', 'Check governor settings.');
+    var fq = num('frequency');
+    var fN = lim('frequency.nominal_hz');
+    if (fq !== null && fN !== null) {
+      var df = Math.abs(fq - fN), fC = lim('frequency.crit_dev_hz'), fW = lim('frequency.warn_dev_hz');
+      if (fC !== null && df > fC) add('CRITICAL', 'Frequency ' + fq + ' Hz', 'Check governor / engine speed control.');
+      else if (fW !== null && df > fW) add('WARNING', 'Frequency off-nominal: ' + fq + ' Hz', 'Check governor settings.');
     }
-    var vv = num('voltage', 50, 600);
-    if (vv !== null) {
-      var vn = vv > 300 ? 415 : 230;
-      var dv = Math.abs(vv - vn) / vn;
-      if (dv > 0.12) add('CRITICAL', 'Output voltage ' + vv + ' V (nominal ' + vn + ' V)', 'Check the alternator voltage regulator (AVR).');
-      else if (dv > 0.08) add('WARNING', 'Output voltage ' + vv + ' V off nominal', 'Check the alternator voltage regulator (AVR) settings.');
+    var vv = num('voltage');
+    var vn = lim('voltage.nominal_v');
+    if (vv !== null && vn !== null) {
+      var dv = Math.abs(vv - vn) / vn * 100, vC = lim('voltage.crit_pct'), vW = lim('voltage.warn_pct');
+      if (vC !== null && dv > vC) add('CRITICAL', 'Output voltage ' + vv + ' V (nominal ' + vn + ' V)', 'Check the alternator voltage regulator (AVR).');
+      else if (vW !== null && dv > vW) add('WARNING', 'Output voltage ' + vv + ' V off nominal', 'Check the alternator voltage regulator (AVR) settings.');
     }
-    var pf = num('power_factor', 0, 1);
-    var pkw = num('power_kw', 0, 5000);
-    if (pf !== null && pkw !== null && pkw > 50 && pf < 0.8) add('WARNING', 'Low power factor ' + pf + ' at ' + pkw + ' kW', 'Review load / capacitor bank.');
-    if (pkw !== null && CFG.rated_kw) {
-      var load = pkw / Number(CFG.rated_kw) * 100;
+    var pf = num('power_factor');
+    var pkw = num('power');
+    var pfMin = lim('power_factor.min'), pfKw = lim('power_factor.min_kw');
+    if (pf !== null && pkw !== null && pfMin !== null && pfKw !== null && pkw > pfKw && pf < pfMin) add('WARNING', 'Low power factor ' + pf + ' at ' + pkw + ' kW', 'Review load / capacitor bank.');
+    var ratedKw = opt('load.rated_kw');
+    if (pkw !== null && ratedKw) {
+      var load = pkw / ratedKw * 100, lC = lim('load.crit_pct'), lW = lim('load.warn_pct');
       out.pm_load_pct = r1(load);
-      if (load > 100) add('CRITICAL', 'DG overloaded: ' + r1(load) + '% of ' + CFG.rated_kw + ' kW', 'Shed load immediately.');
-      else if (load > 90) add('WARNING', 'DG load high: ' + r1(load) + '%', 'Avoid adding load.');
+      if (lC !== null && load > lC) add('CRITICAL', 'DG overloaded: ' + r1(load) + '% of ' + ratedKw + ' kW', 'Shed load immediately.');
+      else if (lW !== null && load > lW) add('WARNING', 'DG load high: ' + r1(load) + '%', 'Avoid adding load.');
     }
   } else {
     out.predicted_coolant_1h = '--';
   }
 
   // Controller alarm
-  var ca = num('common_alarm', 0, 29999);
+  var ca = num('common_alarm');
   if (ca !== null && ca !== 0) add('WARNING', 'Controller common alarm active (code ' + ca + ')', 'Check the alarm list on the DG control panel.');
 
-  // Service due (run hours). Only computed from the real last-service record entered in pm_config;
-  // without it the due time is unknown and is shown as '--' (no assumed service history).
-  var rh = expect(num('run_hours', 0, 200000));
-  var lastSvcCfg = CFG.last_service_run_hours;
-  var lastSvc = (lastSvcCfg === undefined || lastSvcCfg === null || lastSvcCfg === '') ? null : Number(lastSvcCfg);
-  if (lastSvc !== null && !isFinite(lastSvc)) lastSvc = null;
-  if (rh !== null && lastSvc !== null) {
-    var interval = Number(CFG.service_interval_h) || 250;
+  // Service due (run hours), only from the real last-service record (logged in the Maintenance Log)
+  var rh = expect(num('run_hours'));
+  var lastSvc = opt('service.last_service_run_hours');
+  var interval = lim('service.interval_h');
+  if (rh !== null && lastSvc !== null && interval !== null) {
     var due = lastSvc + interval - rh;
     out.pm_service_due_h = r1(due);
     out.rul_hours = Math.max(0, r1(due));
-    if (due < -100) add('CRITICAL', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Carry out the scheduled service (oil, filters) now.');
+    var sOver = lim('service.overdue_crit_h'), sSoon = lim('service.due_soon_h');
+    if (sOver !== null && due < -sOver) add('CRITICAL', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Carry out the scheduled service (oil, filters) now.');
     else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and record it in the Maintenance Log.');
-    else if (due < 25) add('INFO', 'Service due in ' + Math.round(due) + ' run-hours', 'Plan the next service.', 2);
+    else if (sSoon !== null && due < sSoon) add('INFO', 'Service due in ' + Math.round(due) + ' run-hours', 'Plan the next service.', lim('service.due_soon_penalty'));
   } else {
     out.pm_service_due_h = '--';
     out.rul_hours = '--';
     if (lastSvc === null) add('INFO', 'Service schedule not set up - last service not yet logged', 'Record the last DG service in the Maintenance Log (Reports & Maintenance dashboard) to start the service countdown.', 0);
   }
-  // Exercise (standby DG must run regularly). The controller sometimes nudges the run-hour counter by
-  // 0.01-0.02 h with the engine stopped, so only a rise of at least 0.1 h (6 min) counts as a run.
-  if (rh !== null) {
+  // Exercise (standby DG must run regularly). The controller sometimes nudges the run-hour counter with the
+  // engine stopped, so only a rise of at least exercise.min_run_increase_h counts as a run.
+  var minInc = lim('exercise.min_run_increase_h');
+  if (rh !== null && minInc !== null) {
     if (running || S.lastRh === undefined || rh < S.lastRh) {
       S.lastRh = rh;
-    } else if (rh >= S.lastRh + 0.1) {
+    } else if (rh >= S.lastRh + minInc) {
       S.lastRunTs = NOW;
       S.lastRh = rh;
     }
   }
   if (running) S.lastRunTs = NOW;
+  var exDays = lim('exercise.days'), exLong = lim('exercise.long_factor');
   if (S.lastRunTs) {
-    var idleDays = (NOW - S.lastRunTs) / (24 * HOUR);
+    var idleDays = (NOW - S.lastRunTs) / DAY;
     out.pm_days_since_run = r1(idleDays);
-    var exDays = Number(CFG.exercise_days) || 7;
-    if (idleDays > exDays * 2) add('WARNING', 'DG idle ' + Math.round(idleDays) + ' days', 'Run a no-load/load test to confirm standby readiness.', 20);
-    else if (idleDays > exDays) add('WARNING', 'DG idle ' + Math.round(idleDays) + ' days (test every ' + exDays + ' days)', 'Schedule the weekly test run.', 10);
+    if (exDays !== null && exLong !== null && idleDays > exDays * exLong) add('WARNING', 'DG idle ' + Math.round(idleDays) + ' days', 'Run a no-load/load test to confirm standby readiness.', lim('exercise.long_penalty'));
+    else if (exDays !== null && idleDays > exDays) add('WARNING', 'DG idle ' + Math.round(idleDays) + ' days (test every ' + exDays + ' days)', 'Schedule the weekly test run.', lim('exercise.penalty'));
   }
 
   // Start counter (many starts per day = failed/short starts)
-  var st = num('engine_starts', 0, 1000000);
+  var st = num('starts');
   if (st !== null) {
-    var day = Math.floor((NOW + 19800000) / (24 * HOUR));
+    var day = localDay();
     if (!S.starts || S.starts.day !== day) S.starts = {day: day, base: st};
-    var today = st - S.starts.base;
-    out.pm_starts_today = today;
-    if (today > 6) add('WARNING', today + ' engine starts today', 'Check failed or short starts (battery, starter, fuel).');
+    var startsToday = st - S.starts.base;
+    out.pm_starts_today = startsToday;
+    var maxStarts = lim('starts.max_per_day');
+    if (maxStarts !== null && startsToday > maxStarts) add('WARNING', startsToday + ' engine starts today', 'Check failed or short starts (battery, starter, fuel).');
   }
 
 // =====================================================================================
 } else if (kind === 'LT') {
   mode = 'LT';
+  var sfx = cfgv('feeder_suffix') || {};
   var feeders = [];
-  for (var key in metadata) {
-    var mm = /^(.+)_voltage$/.exec(key);
-    if (mm && key.indexOf('ss_') !== 0) feeders.push(mm[1]);
+  if (sfx.voltage) {
+    for (var mk in metadata) {
+      if (mk.indexOf('ss_') !== 0 && mk.length > sfx.voltage.length && mk.slice(-sfx.voltage.length) === sfx.voltage) feeders.push(mk.slice(0, -sfx.voltage.length));
+    }
   }
   feeders.sort();
   var fsum = {};
-  var ratedA = CFG.rated_a || {};
   for (var i = 0; i < feeders.length; i++) {
     var fd = feeders[i];
     var label = fd.replace(/_/g, ' ');
-    var V = num(fd + '_voltage', 1, 1000), I = num(fd + '_current', 0, 100000), P = num(fd + '_power', -100000, 100000), F = num(fd + '_frequency', 1, 100);
+    var V = numKey(fd + sfx.voltage, 'valid.voltage');
+    var I = sfx.current ? numKey(fd + sfx.current, 'valid.current') : null;
+    var P = sfx.power ? numKey(fd + sfx.power, 'valid.power') : null;
+    var F = sfx.frequency ? numKey(fd + sfx.frequency, 'valid.frequency') : null;
     expect(V);
     if (V === null) {
       fsum[fd] = 'NO DATA';
-      add('INFO', label + ': meter not reporting', 'Check the energy meter of ' + label + ' and its communication cable.', 2);
+      add('INFO', label + ': meter not reporting', 'Check the energy meter of ' + label + ' and its communication cable.', lim('no_data_penalty'));
       continue;
     }
-    var nominal = (CFG.nominal_v && CFG.nominal_v[fd]) || ((base(fd + '_voltage', 'median') || V) > 300 ? 415 : 230);
-    var vt = trend(fd + '_v', V, 0.4);
-    var dev = (vt.f - nominal) / nominal * 100;
     var fstate = 'OK';
-    if (Math.abs(dev) > 10) { add('CRITICAL', label + ' voltage ' + r1(vt.f) + ' V (' + r1(dev) + '% from ' + nominal + ' V)', 'Check supply / transformer tap and connected equipment.'); fstate = 'CRITICAL'; }
-    else if (Math.abs(dev) > 7.5) { add('WARNING', label + ' voltage ' + r1(vt.f) + ' V (' + r1(dev) + '%)', 'Monitor supply voltage; check transformer tap.'); fstate = 'WARNING'; }
-    if (F !== null) {
-      var ftr = trend(fd + '_f', F, 0.4);
-      var dfq = Math.abs(ftr.f - 50);
-      if (dfq > 1) { add('CRITICAL', label + ' frequency ' + r2(ftr.f) + ' Hz', 'Check supply source.'); fstate = 'CRITICAL'; }
-      else if (dfq > 0.6) { add('WARNING', label + ' frequency ' + r2(ftr.f) + ' Hz', 'Monitor supply frequency.'); if (fstate === 'OK') fstate = 'WARNING'; }
+    var nominal = lim('nominal_v.' + fd);
+    if (nominal !== null) {
+      var vt = trend(fd + '_v', V, lim('voltage.trend_alpha') || 0);
+      var dev = (vt.f - nominal) / nominal * 100, lvC = lim('voltage.crit_pct'), lvW = lim('voltage.warn_pct');
+      if (lvC !== null && Math.abs(dev) > lvC) { add('CRITICAL', label + ' voltage ' + r1(vt.f) + ' V (' + r1(dev) + '% from ' + nominal + ' V)', 'Check supply / transformer tap and connected equipment.'); fstate = 'CRITICAL'; }
+      else if (lvW !== null && Math.abs(dev) > lvW) { add('WARNING', label + ' voltage ' + r1(vt.f) + ' V (' + r1(dev) + '%)', 'Monitor supply voltage; check transformer tap.'); fstate = 'WARNING'; }
+    }
+    var lfN = lim('frequency.nominal_hz');
+    if (F !== null && lfN !== null) {
+      var ftr = trend(fd + '_f', F, lim('frequency.trend_alpha') || 0);
+      var dfq = Math.abs(ftr.f - lfN), lfC = lim('frequency.crit_dev_hz'), lfW = lim('frequency.warn_dev_hz');
+      if (lfC !== null && dfq > lfC) { add('CRITICAL', label + ' frequency ' + r2(ftr.f) + ' Hz', 'Check supply source.'); fstate = 'CRITICAL'; }
+      else if (lfW !== null && dfq > lfW) { add('WARNING', label + ' frequency ' + r2(ftr.f) + ' Hz', 'Monitor supply frequency.'); if (fstate === 'OK') fstate = 'WARNING'; }
     }
     if (I !== null) {
-      var it = trend(fd + '_i', I, 0.3);
-      var rated = Number(ratedA[fd]);
-      var p95 = base(fd + '_current', 'p95');
-      if (rated > 0) {
-        var lp = it.f / rated * 100;
-        if (lp > 100) { add('CRITICAL', label + ' overloaded: ' + Math.round(it.f) + ' A (' + Math.round(lp) + '% of ' + rated + ' A)', 'Shed or redistribute load.'); fstate = 'CRITICAL'; }
-        else if (lp > 90) { add('WARNING', label + ' load ' + Math.round(lp) + '% of rating', 'Plan load redistribution.'); if (fstate === 'OK') fstate = 'WARNING'; }
-      } else if (p95 !== null && p95 > 5 && it.n >= 6 && it.f > p95 * 1.3) {
-        add('WARNING', label + ' current ' + Math.round(it.f) + ' A is ' + Math.round((it.f / p95 - 1) * 100) + '% above its normal peak (' + Math.round(p95) + ' A)', 'Check this feeder: newly added load or a developing fault.');
-        if (fstate === 'OK') fstate = 'WARNING';
+      var it = trend(fd + '_i', I, lim('current.trend_alpha') || 0);
+      var rated = opt('rated_a.' + fd);
+      var p95 = base(fd + sfx.current, 'p95');
+      if (rated) {
+        var lp = it.f / rated * 100, cC2 = lim('current.load_crit_pct'), cW2 = lim('current.load_warn_pct');
+        if (cC2 !== null && lp > cC2) { add('CRITICAL', label + ' overloaded: ' + Math.round(it.f) + ' A (' + Math.round(lp) + '% of ' + rated + ' A)', 'Shed or redistribute load.'); fstate = 'CRITICAL'; }
+        else if (cW2 !== null && lp > cW2) { add('WARNING', label + ' load ' + Math.round(lp) + '% of rating', 'Plan load redistribution.'); if (fstate === 'OK') fstate = 'WARNING'; }
+      } else {
+        var pkF = lim('current.peak_factor'), pkMin = lim('current.peak_min_a'), pkEv = lim('current.peak_min_evals');
+        if (p95 !== null && pkF !== null && pkMin !== null && pkEv !== null && p95 > pkMin && it.n >= pkEv && it.f > p95 * pkF) {
+          add('WARNING', label + ' current ' + Math.round(it.f) + ' A is ' + Math.round((it.f / p95 - 1) * 100) + '% above its normal peak (' + Math.round(p95) + ' A)', 'Check this feeder: newly added load or a developing fault.');
+          if (fstate === 'OK') fstate = 'WARNING';
+        }
       }
       // Power factor from P, V, I
-      if (P !== null && I > 5 && (p95 === null || I > 0.1 * p95)) {
-        var kva = (V > 300 ? 1.732 * V * I : V * I) / 1000;
+      var pfMinI = lim('power_factor.min_current_a'), pfShare = lim('power_factor.min_share_of_peak'), pfMax = lim('power_factor.max_plausible');
+      var pf3 = lim('power_factor.three_phase_above_v'), pfLow = lim('power_factor.min');
+      if (P !== null && pfMinI !== null && pfShare !== null && pfMax !== null && pf3 !== null && pfLow !== null && I > pfMinI && (p95 === null || I > pfShare * p95)) {
+        var kva = (V > pf3 ? Math.sqrt(3) * V * I : V * I) / 1000;
         var pfv = kva > 0 ? Math.abs(P) / kva : null;
-        if (pfv !== null && pfv <= 1.05) {
-          var pft = trend(fd + '_pf', Math.min(1, pfv), 0.3);
-          if (pft.n >= 3 && pft.f < 0.8) { add('WARNING', label + ' power factor ' + r2(pft.f), 'Check capacitor bank / reactive load.', 10); if (fstate === 'OK') fstate = 'WARNING'; }
+        if (pfv !== null && pfv <= pfMax) {
+          var pft = trend(fd + '_pf', Math.min(1, pfv), lim('power_factor.trend_alpha') || 0);
+          if (pft.n >= (lim('power_factor.min_evals') || 0) && pft.f < pfLow) { add('WARNING', label + ' power factor ' + r2(pft.f), 'Check capacitor bank / reactive load.', lim('power_factor.penalty')); if (fstate === 'OK') fstate = 'WARNING'; }
         }
       }
     }
@@ -346,115 +458,131 @@ if (kind === 'DG') {
 // =====================================================================================
 } else if (kind === 'RO') {
   mode = 'RO';
-  var tds = expect(num('tds_ppm', 0, 5000));
-  var med = base('tds_ppm', 'median');
-  var warnT = Number(CFG.tds_warn) || Math.min(300, Math.max(150, (med || 75) * 2));
-  var critT = Number(CFG.tds_crit) || 500;
+  var tds = expect(num('tds'));
+  var med = base(key('tds'), 'median');
+  var warnT = lim('tds.warn_ppm'), critT = lim('tds.crit_ppm');
   if (tds !== null) {
-    var tt = trend('tds', tds, 0.05);
+    var tt = trend('tds', tds, lim('tds.trend_alpha') || 0);
     out.pm_tds_avg = r1(tt.f);
-    if (tt.f > critT) add('CRITICAL', 'Product water TDS ' + Math.round(tt.f) + ' ppm (limit ' + critT + ')', 'Stop drinking-water supply; inspect RO membrane and O-rings.');
-    else if (tt.f > warnT) add('WARNING', 'Product water TDS ' + Math.round(tt.f) + ' ppm (normal ~' + Math.round(med || 0) + ')', 'Clean the RO membrane or plan its replacement.');
-    // Long-term TDS trend = least-squares slope of the daily average TDS (IST days) over the last 14
-    // completed days. Short swings within a day are not a membrane trend, so the trend stays '--'
-    // until at least 3 full days (each with 4 h or more of readings) are available.
-    var tdsDay = Math.floor((NOW + 19800000) / (24 * HOUR));
-    if (!S.tdsDays) S.tdsDays = [];
-    var curB = S.tdsDays.length ? S.tdsDays[S.tdsDays.length - 1] : null;
-    if (!curB || curB.d !== tdsDay) {
-      curB = {d: tdsDay, s: 0, n: 0};
-      S.tdsDays.push(curB);
-    }
-    curB.s += tds;
-    curB.n++;
-    var keptDays = [];
-    for (var di = 0; di < S.tdsDays.length; di++) {
-      if (S.tdsDays[di].d > tdsDay - 15) keptDays.push(S.tdsDays[di]);
-    }
-    S.tdsDays = keptDays;
-    var xs = [], ys = [];
-    for (var dj = 0; dj < S.tdsDays.length; dj++) {
-      var bd = S.tdsDays[dj];
-      if (bd.d < tdsDay && bd.n >= 48) {
-        xs.push(bd.d);
-        ys.push(bd.s / bd.n);
+    if (critT !== null && tt.f > critT) add('CRITICAL', 'Product water TDS ' + Math.round(tt.f) + ' ppm (limit ' + critT + ')', 'Stop drinking-water supply; inspect RO membrane and O-rings.');
+    else if (warnT !== null && tt.f > warnT) add('WARNING', 'Product water TDS ' + Math.round(tt.f) + ' ppm (normal ~' + Math.round(med || 0) + ')', 'Clean the RO membrane or plan its replacement.');
+    // Long-term TDS trend = least-squares slope of the daily average TDS (local days) over the configured number of
+    // completed days; it is reported only with enough days, enough samples per day and a good fit (R2).
+    var tDays = lim('tds.trend_days'), tMinDays = lim('tds.trend_min_days'), tMinN = lim('tds.trend_min_samples_per_day'), tR2 = lim('tds.trend_min_r2');
+    var slope = null, nDays = 0;
+    if (tDays !== null && tMinDays !== null && tMinN !== null && tR2 !== null) {
+      var tdsDay = localDay();
+      if (!S.tdsDays) S.tdsDays = [];
+      var curB = S.tdsDays.length ? S.tdsDays[S.tdsDays.length - 1] : null;
+      if (!curB || curB.d !== tdsDay) {
+        curB = {d: tdsDay, s: 0, n: 0};
+        S.tdsDays.push(curB);
       }
-    }
-    var slope = null;
-    if (xs.length >= 3) {
-      var mx = 0, my = 0;
-      for (var a1 = 0; a1 < xs.length; a1++) {
-        mx += xs[a1];
-        my += ys[a1];
+      curB.s += tds;
+      curB.n++;
+      var keptDays = [];
+      for (var di = 0; di < S.tdsDays.length; di++) {
+        if (S.tdsDays[di].d > tdsDay - (tDays + 1)) keptDays.push(S.tdsDays[di]);
       }
-      mx /= xs.length;
-      my /= xs.length;
-      var sxy = 0, sxx = 0;
-      for (var a2 = 0; a2 < xs.length; a2++) {
-        sxy += (xs[a2] - mx) * (ys[a2] - my);
-        sxx += (xs[a2] - mx) * (xs[a2] - mx);
-      }
-      if (sxx > 0) {
-        slope = sxy / sxx;
-        // Fit quality: a rise-and-fall is not a steady trend, so it is not extrapolated (R2 below 0.5)
-        var ssTot = 0, ssRes = 0;
-        for (var a3 = 0; a3 < xs.length; a3++) {
-          var fit = my + slope * (xs[a3] - mx);
-          ssRes += (ys[a3] - fit) * (ys[a3] - fit);
-          ssTot += (ys[a3] - my) * (ys[a3] - my);
+      S.tdsDays = keptDays;
+      var xs = [], ys = [];
+      for (var dj = 0; dj < S.tdsDays.length; dj++) {
+        var bd = S.tdsDays[dj];
+        if (bd.d < tdsDay && bd.n >= tMinN) {
+          xs.push(bd.d);
+          ys.push(bd.s / bd.n);
         }
-        var fitR2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
-        out.pm_tds_trend_r2 = r2(fitR2);
-        if (fitR2 < 0.5) slope = null;
+      }
+      nDays = xs.length;
+      if (xs.length >= tMinDays) {
+        var mx = 0, my = 0;
+        for (var a1 = 0; a1 < xs.length; a1++) {
+          mx += xs[a1];
+          my += ys[a1];
+        }
+        mx /= xs.length;
+        my /= xs.length;
+        var sxy = 0, sxx = 0;
+        for (var a2 = 0; a2 < xs.length; a2++) {
+          sxy += (xs[a2] - mx) * (ys[a2] - my);
+          sxx += (xs[a2] - mx) * (xs[a2] - mx);
+        }
+        if (sxx > 0) {
+          slope = sxy / sxx;
+          // Fit quality: a rise-and-fall is not a steady trend, so it is not extrapolated
+          var ssTot = 0, ssRes = 0;
+          for (var a3 = 0; a3 < xs.length; a3++) {
+            var fit = my + slope * (xs[a3] - mx);
+            ssRes += (ys[a3] - fit) * (ys[a3] - fit);
+            ssTot += (ys[a3] - my) * (ys[a3] - my);
+          }
+          var fitR2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+          out.pm_tds_trend_r2 = r2(fitR2);
+          if (fitR2 < tR2) slope = null;
+        }
       }
     }
     out.pm_tds_trend_ppm_day = slope === null ? '--' : r2(slope);
-    out.pm_tds_trend_days = xs.length;
-    if (slope !== null && slope > 0.5 && tt.f < warnT) {
+    out.pm_tds_trend_days = nDays;
+    var tMinSlope = lim('tds.trend_min_ppm_per_day'), tWithin = lim('tds.warn_within_days');
+    if (slope !== null && warnT !== null && tMinSlope !== null && slope > tMinSlope && tt.f < warnT) {
       var ht = (warnT - tt.f) / slope * 24;
-      if (ht > 0 && ht <= 24 * 365) {
+      if (ht > 0 && ht <= Number(E.rul_max_days) * 24) {
         rulHours.push(ht);
-        if (ht < 24 * 30) add('WARNING', 'TDS rising ' + r1(slope) + ' ppm/day over ' + xs.length + ' days - reaches ' + warnT + ' ppm in ~' + Math.round(ht / 24) + ' days', 'Plan membrane cleaning / replacement.', 10);
+        if (tWithin !== null && ht < tWithin * 24) add('WARNING', 'TDS rising ' + r1(slope) + ' ppm/day over ' + nDays + ' days - reaches ' + warnT + ' ppm in ~' + Math.round(ht / 24) + ' days', 'Plan membrane cleaning / replacement.', lim('tds.trend_penalty'));
       }
     }
   }
-  var tc = expect(num('temperature_c', -5, 90));
+  var tc = expect(num('temperature'));
   if (tc !== null) {
-    if (tc > 45) add('CRITICAL', 'Water temperature ' + tc + ' C (membrane max 45 C)', 'Stop the RO to protect the membrane.');
-    else if (tc > 38) add('WARNING', 'Water temperature high: ' + tc + ' C', 'Check feed water source / plant room ventilation.');
+    var tcC = lim('temperature.crit_c'), tcW = lim('temperature.warn_c');
+    if (tcC !== null && tc > tcC) add('CRITICAL', 'Water temperature ' + tc + ' C (membrane max ' + tcC + ' C)', 'Stop the RO to protect the membrane.');
+    else if (tcW !== null && tc > tcW) add('WARNING', 'Water temperature high: ' + tc + ' C', 'Check feed water source / plant room ventilation.');
   }
-  var ph = num('ph', 0, 14);
-  if (raw('ph') !== null) expect(ph);
+  var ph = num('ph');
+  if (raw(key('ph')) !== null) expect(ph);
   if (ph !== null) {
-    if (ph < 6 || ph > 9) add('CRITICAL', 'pH ' + ph, 'Stop supply and check dosing.');
-    else if (ph < 6.5 || ph > 8.5) add('WARNING', 'pH out of range: ' + ph, 'Check dosing / remineralisation.');
+    var pcl = lim('ph.crit_low'), pch = lim('ph.crit_high'), pwl = lim('ph.warn_low'), pwh = lim('ph.warn_high');
+    if ((pcl !== null && ph < pcl) || (pch !== null && ph > pch)) add('CRITICAL', 'pH ' + ph, 'Stop supply and check dosing.');
+    else if ((pwl !== null && ph < pwl) || (pwh !== null && ph > pwh)) add('WARNING', 'pH out of range: ' + ph, 'Check dosing / remineralisation.');
   }
-  var pr = num('pressure', 0, 100);
-  if (raw('pressure') !== null) expect(pr);
-  var roSensors = [['ph', 'pH sensor'], ['pressure', 'Pressure sensor'], ['temperature_c', 'Temperature sensor']];
-  for (var rs = 0; rs < roSensors.length; rs++) {
-    var sdays = staleDays(roSensors[rs][0]);
-    if (sdays !== null) add('INFO', roSensors[rs][1] + ' not reporting (last reading ' + ageText(sdays) + ' ago)', 'Check the ' + roSensors[rs][1] + ' and its wiring; related checks resume once it reports again.', 5);
+  var pr = num('pressure');
+  if (raw(key('pressure')) !== null) expect(pr);
+  var watch = cfgv('sensors_to_watch') || {};
+  for (var wk in watch) {
+    var sdays = staleDays(key(wk));
+    if (sdays !== null) add('INFO', watch[wk] + ' not reporting (last reading ' + ageText(sdays) + ' ago)', 'Check the ' + watch[wk] + ' and its wiring; related checks resume once it reports again.', lim('sensor_offline_penalty'));
   }
-  var prMed = base('pressure', 'median');
-  if (pr !== null && prMed) {
-    var prt = trend('pressure', pr, 0.2);
+  var prMed = base(key('pressure'), 'median'), prDev = lim('pressure.dev_pct');
+  if (pr !== null && prMed && prDev !== null) {
+    var prt = trend('pressure', pr, lim('pressure.trend_alpha') || 0);
     var pd = (prt.f - prMed) / prMed * 100;
-    if (Math.abs(pd) > 25) add('WARNING', 'Pressure ' + r1(prt.f) + ' bar (' + Math.round(pd) + '% from normal ' + prMed + ')', pd > 0 ? 'Membrane/pre-filter may be fouling - check differential pressure.' : 'Check pump and pre-filters.');
+    if (Math.abs(pd) > prDev) add('WARNING', 'Pressure ' + r1(prt.f) + ' bar (' + Math.round(pd) + '% from normal ' + prMed + ')', pd > 0 ? 'Membrane/pre-filter may be fouling - check differential pressure.' : 'Check pump and pre-filters.');
   }
-  if (bool('tds_online') === false) add('WARNING', 'TDS sensor offline', 'Check the TDS sensor connection.');
-  if (bool('flow_online') === false) add('INFO', 'Flow sensor offline - water flow checks unavailable', 'Repair the flow sensor to restore water flow and membrane checks.', 5);
+  if (bool(key('tds_online')) === false) add('WARNING', 'TDS sensor offline', 'Check the TDS sensor connection.');
+  if (bool(key('flow_online')) === false) add('INFO', 'Flow sensor offline - water flow checks unavailable', 'Repair the flow sensor to restore water flow and membrane checks.', lim('sensor_offline_penalty'));
 
 // =====================================================================================
 } else if (kind === 'FIRE') {
   mode = 'FIRE';
-  var ignore = CFG.ignore_channels || [];
+  var ignore = cfgv('ignore_channels') || [];
+  var pats = cfgv('channel_patterns') || [];
+  var res = [];
+  for (var pi = 0; pi < pats.length; pi++) {
+    res.push(new RegExp(pats[pi]));
+  }
   var chans = [];
   for (var ck in metadata) {
-    var cm = /^(cylinder_pressure_|fire_suppression_)(\d+)(_pressure)?$/.exec(ck);
-    if (cm && (cm[1] === 'cylinder_pressure_' ? !cm[3] : cm[3])) chans.push({key: ck, n: Number(cm[2])});
+    for (var ri = 0; ri < res.length; ri++) {
+      var cm = res[ri].exec(ck);
+      if (cm) {
+        chans.push({key: ck, n: Number(cm[1])});
+        break;
+      }
+    }
   }
   chans.sort(function (a, b) { return a.n - b.n; });
+  var flapN = lim('flap_changes');
   var lowList = [], flapList = [], okCount = 0;
   for (var c = 0; c < chans.length; c++) {
     var ch = chans[c];
@@ -467,42 +595,48 @@ if (kind === 'DG') {
         vals.push(hv === true || hv === 1 || hv === '1' || ('' + hv).toLowerCase() === 'true');
       }
     }
-    if (!vals.length) continue;   // no data in the last 15 min: channel not in use on this device
+    if (!vals.length) continue;   // no data in the window: channel not in use on this device
     expect(true);
     var changes = 0;
     for (var q = 1; q < vals.length; q++) {
       if (vals[q] !== vals[q - 1]) changes++;
     }
-    if (changes >= 4) flapList.push(ch.n + ' (' + changes + ' changes)');
+    if (flapN !== null && changes >= flapN) flapList.push(ch.n + ' (' + changes + ' changes)');
     else if (!vals[vals.length - 1]) lowList.push(ch.n);
     else okCount++;
   }
   out.pm_cylinders_ok = okCount;
   out.pm_cylinders_low = lowList.length;
   out.pm_cylinders_unstable = flapList.length;
-  if (lowList.length) add('WARNING', 'Low pressure on cylinder(s) ' + lowList.join(', '), 'Inspect and recharge these cylinders; check the pressure switch if the cylinder gauge reads normal.', Math.min(45, 12 * lowList.length));
-  if (flapList.length) add('WARNING', 'Unstable pressure signal on cylinder(s) ' + flapList.join(', ') + ' in the last 15 min', 'Check the pressure switch, its wiring and connections.', Math.min(45, 10 * flapList.length));
-  for (var rr = 0; rr <= 2; rr++) {
-    var rk = rr === 0 ? 'relay_online' : 'relay_' + rr + '_online';
-    if (bool(rk) === false) add('WARNING', 'Relay ' + (rr || '') + ' offline', 'Check the relay module power / network.');
+  var maxPen = lim('max_penalty'), win = lim('window_minutes');
+  if (lowList.length) add('WARNING', 'Low pressure on cylinder(s) ' + lowList.join(', '), 'Inspect and recharge these cylinders; check the pressure switch if the cylinder gauge reads normal.', Math.min(maxPen || 0, (lim('low_penalty_per_channel') || 0) * lowList.length));
+  if (flapList.length) add('WARNING', 'Unstable pressure signal on cylinder(s) ' + flapList.join(', ') + ' in the last ' + win + ' min', 'Check the pressure switch, its wiring and connections.', Math.min(maxPen || 0, (lim('flap_penalty_per_channel') || 0) * flapList.length));
+  var relays = cfgv('relay_keys') || [];
+  for (var rr = 0; rr < relays.length; rr++) {
+    var rl = relays[rr].replace(/_online$/, '').replace(/_/g, ' ');
+    if (bool(relays[rr]) === false) add('WARNING', rl.charAt(0).toUpperCase() + rl.slice(1) + ' offline', 'Check the relay module power / network.');
   }
 } else {
   mode = 'UNKNOWN';
 }
 
+if (missing.length) add('INFO', 'Some checks are not configured: ' + missing.slice(0, 8).join(', ') + (missing.length > 8 ? ' (+' + (missing.length - 8) + ' more)' : ''),
+  'Set these limits in Maintenance Management > Settings > Predictive maintenance.', 0);
+
 // ---------- scoring ----------
 var rawSev = 'OK', penalty = 0;
 for (var x = 0; x < issues.length; x++) {
-  penalty += issues[x].p;
+  penalty += Number(issues[x].p) || 0;
   if (issues[x].sev === 'CRITICAL') rawSev = 'CRITICAL';
   else if (issues[x].sev === 'WARNING' && rawSev !== 'CRITICAL') rawSev = 'WARNING';
 }
 var noData = expected > 0 && present === 0;
 var score = Math.max(0, 100 - penalty);
-// Health bands follow severity: OK 80-100, WARNING 40-79, CRITICAL 0-39
-if (rawSev === 'CRITICAL') score = Math.min(score, 39);
-else if (rawSev === 'WARNING') score = Math.max(40, Math.min(score, 79));
-else score = Math.max(80, score);
+// Health bands follow severity: OK >= ok_min, WARNING >= warning_min, CRITICAL below
+var okMin = Number(E.health_bands.ok_min), warnMin = Number(E.health_bands.warning_min);
+if (rawSev === 'CRITICAL') score = Math.min(score, warnMin - 1);
+else if (rawSev === 'WARNING') score = Math.max(warnMin, Math.min(score, okMin - 1));
+else score = Math.max(okMin, score);
 
 // Hysteresis on severity
 var RANK = {OK: 0, WARNING: 1, CRITICAL: 2};
@@ -511,7 +645,7 @@ if (!noData) {
   if (rawSev === sv.confirmed) { sv.cand = rawSev; sv.n = 0; }
   else {
     if (sv.cand === rawSev) sv.n++; else { sv.cand = rawSev; sv.n = 1; }
-    var need = RANK[rawSev] > RANK[sv.confirmed] ? ESCALATE_EVALS : RELAX_EVALS;
+    var need = RANK[rawSev] > RANK[sv.confirmed] ? Number(E.escalate_evals) : Number(E.relax_evals);
     if (sv.n >= need) { sv.confirmed = rawSev; sv.n = 0; }
   }
 }
@@ -531,7 +665,7 @@ for (var z = 0; z < rulHours.length; z++) {
 
 var autoSummary, autoAction;
 if (noData) {
-  autoSummary = name + ': no fresh telemetry in the last 15 min - predictive checks paused.';
+  autoSummary = name + ': no fresh telemetry in the last ' + E.stale_minutes + ' min - predictive checks paused.';
   autoAction = 'Check gateway power, network and meter link.';
 } else if (!real.length) {
   var MODE_LABEL = {RUNNING: 'running', STANDBY: 'standby', LT: 'LT panel feeders', RO: 'RO plant', FIRE: 'fire suppression'};
@@ -549,15 +683,15 @@ if (noData) {
 out.pm_status = noData ? 'NO DATA' : 'ACTIVE';
 out.pm_mode = mode;
 out.pm_health_score = noData ? '--' : score;
-out.pm_risk_pct = noData ? '--' : Math.max(0, Math.min(99, 100 - score));
+out.pm_risk_pct = noData ? '--' : Math.max(0, Math.min(Number(E.risk_max_pct), 100 - score));
 out.pm_severity = noData ? 'NO DATA' : sev;
 out.pm_severity_raw = rawSev;
 out.pm_rul_days = rul === null ? '--' : r1(rul / 24);
 out.pm_issue_count = real.length;
 out.pm_top_issue = top ? top.text : 'None';
 out.pm_data_quality_pct = expected ? Math.round(present / expected * 100) : 100;
-var il = [];
-for (var u = 0; u < issues.length && u < 12; u++) {
+var il = [], maxIssues = Number(E.max_issues);
+for (var u = 0; u < issues.length && u < maxIssues; u++) {
   il.push({sev: issues[u].sev, text: issues[u].text, action: issues[u].action});
 }
 out.pm_issues = JSON.stringify(il);
@@ -566,14 +700,14 @@ out.pm_recommendation_auto = autoAction.substring(0, 300);
 
 // Template summary stands in until the LLM writes one, and whenever the facts behind the last LLM text
 // change: severity, presence of a predicted RUL, or the issues and their actions (numbers ignored, so live readings
-// inside an issue text keep the LLM text until the next 15-min summary).
+// inside an issue text keep the LLM text until the next AI summary).
 var sigParts = [out.pm_severity, out.pm_rul_days === '--' ? 'norul' : 'rul'];
 for (var g = 0; g < issues.length; g++) {
   sigParts.push(issues[g].sev + ':' + (issues[g].text + ' / ' + issues[g].action).replace(/[0-9.,+-]+/g, '#'));
 }
 var sig = sigParts.join('|');
 var llm = raw('pm_summary');
-var llmStale = !llm || NOW - llm.ts > 40 * 60 * 1000 || S.lastSev !== out.pm_severity || S.lastSig !== sig;
+var llmStale = !llm || NOW - llm.ts > Number(E.ai_summary_max_age_minutes) * 60000 || S.lastSev !== out.pm_severity || S.lastSig !== sig;
 S.lastSig = sig;
 if (llmStale) {
   out.pm_summary = out.pm_summary_auto;

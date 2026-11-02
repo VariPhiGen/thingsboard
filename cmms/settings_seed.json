@@ -1,0 +1,45 @@
+{
+  "_note": "Initial CMMS configuration. Written ONCE to the ThingsBoard asset 'Maintenance Settings' (attribute cmms_settings) by period_reports/deploy_dashboard.py when it does not exist yet. After that the values live in ThingsBoard and are edited on the dashboard (Maintenance Management > Settings); the code contains no defaults.",
+  "timezone_offset_minutes": 330,
+  "equipment_profiles": ["woodward_kg1500", "LT Panels Profile", "RO System Profile", "LT Panel Fire Profile"],
+  "meter": {"key": "run_hours", "unit": "run-h", "valid_min": 0, "valid_below": 30000},
+  "priorities": [
+    {"code": "P1", "label": "Emergency", "response_days": 1},
+    {"code": "P2", "label": "Urgent", "response_days": 3},
+    {"code": "P3", "label": "Normal", "response_days": 7},
+    {"code": "P4", "label": "Low", "response_days": 30}
+  ],
+  "wo_types": [
+    {"name": "Preventive", "planned": true, "plan_allowed": true, "failure_codes": false, "pm_service_reset": true},
+    {"name": "Inspection", "planned": true, "plan_allowed": true, "failure_codes": false, "pm_service_reset": false},
+    {"name": "Statutory", "planned": true, "plan_allowed": true, "failure_codes": false, "pm_service_reset": false},
+    {"name": "Calibration", "planned": true, "plan_allowed": true, "failure_codes": false, "pm_service_reset": false},
+    {"name": "Corrective", "planned": false, "plan_allowed": false, "failure_codes": true, "pm_service_reset": false},
+    {"name": "Condition-based", "planned": false, "plan_allowed": false, "failure_codes": true, "pm_service_reset": false}
+  ],
+  "due_soon_days": 7,
+  "meter_due_window": {"pct_of_interval": 10, "min_units": 10},
+  "failure_codes": {
+    "problem": ["Fails to start", "Fails while running", "Overheating", "Abnormal noise / vibration", "Leakage",
+                "Low output / performance", "Electrical fault", "Instrument / sensor fault", "Low pressure",
+                "Structural damage", "Other"],
+    "cause": ["Wear / ageing", "Lack of maintenance", "Contamination", "Operating error", "Design / installation",
+              "Power supply", "Material defect", "External / environment", "Unknown"],
+    "action": ["Replace", "Repair", "Adjust / calibrate", "Clean", "Refill / recharge", "Tighten / secure",
+               "Settings / software change", "Temporary fix", "No fault found"]
+  },
+  "doc_categories": ["Manual", "SOP / Procedure", "Checklist", "Drawing / Diagram", "Warranty / AMC", "Certificate",
+                     "Statutory licence", "Service report", "Photo", "Other"],
+  "attachment_categories": {"image": "Photo", "other": "Service report"},
+  "doc_expiry_alert_days": 30,
+  "max_upload_mb": 50,
+  "verification": {"different_user": true},
+  "condition_based": {
+    "enabled": true,
+    "severities": ["CRITICAL"],
+    "alarm_types": ["Predictive Maintenance - Critical", "Fire Cylinder * Low Pressure"],
+    "wo_type": "Condition-based",
+    "priority": "P1"
+  },
+  "alerts": {"overdue_priorities": ["P1", "P2"], "digest_enabled": true, "digest_hour": 8, "kpi_periods_days": [30, 90, 180, 365]}
+}
