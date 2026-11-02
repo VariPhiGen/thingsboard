@@ -119,11 +119,28 @@ def baseline(tb, did, keys, now):
     return out
 
 
-def last_run_ts(tb, did, now):
-    """Time the DG last accumulated run hours (3-hourly average over 60 days), or None.
-    AVG, not MAX: the gateway sometimes sends the text 'error', and MAX then returns that text."""
+def last_run_ts(tb, did, now, days=60):
+    """(exact time of the newest real running sample, latest valid run_hours) or (None, ...).
+    Running = dg_status RUNNING or engine_rpm > 300, scanned day by day from today backwards. A 3-hourly
+    run_hours average was used before; it placed the last run up to 3 h late (bucket start)."""
+    last = None
+    for d in range(days):
+        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys='dg_status,engine_rpm',
+                   startTs=now - (d + 1) * 86400000, endTs=now - d * 86400000, limit=50000, agg='NONE', orderBy='DESC') or {}
+        hits = [v['ts'] for v in r.get('dg_status', []) if v['value'] == 'RUNNING']
+        for v in r.get('engine_rpm', []):
+            try:
+                rpm = float(v['value'])
+            except (TypeError, ValueError):
+                continue
+            if 300 < rpm and not is_sentinel(rpm):
+                hits.append(v['ts'])
+        if hits:
+            last = max(hits)
+            break
+    # Latest valid run-hour reading (AVG, not MAX: the gateway sometimes sends the text 'error')
     data = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys='run_hours',
-                  startTs=now - 60 * 86400000, endTs=now, interval=3 * 3600000, agg="AVG", limit=1000)
+                  startTs=now - 7 * 86400000, endTs=now, interval=3 * 3600000, agg="AVG", limit=1000)
     pts = []
     for v in (data or {}).get('run_hours', []):
         try:
@@ -133,10 +150,6 @@ def last_run_ts(tb, did, now):
         if n == n and not is_sentinel(n):
             pts.append((v['ts'], n))
     pts.sort()
-    last = None
-    for (t0, a), (t1, b) in zip(pts, pts[1:]):
-        if b > a + 0.01:
-            last = t1
     return last, (pts[-1][1] if pts else None)
 
 
