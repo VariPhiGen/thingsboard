@@ -102,7 +102,7 @@ def _fmt_ts(ts):
     return datetime.fromtimestamp(ts / 1000, REPORT_TZ).strftime("%Y-%m-%d %H:%M:%S") if ts else "No activity"
 
 
-def collect_device(client, device, category, start_ts, end_ts, historical):
+def collect_device(client, device, category, start_ts, end_ts, historical, sample_filter=None):
     dev_id = device["id"]["id"]
     keys = client.timeseries_keys(dev_id)
     latest = client.latest(dev_id, keys, end_ts if historical else None)
@@ -111,7 +111,11 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
     series, agg, samples_by_key = {}, {}, {}
     energy_kwh = energy_coverage = runs = None
     for key, points in history.items():
-        samples = samples_by_key[key] = valid_samples(points)
+        samples = valid_samples(points)
+        if sample_filter:
+            # Optional per-key cleaning (period_reports drops 0 V / 0 Hz from offline LT meters)
+            samples = sample_filter(category, key, samples)
+        samples_by_key[key] = samples
         series[key] = bucket_series(samples, start_ts, end_ts)
         for stat, value in sample_stats(samples).items():
             agg[f"{key}_24h_{stat}"] = value
@@ -157,6 +161,10 @@ def collect_device(client, device, category, start_ts, end_ts, historical):
         "alarms_count": len(alarms),
         "alarm_types": dict(Counter(a.get("type", "Unknown") for a in alarms)),
         "active_alarms": [a.get("type") for a in alarms],
+        # Compact alarm records for multi-day reports (period_reports); the daily PDFs use the counts above
+        "alarm_list": [{"type": a.get("type"), "severity": a.get("severity"), "status": a.get("status"),
+                        "start_ts": a.get("startTs") or a.get("createdTime"), "clear_ts": a.get("clearTs") or None}
+                       for a in alarms],
         "alarms_excluded": dict(alarms_excluded),
         "operational_events": dict(operational),
         "runs_24h": runs,
@@ -186,7 +194,7 @@ def period_of(summary):
     return start_ts, end_ts, False
 
 
-def collect_summary(client, profiles, report_date=None):
+def collect_summary(client, profiles, report_date=None, sample_filter=None):
     """Summary dicts for every device that belongs to one of the reports."""
     report_date = resolve_report_date(report_date)
     start_ts, end_ts = report_window(report_date)
@@ -197,7 +205,7 @@ def collect_summary(client, profiles, report_date=None):
         if category is None:
             log.debug("Skipping device %s (profile %s not in any report)", device["name"], device.get("type"))
             continue
-        summary.append(collect_device(client, device, category, start_ts, end_ts, historical))
+        summary.append(collect_device(client, device, category, start_ts, end_ts, historical, sample_filter))
     found = Counter(d["category"] for d in summary)
     for category in profiles:
         if not found[category]:
