@@ -612,8 +612,10 @@ def build_dashboard(tb, existing):
         "title": "Health score trend (hourly average)", "showTitle": True, "useDashboardTimewindow": False,
         "displayTimewindow": True, "showLegend": True,
         "datasources": [{"type": "entity", "name": "", "entityAliasId": alias_id, "dataKeys": [
+            # No key-level aggregationType: on a data key it means "one aggregated value for the whole window",
+            # which leaves a line chart empty. The hourly AVG comes from the widget timewindow below.
             {"name": "pm_health_score", "type": "timeseries", "label": "${entityName}", "color": "#2196f3",
-             "settings": {}, "aggregationType": "AVG"}]}],
+             "settings": {}}]}],
         "timewindow": {"selectedTab": 0, "realtime": {"realtimeType": 0, "timewindowMs": 7 * 86400000,
                                                       "interval": 3600000},
                        "aggregation": {"type": "AVG", "limit": 2000}},
