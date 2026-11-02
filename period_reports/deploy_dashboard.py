@@ -69,11 +69,11 @@ def main():
     ml = widget_type(api, "maintenance_log", "Maintenance Log", "latest", read("maintenance_log.css"),
                      read("maintenance_log.js"), (14, 18), maint_cfg,
                      "Record maintenance work; resets the DG service-due counter")
-    planner_cfg = {"showTitle": True, "title": "Maintenance Planner", "backgroundColor": "#ffffff", "padding": "0px",
+    planner_cfg = {"showTitle": True, "title": "Maintenance Management", "backgroundColor": "#ffffff", "padding": "0px",
                    "dropShadow": True, "settings": {}, "datasources": []}
-    mp = widget_type(api, "maintenance_planner", "Maintenance Planner", "latest", read("maintenance_planner.css"),
-                     read("maintenance_planner.js"), (24, 14), planner_cfg,
-                     "Maintenance job schedule, technical documents and work done")
+    mp = widget_type(api, "maintenance_planner", "Maintenance Management", "latest", read("maintenance_planner.css"),
+                     read("maintenance_planner.js"), (24, 16), planner_cfg,
+                     "CMMS: work orders, maintenance plans, technical documents and KPIs")
     api.post(f"/api/widgetsBundle/{bundle['id']['id']}/widgetTypeFqns", [rd["fqn"], ml["fqn"], mp["fqn"]])
     print("widget types:", rd["fqn"], ml["fqn"], mp["fqn"])
 
@@ -90,18 +90,18 @@ def main():
         "type": "deviceType", "resolveMultiple": True, "deviceTypes": EQUIPMENT_TYPES, "deviceType": None,
         "deviceNameFilter": ""}}}
     widgets = {
-        "planner": {"typeFullFqn": f"tenant.{mp['fqn']}", "type": "latest", "sizeX": 24, "sizeY": 14, "row": 0, "col": 0,
+        "planner": {"typeFullFqn": f"tenant.{mp['fqn']}", "type": "latest", "sizeX": 24, "sizeY": 16, "row": 0, "col": 0,
                     "id": "planner",
                     "config": dict(planner_cfg, datasources=[{"type": "entity", "name": "", "entityAliasId": alias_id,
                                                               "dataKeys": run_hours_key}], timewindow=live_tw)},
-        "reports": {"typeFullFqn": f"tenant.{rd['fqn']}", "type": "static", "sizeX": 9, "sizeY": 10, "row": 14,
+        "reports": {"typeFullFqn": f"tenant.{rd['fqn']}", "type": "static", "sizeX": 9, "sizeY": 10, "row": 16,
                     "col": 0, "id": "reports", "config": report_cfg},
-        "maintenance": {"typeFullFqn": f"tenant.{ml['fqn']}", "type": "latest", "sizeX": 15, "sizeY": 20, "row": 14,
+        "maintenance": {"typeFullFqn": f"tenant.{ml['fqn']}", "type": "latest", "sizeX": 15, "sizeY": 20, "row": 16,
                         "col": 9, "id": "maintenance",
                         "config": dict(maint_cfg, datasources=[{"type": "entity", "name": "", "entityAliasId": alias_id,
                                                                 "dataKeys": run_hours_key}],
                                        timewindow=live_tw)},
-        "about": {"typeFullFqn": "system.cards.markdown_card", "type": "static", "sizeX": 9, "sizeY": 10, "row": 24,
+        "about": {"typeFullFqn": "system.cards.markdown_card", "type": "static", "sizeX": 9, "sizeY": 10, "row": 26,
                   "col": 0, "id": "about",
                   "config": {"showTitle": True, "title": "What the reports contain", "backgroundColor": "#ffffff",
                              "padding": "12px", "dropShadow": True, "datasources": [],

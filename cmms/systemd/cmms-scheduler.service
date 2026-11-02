@@ -1,0 +1,12 @@
+[Unit]
+Description=CMMS scheduler: preventive / condition-based work orders, overdue alerts, daily maintenance digest
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/home/ubuntu/thingsboard
+ExecStart=/usr/bin/python3 -m cmms.scheduler
+TimeoutStartSec=300
+Nice=5

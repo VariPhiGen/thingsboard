@@ -41,25 +41,12 @@ run_hours, parts, cost, next_due, service_reset, logged_by) on the equipment at 
 A DG *Preventive service* with "restart the service-due counter" sets `pm_config.last_service_run_hours`,
 so the Predictive Maintenance service countdown restarts.
 
-## Maintenance Planner (job schedule, technical documents, work done)
+## Maintenance Management (CMMS)
 
-Widget *Maintenance Planner* (top of the **Reports & Maintenance** dashboard):
-
-- **Job schedule** - jobs per equipment: one-time, every N days, or every N run-hours (DG). Status is computed live:
-  *Overdue*, *Due within 7 days* (run-hours: within 10 % of the interval, min 10 h), *Upcoming*, *Completed*.
-  Stored as server attribute `maint_jobs` (JSON list) on the equipment device.
-- **Technical documents** - manuals, SOPs, checklists, drawings, certificates uploaded as ThingsBoard GENERAL resources
-  (max 50 MB each). The list is server attribute `maint_docs` on the equipment, or on the asset
-  *Maintenance Document Library* for documents that apply to all equipment (tenant attributes are read-only for
-  tenant admins). Documents can be linked to jobs and are offered for download in the job.
-- **Work done** - *Complete* records checklist results, technician, run hours, work done, parts, cost and attached
-  job cards/photos as telemetry `maintenance_record` (same format as the Maintenance Log, plus `job_id`, `job_title`,
-  `checklist`, `attachments`), so it appears in the Maintenance Log and in the period reports. Recurring jobs move to
-  their next due date / run-hours; a one-time job is marked completed. A DG *Preventive service* restarts the
-  Predictive Maintenance service countdown (`pm_config.last_service_run_hours`, and `service_interval_h` for
-  run-hour jobs).
-
-Test (needs jsdom): `NODE_PATH=<node_modules with jsdom> node period_reports/tests/test_maintenance_planner.js`
+Widget *Maintenance Management* (top of this dashboard): work orders with lifecycle and verification, preventive
+maintenance plans (time / run-hours), technical documents with revision and expiry, KPIs, printable job cards.
+Server side scheduler, alerts and the full design: see `cmms/README.md`. Completed work orders also write
+`maintenance_record`, so they appear in the Maintenance Log and in the period reports.
 
 ## Operations
 
