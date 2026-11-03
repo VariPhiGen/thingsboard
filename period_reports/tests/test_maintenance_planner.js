@@ -306,6 +306,54 @@ async function t(name, fn) { await fn(); passed++; console.log('ok -', name); }
     assert.strictEqual(pc.kind, 'RO'); assert.strictEqual(pc.limits.keys.tds, PM_SEED.kinds.RO.keys.tds);
   });
 
+  await t('Work done tab: work recorded without a work order (2 steps, nothing saved until the work is saved)', async () => {
+    tab('done'); await tick(4);
+    const before = Object.values(db.assets).filter((a) => a.type === 'Work Order').length;
+    const listed = $$('tr[data-act="viewwo"]').length;
+    assert.ok(listed >= 1, 'completed / verified work is listed');
+    act('newdone'); await tick();
+    assert.strictEqual($('.d-eq').value, ''); assert.strictEqual($('.d-type').value, ''); assert.strictEqual($('.d-pri').value, '');
+    act('donenext'); await tick(); assert.ok(/required/.test(status()), status());
+    set('.d-eq', 'dg1'); set('.d-type', SEED.wo_types.find((x) => x.pm_service_reset).name); set('.d-title', 'Annual service by OEM');
+    assert.strictEqual($('.d-rep').style.display, 'none', 'reported time only for corrective work');
+    act('donenext'); await tick();
+    assert.ok($('.c-reset'), 'PM countdown restart offered for DG preventive work');
+    act('back'); await tick();
+    assert.strictEqual($('.d-title').value, 'Annual service by OEM', 'step 1 values kept on Back');
+    act('close'); await tick(4);
+    assert.strictEqual(Object.values(db.assets).filter((a) => a.type === 'Work Order').length, before, 'abandoned form creates no work order');
+    act('newdone'); await tick();
+    set('.d-eq', 'dg1'); set('.d-type', SEED.wo_types.find((x) => x.pm_service_reset).name); set('.d-title', 'Annual service by OEM');
+    act('donenext'); await tick();
+    set('.c-when', workTime()); set('.c-tech', 'OEM engineer'); set('.c-rh', '170'); set('.c-lab', '3'); set('.c-down', '1'); set('.c-desc', 'Oil, filters, belts');
+    $('.c-reset').checked = true;
+    act('savedone'); await tick(16);
+    const id = Object.keys(db.assets).filter((k) => db.assets[k].type === 'Work Order').find((k) => A(k).wo_title === 'Annual service by OEM');
+    const a = A(id), d = J(a.wo_detail);
+    assert.strictEqual(a.wo_status, 'Completed'); assert.strictEqual(a.wo_source, 'direct'); assert.strictEqual(a.wo_due_date, '', 'no due date: not counted in PM compliance');
+    assert.strictEqual(a.wo_assignee, 'OEM engineer'); assert.strictEqual(a.wo_priority, '');
+    assert.deepStrictEqual(d.history.map((h) => h.action), ['created', 'completed']);
+    assert.strictEqual(J(A('dg1').pm_config).limits.service.last_service_run_hours, 170);
+    assert.ok(db.ts.some((x) => x.id === 'dg1' && x.rec.wo_number === db.assets[id].name && x.rec.run_hours === 170), 'maintenance_record written');
+    tab('done'); await tick(4);
+    assert.strictEqual($$('tr[data-act="viewwo"]').length, listed + 1);
+    assert.ok($$('tr[data-act="viewwo"]')[0].textContent.includes('Annual service by OEM'), 'newest first');
+    assert.ok(/Awaiting verification/.test($$('tr[data-act="viewwo"]')[0].textContent));
+  });
+
+  await t('corrective work recorded afterwards counts in MTTR only with its reported time', async () => {
+    act('newdone'); await tick();
+    set('.d-eq', 'ro'); set('.d-type', SEED.wo_types.find((x) => x.failure_codes).name); set('.d-title', 'Pump seal leak');
+    assert.strictEqual($('.d-rep').style.display, '');
+    set('.d-reported', workTime()); act('donenext'); await tick();
+    set('.c-when', workTime()); set('.c-tech', 'Plumber'); set('.c-lab', '1'); set('.c-down', '1'); set('.c-desc', 'Seal replaced');
+    set('.c-fp', SEED.failure_codes.problem[0]); set('.c-fc', SEED.failure_codes.cause[0]); set('.c-fa', SEED.failure_codes.action[0]);
+    act('savedone'); await tick(14);
+    const id = Object.keys(db.assets).find((k) => A(k).wo_title === 'Pump seal leak');
+    assert.strictEqual(A(id).wo_status, 'Completed');
+    assert.ok(J(A(id).wo_detail).reported_ts > 0);
+  });
+
   await t('missing settings: clear message, nothing assumed', async () => {
     const keep = db.attrs.set.cmms_settings; delete db.attrs.set.cmms_settings;
     mount(['tech@site', 'Ravi']); await tick(8);

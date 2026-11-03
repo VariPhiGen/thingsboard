@@ -37,6 +37,15 @@ same number (the loser retries with the next one). `wo_rev` / `plan_rev` are che
 made meanwhile by another user is reported instead of overwritten. Every change is also in the ThingsBoard audit log.
 ThingsBoard rejects null attribute values, so empty fields are stored as `""`.
 
+## Work done tab
+
+Lists every completed / verified work order, newest first (equipment filter, search, verification status). **+ Record
+work done** enters work that was carried out without a work order: step 1 equipment, type, title (priority optional;
+for corrective types the time the problem was reported), step 2 the normal completion form. The work order (source
+`direct`) is created only when the work is saved, so an abandoned form leaves nothing behind. It has no due date, so it
+is not counted in PM compliance; a corrective one counts in MTTR only when its reported time was entered. It is then
+verified by another user like any other work order.
+
 ## Lifecycle (EN 13306 terms)
 
 ```

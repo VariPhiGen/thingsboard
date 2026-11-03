@@ -315,10 +315,11 @@ self.onInit = function () {
     var c = counts();
     var expiring = allDocs().filter(function (x) { var s = docState(x.d); return s && s.k !== 'valid'; }).length;
     var h = '<div class="mp">' + (state.error ? '<div class="mp-err">' + esc(state.error) + '</div>' : '') +
-      '<div class="mp-tabs">' + [['wo', 'Work orders', c.overdue], ['plans', 'Maintenance plans', 0], ['docs', 'Technical documents', expiring], ['kpi', 'KPIs', 0], ['settings', 'Settings', 0]].map(function (t) {
+      '<div class="mp-tabs">' + [['wo', 'Work orders', c.overdue], ['done', 'Work done', c.verify], ['plans', 'Maintenance plans', 0], ['docs', 'Technical documents', expiring], ['kpi', 'KPIs', 0], ['settings', 'Settings', 0]].map(function (t) {
         return '<button class="mp-tab' + (state.tab === t[0] ? ' on' : '') + '" data-tab="' + t[0] + '">' + t[1] + (t[2] ? '<span class="n">' + t[2] + '</span>' : '') + '</button>';
       }).join('') + '</div><div class="mp-panel-slot"></div>';
     if (state.tab === 'wo') h += woView(c);
+    else if (state.tab === 'done') h += doneView();
     else if (state.tab === 'plans') h += plansView();
     else if (state.tab === 'docs') h += docsView();
     else if (state.tab === 'kpi') h += kpiView();
@@ -374,8 +375,59 @@ self.onInit = function () {
           '<td class="nw">' + esc(w.equipment_name) + '</td><td><span class="pill pr-' + (porder.indexOf(w.priority) + 1) + '">' + esc(w.priority) + '</span></td>' +
           '<td><span class="st ' + statusCls(w.status) + '">' + esc(w.status) + '</span></td>' +
           '<td class="nw">' + (ds === 'overdue' || ds === 'due' ? '<span class="pill ' + ds + '">' + (ds === 'overdue' ? 'Overdue' : 'Due') + '</span> ' : '') + esc(dueText(w)) + '</td>' +
-          '<td>' + esc(w.assignee || '-') + '</td><td class="nw sub">' + esc({plan: 'Plan ' + (d.plan_number || ''), alarm: 'Alarm', manual: 'Manual'}[w.source] || w.source || '') + '</td></tr>';
+          '<td>' + esc(w.assignee || '-') + '</td><td class="nw sub">' + esc({plan: 'Plan ' + (d.plan_number || ''), alarm: 'Alarm', manual: 'Manual', direct: 'Work record'}[w.source] || w.source || '') + '</td></tr>';
       }).join('') + '</tbody></table>';
+  }
+  // Work done: every completed / verified work order, newest first, and direct entry of work already carried out
+  function doneView() {
+    var h = '<div class="mp-top"><span class="sub">All maintenance work carried out. Work done without a work order is entered here; ' +
+      (cfg.verification.different_user ? 'another user verifies it.' : 'it can then be verified.') + '</span></div><div class="mp-top">' + equipSelect('mp-eqf', state.equip, true) +
+      '<input class="mp-q search" placeholder="Search number, work, technician" value="' + esc(state.q) + '"><span class="mp-sp"></span>' +
+      '<button class="mp-btn ok" data-act="newdone">+ Record work done</button></div>';
+    var q = state.q.toLowerCase();
+    var rows = wos.filter(function (w) {
+      if (!w.completed_ts || (w.status !== S.CMP && w.status !== S.CLS)) return false;
+      if (state.equip && w.equipment_id !== state.equip) return false;
+      var d = w.detail || {};
+      return !q || ((w.number || '') + ' ' + (w.title || '') + ' ' + (d.work_done || '') + ' ' + (d.technician || '') + ' ' + (w.equipment_name || '')).toLowerCase().indexOf(q) >= 0;
+    });
+    rows.sort(function (a, b) { return (Number(b.completed_ts) - Number(a.completed_ts)) || String(b.number).localeCompare(String(a.number)); });
+    if (!rows.length) return h + '<div class="mp-empty">No work recorded yet.</div>';
+    return h + '<table><thead><tr><th>Finished</th><th>WO number</th><th>Equipment</th><th>Work done</th><th>Technician</th><th>Meter</th><th>Labour h</th><th>Downtime h</th><th>Cost</th><th>Status</th></tr></thead><tbody>' +
+      rows.map(function (w) {
+        var d = w.detail || {};
+        return '<tr class="click' + (state.panel && state.panel.arg === w.id ? ' sel' : '') + '" data-act="viewwo" data-id="' + w.id + '"><td class="nw">' + fmtTs(w.completed_ts) + '</td>' +
+          '<td class="num">' + esc(w.number) + '</td><td class="nw">' + esc(w.equipment_name) + '</td>' +
+          '<td><b>' + esc(w.title) + '</b> <span class="tag">' + esc(w.type) + '</span><div class="sub">' + esc(d.work_done || '') + '</div></td>' +
+          '<td>' + esc(d.technician || '') + '</td><td class="nw">' + (d.done_rh != null && d.done_rh !== '' ? esc(d.done_rh) + ' ' + esc(unit()) : '') + '</td>' +
+          '<td>' + esc(d.labour_hours == null ? '' : d.labour_hours) + '</td><td>' + esc(d.downtime_hours == null ? '' : d.downtime_hours) + '</td><td>' + esc(d.cost_total || '') + '</td>' +
+          '<td>' + (w.status === S.CLS ? '<span class="pill done">Verified</span><div class="sub">' + esc((d.verified_by || {}).name || '') + '</div>' : '<span class="pill due">Awaiting verification</span>') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  // Step 1 of "Record work done" without a work order: what was worked on. Step 2 is the completion form.
+  function doneStart(draft) {
+    var dr = draft || {};
+    slot().innerHTML = '<div class="mp-panel"><h4>Record work done</h4><div class="mp-grid">' +
+      '<label>Equipment <span class="req">*</span>' + equipSelect('d-eq', dr.equipment_id || state.equip, false, false, true) + '</label>' +
+      '<label>Type <span class="req">*</span><select class="d-type">' + opts(typeNames(), dr.type || '', true) + '</select></label>' +
+      '<label class="wide">Work title <span class="req">*</span><input class="d-title" maxlength="120" value="' + esc(dr.title || '') + '"></label>' +
+      '<label>Priority<select class="d-pri">' + opts(priOpts(), dr.priority || '', true) + '</select></label>' +
+      '<label class="d-rep">Problem reported at<input type="datetime-local" class="d-reported" max="' + localNow() + '" value="' + esc(dr.reported || '') + '"><span class="sub">used in the mean time to repair</span></label>' +
+      '<label class="wide">Description<textarea class="d-desc" rows="2" maxlength="1000">' + esc(dr.description || '') + '</textarea></label>' +
+      '</div><div class="mp-row"><button class="mp-btn" data-act="donenext">Next: work details</button><button class="mp-btn light" data-act="close">Cancel</button><span class="mp-status"></span></div></div>';
+    var p = slot();
+    function sync() { p.querySelector('.d-rep').style.display = type(p.querySelector('.d-type').value).failure_codes ? '' : 'none'; }
+    p.querySelector('.d-type').addEventListener('change', sync);
+    sync();
+    p.querySelector('[data-act="donenext"]').addEventListener('click', function () {
+      var ee = eq(p.querySelector('.d-eq').value), ty = p.querySelector('.d-type').value, title = p.querySelector('.d-title').value.trim();
+      if (!ee || !ty || !title) { pstatus('Equipment, type and work title are required.', 'bad'); return; }
+      var rep = type(ty).failure_codes ? p.querySelector('.d-reported').value : '';
+      var repTs = rep ? new Date(rep).getTime() : null;
+      if (rep && (!isFinite(repTs) || repTs > Date.now() + 60000)) { pstatus('The reported time cannot be in the future.', 'bad'); return; }
+      openPanel('complete', {draft: true, title: title, type: ty, priority: p.querySelector('.d-pri').value, equipment_id: ee.id, equipment_name: ee.name,
+        description: p.querySelector('.d-desc').value.trim(), reported: rep, reported_ts: repTs, status: S.SCH, assignee: '', plan_id: '', detail: {}});
+    });
   }
   function plansView() {
     var h = '<div class="mp-top"><span class="sub">Plans raise their work orders automatically when an occurrence enters its lead time.</span>' +
@@ -430,7 +482,9 @@ self.onInit = function () {
       if (comp && comp >= start && comp <= end) done.push(w);
     });
     var corr = done.filter(function (w) { return corrective.indexOf(w.type) >= 0; });
-    var mttr = corr.filter(function (w) { return w.created_ts && w.completed_ts; }).map(function (w) { return (w.completed_ts - w.created_ts) / 3600000; });
+    // repair time runs from when the problem was raised; work recorded afterwards counts only with its reported time
+    var raised = function (w) { return w.source === 'direct' ? (w.detail || {}).reported_ts : w.created_ts; };
+    var mttr = corr.filter(function (w) { return raised(w) && w.completed_ts; }).map(function (w) { return (w.completed_ts - raised(w)) / 3600000; });
     var open = list.filter(function (w) { return OPEN.indexOf(w.status) >= 0; });
     var sum = function (a, f) { return a.reduce(function (s, w) { return s + (Number((w.detail || {})[f]) || 0); }, 0); };
     return {pmDue: dueIn, pmOnTime: onTime, pmc: dueIn ? r1(onTime * 100 / dueIn) : null, backlog: open.length,
@@ -621,7 +675,7 @@ self.onInit = function () {
   function closePanel() { state.panel = null; render(); }
   function openPanel(kind, arg, keep) {
     state.panel = {kind: kind, arg: arg};
-    var ok = ({wo: woDetail, newwo: woForm, editwo: woForm, complete: completeForm, reason: reasonForm, plan: planForm, upload: uploadForm})[kind](arg);
+    var ok = ({wo: woDetail, newwo: woForm, editwo: woForm, complete: completeForm, newdone: doneStart, reason: reasonForm, plan: planForm, upload: uploadForm})[kind](arg);
     if (ok === false) { state.panel = null; return; }
     if (!keep && slot().scrollIntoView) slot().scrollIntoView({behavior: 'smooth', block: 'nearest'});
   }
@@ -657,7 +711,7 @@ self.onInit = function () {
       '<span class="st ' + statusCls(w.status) + '">' + esc(w.status) + '</span>' + (ds === 'overdue' ? '<span class="pill overdue">Overdue</span>' : '') + '</h4>' +
       '<div class="mp-kv"><div><b>Equipment</b>' + esc(w.equipment_name) + (hasMeter(e) && e.meter != null ? ' <span class="sub">(now ' + e.meter + ' ' + esc(unit()) + ')</span>' : '') + '</div>' +
       '<div><b>Type</b>' + esc(w.type) + '</div><div><b>Due</b>' + esc(dueText(w) || '-') + '</div><div><b>Assigned to</b>' + esc(w.assignee || '-') + '</div>' +
-      '<div><b>Raised</b>' + fmtTs(w.created_ts) + '<div class="sub">' + esc({plan: 'from plan ' + (d.plan_number || ''), alarm: 'by alarm ' + (d.alarm_type || ''), manual: 'manually'}[w.source] || '') + '</div></div>' +
+      '<div><b>Raised</b>' + fmtTs(w.created_ts) + '<div class="sub">' + esc({plan: 'from plan ' + (d.plan_number || ''), alarm: 'by alarm ' + (d.alarm_type || ''), manual: 'manually', direct: 'as work done' + (d.reported_ts ? ', problem reported ' + fmtTs(d.reported_ts) : '')}[w.source] || '') + '</div></div>' +
       (d.est_hours ? '<div><b>Estimated</b>' + esc(d.est_hours) + ' h</div>' : '') +
       (w.completed_ts ? '<div><b>Completed</b>' + fmtTs(w.completed_ts) + '<div class="sub">' + esc(d.technician || '') + (d.completed_by ? ', recorded by ' + esc(d.completed_by.name) : '') + '</div></div>' : '') +
       (w.closed_ts && w.status === S.CLS ? '<div><b>Verified</b>' + fmtTs(w.closed_ts) + '<div class="sub">' + esc((d.verified_by || {}).name || '') + '</div></div>' : '') + '</div>' +
@@ -779,15 +833,16 @@ self.onInit = function () {
     });
   }
 
-  function completeForm(id) {
-    var w = byId(wos, id);
+  function completeForm(arg) {
+    var draft = arg && arg.draft ? arg : null;
+    var w = draft || byId(wos, arg);
     if (!w) return false;
     var d = w.detail || {}, e = eq(w.equipment_id), metered = hasMeter(e), ty = type(w.type);
     var corrective = !!ty.failure_codes;
     var svc = !!ty.pm_service_reset && !!(e && e.pm && e.pm.kind) && metered;
     var plan = byId(plans, w.plan_id);
     var needMeter = svc || (plan && plan.strategy === 'meter');
-    slot().innerHTML = '<div class="mp-panel"><h4>Record work done &middot; ' + esc(w.number) + ' &middot; ' + esc(w.title) + '</h4>' +
+    slot().innerHTML = '<div class="mp-panel"><h4>Record work done &middot; ' + (draft ? esc(w.equipment_name) : esc(w.number)) + ' &middot; ' + esc(w.title) + '</h4>' +
       ((d.docs || []).length ? '<div class="sub" style="margin-bottom:6px">Documents: ' + docLinks(d.docs) + '</div>' : '') +
       ((d.checklist || []).length ? '<h5>Checklist <span class="req">*</span> (tick each step done; remark required for a step not done)</h5><div class="mp-checks c-cl" style="max-height:none">' + d.checklist.map(function (s, i) {
         return '<div class="mp-cl-row"><input type="checkbox" data-i="' + i + '"><span>' + esc(s) + '</span><input class="c-note" data-i="' + i + '" placeholder="Reading / remark"></div>';
@@ -842,11 +897,23 @@ self.onInit = function () {
       var cost = Math.round(parts.reduce(function (s, x) { return s + x.qty * x.rate; }, 0) * 100) / 100;
       var files = [].slice.call(p.querySelector('.c-files').files || []);
       busy(true); pstatus(files.length ? 'Uploading ' + files.length + ' file(s)…' : 'Saving…');
-      files.reduce(function (pr, f) {
+      // Work recorded without a work order: the work order is created only now, with the work, so an abandoned form
+      // leaves nothing behind. No due date (unscheduled work is not counted in PM compliance).
+      var ready = !draft ? Promise.resolve(w) : (function () {
+        var det0 = {description: draft.description, direct: true, reported_ts: draft.reported_ts || null,
+                    history: [hist('created', 'Recorded as work done', null, S.SCH)]};
+        return createWo({title: draft.title, type: draft.type, priority: draft.priority, status: S.SCH, source: 'direct', plan_id: '', alarm_id: '',
+                         equipment_id: draft.equipment_id, equipment_name: draft.equipment_name, due_date: '', due_rh: null, interval_rh: null,
+                         assignee: tech, created_ts: Date.now(), completed_ts: null, closed_ts: null, overdue_alerted: false, detail: det0})
+          .then(function (r) { w = {id: r.id, number: r.number, rev: 1, title: draft.title, type: draft.type, priority: draft.priority, status: S.SCH,
+                                   source: 'direct', plan_id: '', equipment_id: draft.equipment_id, equipment_name: draft.equipment_name, assignee: tech, detail: det0};
+                               state.panel = {kind: 'wo', arg: r.id}; return w; });
+      })();
+      ready.then(function () { return files.reduce(function (pr, f) {
         return pr.then(function (acc) {
           return uploadFile(f, w.number + ' - ' + f.name).then(function (meta) { meta.category = attachCat(f.name); meta.wo = w.number; acc.push(meta); return acc; });
         });
-      }, Promise.resolve([])).then(function (att) {
+      }, Promise.resolve([])); }).then(function (att) {
         var rec = {type: w.type, description: desc, technician: tech, run_hours: rh, parts: parts.map(function (x) { return x.name + ' x' + x.qty; }).join(', ') || null,
                    cost: cost || null, next_due: null, service_reset: reset, logged_by: me.name, logged_at: Date.now(), wo_number: w.number, job_title: w.title,
                    checklist: results, labour_hours: lab, downtime_hours: down, failure: fail3, attachments: att.map(function (a) { return {id: a.id, title: a.title, file: a.file}; })};
@@ -1013,9 +1080,11 @@ self.onInit = function () {
     if (!act && t.getAttribute('data-doc')) { download(t.getAttribute('data-doc')); return; }
     var cur = state.panel && state.panel.kind === 'wo' ? byId(wos, state.panel.arg) : null;
     if (act === 'close') closePanel();
+    else if (act === 'back' && state.panel && state.panel.arg && state.panel.arg.draft) openPanel('newdone', state.panel.arg);
     else if (act === 'back') { if (state.panel && state.panel.arg) openPanel('wo', state.panel.arg.id || state.panel.arg); else closePanel(); }
     else if (act === 'viewwo') openPanel('wo', t.getAttribute('data-id'));
     else if (act === 'newwo') openPanel('newwo', null);
+    else if (act === 'newdone') openPanel('newdone', null);
     else if (act === 'newplan') openPanel('plan', null);
     else if (act === 'editplan') openPanel('plan', t.getAttribute('data-id'));
     else if (act === 'upload') openPanel('upload');

@@ -190,7 +190,10 @@ def kpis(work_orders, start, end, today, settings, run_hours=None):
         if completed and start <= completed <= end:
             done.append(w)
     corrective = [w for w in done if w.get("type") in settings.corrective_types]
-    mttr = [(w["completed_ts"] - w["created_ts"]) / 3600000 for w in corrective if w.get("created_ts") and w.get("completed_ts")]
+    # repair time runs from when the problem was raised; work recorded afterwards counts only with its reported time
+    def raised(w):
+        return (w.get("detail") or {}).get("reported_ts") if w.get("source") == "direct" else w.get("created_ts")
+    mttr = [(w["completed_ts"] - raised(w)) / 3600000 for w in corrective if raised(w) and w.get("completed_ts")]
     open_wos = [w for w in work_orders if w.get("status") in OPEN]
     overdue = [w for w in open_wos if due_state(w, run_hours.get(w.get("equipment_id")), today, settings) == "overdue"]
     labour = sum(float((w.get("detail") or {}).get("labour_hours") or 0) for w in done)

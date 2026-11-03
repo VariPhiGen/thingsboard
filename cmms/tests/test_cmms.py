@@ -121,6 +121,20 @@ class Kpis(unittest.TestCase):
         self.assertEqual(k["planned_pct"], 66.7)
         self.assertEqual((k["labour_hours"], k["cost_total"]), (4.0, 1200.0))
 
+    def test_work_recorded_afterwards(self):
+        # recorded as work done: no due date (not in PM compliance); MTTR only from the reported time
+        ts = lambda d, h: int(datetime(2026, 10, d, h, tzinfo=CFG.tz).timestamp() * 1000)
+        wos = [
+            {"type": "Preventive", "status": m.COMPLETED, "source": "direct", "due_date": "", "created_ts": ts(20, 12), "completed_ts": ts(20, 10)},
+            {"type": "Corrective", "status": m.COMPLETED, "source": "direct", "due_date": "", "created_ts": ts(21, 12), "completed_ts": ts(21, 10)},
+            {"type": "Corrective", "status": m.CLOSED, "source": "direct", "due_date": "", "created_ts": ts(22, 12), "completed_ts": ts(22, 10),
+             "detail": {"reported_ts": ts(22, 6)}},
+        ]
+        k = m.kpis(wos, date(2026, 10, 1), date(2026, 10, 31), TODAY, CFG)
+        self.assertEqual(k["pm_due"], 0)
+        self.assertIsNone(k["pm_compliance_pct"])
+        self.assertEqual(k["mttr_h"], 4.0)
+
     def test_no_data_gives_none_not_zero(self):
         k = m.kpis([], date(2026, 10, 1), date(2026, 10, 31), TODAY, CFG)
         self.assertIsNone(k["pm_compliance_pct"]); self.assertIsNone(k["mttr_h"]); self.assertIsNone(k["planned_pct"])
