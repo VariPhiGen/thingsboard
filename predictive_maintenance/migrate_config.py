@@ -123,6 +123,16 @@ def nominal_from(median, rule):
     return rule["three_phase_v"] if median > rule["three_phase_if_median_above_v"] else rule["single_phase_v"]
 
 
+def fill_battery_float(limits, baseline):
+    """DG battery float level = the battery's own 7-day standby median (only when not configured yet)."""
+    bat = limits.setdefault("battery", {})
+    bm = (baseline.get("battery_voltage") or {}).get("median")
+    if bat.get("float_v") is None and bm:
+        bat["float_v"] = round(float(bm), 2)
+        return [f"battery float {bat['float_v']} V (7-day median)"]
+    return [] if bat.get("float_v") is not None else ["battery float level not derivable (no history) - falling-trend check off until set"]
+
+
 def derive(tb, device, kind, limits, baseline):
     """Per-device values from the device's own history (only where the device has no configured value yet)."""
     d, notes = SEED["derive"], []
@@ -132,6 +142,7 @@ def derive(tb, device, kind, limits, baseline):
             for k in ("crit_v", "warn_v", "trend_floor_v", "overcharge_v", "falling_v_per_h"):
                 limits["battery"][k] = round(limits["battery"][k] / 2, 3)
             notes.append(f"battery 12 V system (median {bm} V)")
+        notes += fill_battery_float(limits, baseline)
         rule = d["nominal_voltage"]
         vals = [v for v in tb.history_values(device["id"], limits["keys"]["voltage"], rule["history_days"])
                 if rule["min_valid_v"] <= v < SEED["engine"]["invalid_at_or_above"]]
@@ -165,7 +176,11 @@ def new_config(tb, device, kind, current):
         cfg = copy.deepcopy(cur)                              # already migrated: only fill new keys
         deep_fill(cfg["limits"], strip_notes(SEED["kinds"][kind]))
         deep_fill(cfg["engine"], strip_notes(SEED["engine"]))
-        return cfg, ["already migrated - missing keys filled"]
+        notes = ["already migrated - missing keys filled"]
+        if kind == "DG":
+            baseline = tb.attrs(device["id"], ["pm_baseline"]).get("pm_baseline") or {}
+            notes += fill_battery_float(cfg["limits"], baseline)
+        return cfg, notes
     limits = strip_notes(copy.deepcopy(SEED["kinds"][kind]))
     baseline = tb.attrs(device["id"], ["pm_baseline"]).get("pm_baseline") or {}
     notes = derive(tb, device, kind, limits, baseline)

@@ -22,6 +22,7 @@ function buildCfg(type, overrides, baseline) {
     var bm = baseline.battery_voltage && baseline.battery_voltage.median;
     var D = SEED.derive, NV = D.nominal_voltage;
     if (bm && bm <= D.battery_12v_if_median_at_or_below_v) { ['crit_v', 'warn_v', 'trend_floor_v', 'overcharge_v'].forEach(function (k) { lim.battery[k] = lim.battery[k] / 2; }); lim.battery.falling_v_per_h /= 2; }
+    if (bm) lim.battery.float_v = Math.round(bm * 100) / 100;   // migrate_config.fill_battery_float
     var vm = baseline.voltage && baseline.voltage.median;
     if (vm) lim.voltage.nominal_v = vm > NV.three_phase_if_median_above_v ? NV.three_phase_v : NV.single_phase_v;
   }
@@ -79,7 +80,7 @@ t('DG standby healthy (sensors 32767 are not a fault)', function () {
   var r = run('woodward_kg1500', {
     dg_status: L('OFF'), engine_rpm: L(32767), coolant_temp: L(32767), oil_pressure: L(32767),
     battery_voltage: L(26.7), fuel_level: L(98), run_hours: L(132.27), engine_starts: L(335), common_alarm: L(0)
-  }, {state: {lastRunTs: NOW - 2 * 86400000}});
+  }, {state: {lastRunTs: NOW - 2 * 86400000}, baseline: {battery_voltage: {median: 26.7}}});
   assert.strictEqual(r.msg.pm_severity, 'OK');
   assert.strictEqual(r.msg.pm_mode, 'STANDBY');
   assert.ok(r.msg.pm_health_score >= 80);
@@ -160,9 +161,50 @@ t('DG service overdue and not exercised', function () {
 t('DG battery declining trend predicts RUL', function () {
   var r = runN(40, 'woodward_kg1500', function (i) {
     return {dg_status: L('OFF'), battery_voltage: L(26 - i * 0.02), fuel_level: L(90), run_hours: L(10)};
-  });
+  }, {baseline: {battery_voltage: {median: 26.4}}});
   assert.notStrictEqual(r.msg.pm_rul_days, '--');
   assert.ok(r.msg.pm_rul_days < 3, 'rul ' + r.msg.pm_rul_days);
+});
+
+t('DG battery settling back to float after a run (charger boost) is not a decline', function () {
+  // Live DG Set 2, 2-3 Nov: 28.2 V after the run, back to its 26.7 V float level over ~3 h, then steady
+  var opts = {baseline: {battery_voltage: {median: 26.7}}};
+  var r = runN(60, 'woodward_kg1500', function (i) {
+    var v = i < 36 ? Math.round((28.2 - i * 0.042) * 10) / 10 : 26.7;
+    return {dg_status: L('OFF'), battery_voltage: L(Math.max(26.7, v)), fuel_level: L(100), run_hours: L(132.34)};
+  }, opts);
+  assert.strictEqual(r.msg.pm_rul_days, '--', 'no forecast from charger relaxation: ' + r.msg.pm_rul_days);
+  assert.ok(!/Battery falling/.test(r.msg.pm_issues), r.msg.pm_issues);
+  // ... but a real fall below the float level is still forecast
+  var r2 = runN(40, 'woodward_kg1500', function (i) {
+    return {dg_status: L('OFF'), battery_voltage: L(26.6 - i * 0.02), fuel_level: L(100), run_hours: L(132.34)};
+  }, opts);
+  assert.notStrictEqual(r2.msg.pm_rul_days, '--');
+  // without a float level the falling-trend check is off and reported, never assumed
+  var r3 = run('woodward_kg1500', {dg_status: L('OFF'), battery_voltage: L(26.6), fuel_level: L(100), run_hours: L(10)});
+  assert.ok(/not configured: .*battery.float_v/.test(r3.msg.pm_issues), r3.msg.pm_issues);
+});
+
+t('DG controller alarm: shows since when, named from the configured code list, clears at 0', function () {
+  var base = {dg_status: L('OFF'), battery_voltage: L(26.7), fuel_level: L(100), run_hours: L(10)};
+  var since = NOW - 11 * 3600000;   // 2026-11-02 20:00 IST in the test clock
+  var r = run('woodward_kg1500', Object.assign({common_alarm: L(288)}, base), {state: {ca: {code: 288, since: since}}});
+  var iss = JSON.parse(r.msg.pm_issues)[0];
+  var d = new Date(since + 19800000);
+  var stamp = d.getUTCDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getUTCMonth()] + ' ' +
+    ('0' + d.getUTCHours()).slice(-2) + ':' + ('0' + d.getUTCMinutes()).slice(-2);
+  assert.strictEqual(iss.text, 'Controller alarm active since ' + stamp + ' - code 288');
+  assert.ok(/reset the alarm on the panel/.test(iss.action));
+  var cfg = buildCfg('woodward_kg1500', {});
+  cfg.limits.alarm_codes = {'288': 'Mains failure'};
+  var r2 = run('woodward_kg1500', Object.assign({common_alarm: L(288)}, base), {rawConfig: cfg, state: {ca: {code: 288, since: since}}});
+  assert.ok(/ - Mains failure \(code 288\)/.test(r2.msg.pm_issues), r2.msg.pm_issues);
+  // first seen now -> since = now; back to 0 -> cleared
+  var r3 = run('woodward_kg1500', Object.assign({common_alarm: L(320)}, base));
+  assert.strictEqual(JSON.parse(r3.metadata.pm_state_out).ca.since, NOW);
+  var r4 = run('woodward_kg1500', Object.assign({common_alarm: L(0)}, base), {state: JSON.parse(r3.metadata.pm_state_out)});
+  assert.strictEqual(JSON.parse(r4.metadata.pm_state_out).ca, null);
+  assert.ok(!/Controller alarm/.test(r4.msg.pm_issues));
 });
 
 t('LT feeders: N/A meters are INFO, healthy feeders OK, PF computed', function () {

@@ -187,6 +187,29 @@ def fuel_replay(tb, did, name, config, days=14):
     return json.loads(out)
 
 
+def alarm_onset(tb, did, now, limits, days=30):
+    """(code, ts) of the controller common alarm when it is active now: ts = first sample of the current active
+    period, from the device's own history (None when the alarm is not active or its start is not in the history)."""
+    key = limits['keys']['common_alarm']
+    since, code = None, None
+    for d in range(days):
+        r = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/timeseries", keys=key, startTs=now - (d + 1) * 86400000,
+                   endTs=now - d * 86400000, limit=50000, agg='NONE', orderBy='DESC') or {}
+        for v in r.get(key, []):
+            try:
+                n = float(v['value'])
+            except (TypeError, ValueError):
+                continue                                        # gateway read errors are not a state
+            if is_sentinel(n):
+                continue
+            if n == 0:
+                return (code, since) if code is not None else None
+            if code is None:
+                code = n
+            since = v['ts']
+    return None
+
+
 def server_attrs(tb, did, keys):
     res = tb.get(f"/api/plugins/telemetry/DEVICE/{did}/values/attributes/SERVER_SCOPE", keys=",".join(keys)) or []
     out = {}
@@ -255,6 +278,12 @@ def prepare_devices(tb, dry):
                 if rh is not None:
                     state["lastRh"] = rh
             note += f" | run_hours={rh} last_run={time.strftime('%Y-%m-%d %H:%M', time.localtime(lr / 1000)) if lr else 'unknown'}"
+        if kind == 'DG' and state is not None:
+            onset = alarm_onset(tb, did, now, cfg['limits'])
+            if onset and (not isinstance(state.get('ca'), dict) or (state['ca'].get('since') or now) > onset[1]):
+                state['ca'] = {"code": onset[0], "since": onset[1]}
+                attrs["pm_state"] = json.dumps(state)
+                note += f" | controller alarm {onset[0]:g} since {time.strftime('%Y-%m-%d %H:%M', time.localtime(onset[1] / 1000))}"
         if state is not None and 'pm_state' not in existing:
             attrs["pm_state"] = json.dumps(state)
         if kind == 'DG' and 'fuel_state' not in existing:
@@ -319,10 +348,11 @@ LLM_SYSTEM = (
     "Your text is shown to the facility's client on a dashboard: write short, plain English for a site manager. "
     "Never mention field names, configuration keys, variables or code (nothing with underscores such as pm_config, "
     "last_service_run_hours, pm_rul_days, rated_a), and do not mention the engine, JSON or AI. Use the issue texts and "
-    "actions as written; for service records refer to the Maintenance Log.\n"
+    "actions as written; for service records refer to Maintenance Management (preventive work orders).\n"
     "Respond with ONE JSON object only, no markdown, with keys:\n"
-    "summary: max 220 characters - overall condition, the most important numbers from the issues, and the predicted "
-    "number of days until a limit is reached (pm_rul_days) only when it is not '--'. If pm_severity is OK say the "
+    "summary: max 220 characters - overall condition and the most important issues in plain words. You may name "
+    "cylinders, feeders and alarm codes, but do not quote live readings, days left, health score or risk: the "
+    "dashboard shows those next to your text and they change between your updates. If pm_severity is OK say the "
     "equipment is healthy and mention any INFO items briefly.\n"
     "recommendation: max 160 characters - one concrete next action for the most severe issue."
 )

@@ -181,6 +181,13 @@ function base(k, stat) {
 }
 function r1(x) { return Math.round(x * 10) / 10; }
 function r2(x) { return Math.round(x * 100) / 100; }
+var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function pad2(x) { return (x < 10 ? '0' : '') + x; }
+// Site-local 'D Mon HH:MM' of a timestamp
+function localStamp(ts) {
+  var d = new Date(ts + TZ_MS);
+  return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()] + ' ' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes());
+}
 function localDay() { return Math.floor((NOW + TZ_MS) / DAY); }
 
 // ---------- trends ----------
@@ -239,10 +246,14 @@ if (kind === 'DG') {
     var bCrit = lim('battery.crit_v'), bWarn = lim('battery.warn_v'), bFloor = lim('battery.trend_floor_v'), bOver = lim('battery.overcharge_v');
     if (!running) {
       var bt = trend('battery_off', bv, lim('battery.trend_alpha') || 0);
+      // After a run the charger lifts the battery above its float level and it settles back over hours: that fall is
+      // not a battery fault, so the falling trend only counts below the battery's normal standby (float) level.
+      var bFloat = lim('battery.float_v');
+      if (bFloat !== null && bt.f >= bFloat) bt.s = 0;
       if (bCrit !== null && bv < bCrit) add('CRITICAL', 'Battery ' + bv + ' V on standby (min ' + bCrit + ' V) - DG may fail to crank', 'Check battery charger and battery health now; arrange a replacement battery.');
       else if (bWarn !== null && bv < bWarn) add('WARNING', 'Battery low on standby: ' + bv + ' V', 'Check the battery charger output and electrolyte/terminals.');
       var fall = lim('battery.falling_v_per_h'), within = lim('battery.warn_within_h');
-      if (bFloor !== null && fall !== null) {
+      if (bFloor !== null && fall !== null && bFloat !== null) {
         var hb = hoursTo(bt, bFloor, lim('battery.trend_min_evals'));
         if (hb !== null && bt.s < -fall) {
           rulHours.push(hb);
@@ -333,10 +344,20 @@ if (kind === 'DG') {
   }
 
   // Controller alarm
+  // Controller alarm (latched on the panel until it is reset). S.ca = {code, since}: when the alarm first became active.
   var ca = num('common_alarm');
-  if (ca !== null && ca !== 0) add('WARNING', 'Controller common alarm active (code ' + ca + ')', 'Check the alarm list on the DG control panel.');
+  if (ca !== null && ca !== 0) {
+    if (!S.ca || !S.ca.since) S.ca = {since: NOW};
+    S.ca.code = ca;
+    var names = L && L.alarm_codes && typeof L.alarm_codes === 'object' ? L.alarm_codes : {};
+    var caName = names['' + ca] ? names['' + ca] + ' (code ' + ca + ')' : 'code ' + ca;
+    add('WARNING', 'Controller alarm active' + (S.ca.since ? ' since ' + localStamp(S.ca.since) : '') + ' - ' + caName,
+      'Check the alarm list on the DG control panel, correct the cause and reset the alarm on the panel.');
+  } else if (ca === 0) {
+    S.ca = null;
+  }
 
-  // Service due (run hours), only from the real last-service record (logged in the Maintenance Log)
+  // Service due (run hours), only from the real last-service record (closed preventive work order)
   var rh = expect(num('run_hours'));
   var lastSvc = opt('service.last_service_run_hours');
   var interval = lim('service.interval_h');
@@ -346,12 +367,12 @@ if (kind === 'DG') {
     out.rul_hours = Math.max(0, r1(due));
     var sOver = lim('service.overdue_crit_h'), sSoon = lim('service.due_soon_h');
     if (sOver !== null && due < -sOver) add('CRITICAL', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Carry out the scheduled service (oil, filters) now.');
-    else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and record it in the Maintenance Log.');
+    else if (due < 0) add('WARNING', 'Service overdue by ' + Math.round(-due) + ' run-hours', 'Schedule the service and close it as a preventive work order in Maintenance Management.');
     else if (sSoon !== null && due < sSoon) add('INFO', 'Service due in ' + Math.round(due) + ' run-hours', 'Plan the next service.', lim('service.due_soon_penalty'));
   } else {
     out.pm_service_due_h = '--';
     out.rul_hours = '--';
-    if (lastSvc === null) add('INFO', 'Service schedule not set up - last service not yet logged', 'Record the last DG service in the Maintenance Log (Reports & Maintenance dashboard) to start the service countdown.', 0);
+    if (lastSvc === null) add('INFO', 'Service schedule not set up - last service not yet logged', 'Record the last DG service as a completed preventive work order in Maintenance Management (Reports & Maintenance dashboard) to start the service countdown.', 0);
   }
   // Exercise (standby DG must run regularly). The controller sometimes nudges the run-hour counter with the
   // engine stopped, so only a rise of at least exercise.min_run_increase_h counts as a run.

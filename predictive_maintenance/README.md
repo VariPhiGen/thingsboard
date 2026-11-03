@@ -18,6 +18,14 @@ and derived per-device values from each device's own history with the template's
 system, nominal voltage of the DG output and of each LT feeder, RO TDS warning level. It also stores the template on the
 asset *Maintenance Settings* (`pm_templates`) so new equipment can be configured from the dashboard.
 
+DG specifics:
+- `battery.float_v` = the battery's normal standby (float) voltage, the 7-day median. A falling battery trend (and its
+  "days left") is only tracked below it, so the slow settling after the charger's boost following a DG run is not
+  reported as a decline. Without it the falling-trend check is off and listed as not configured.
+- Controller common alarm: shown with the time it became active (`pm_state.ca`, seeded from history by `deploy_pm.py`),
+  and with a name when the code is listed in `limits.alarm_codes` (code -> name from the controller manual; empty by
+  default, so the code itself is shown).
+
 ```bash
 python3 -m predictive_maintenance.migrate_config --dry-run
 python3 -m predictive_maintenance.migrate_config --apply --backup-dir predictive_maintenance/backups
