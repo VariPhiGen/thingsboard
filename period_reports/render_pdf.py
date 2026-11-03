@@ -289,7 +289,7 @@ def history_section(p):
         if len(rows) > PDF_HISTORY_ROWS:
             body += f'<div class="note">Showing the latest {PDF_HISTORY_ROWS} of {len(rows)} entries. The Excel report lists all.</div>'
     hint = ('' if n_manual else '<div class="note">No maintenance work was logged in this period. Record work in the '
-            '<b>Maintenance Log</b> on the Reports dashboard so that it appears here and resets the service counters.</div>')
+            '<b>Maintenance Management</b> on the Reports &amp; Maintenance dashboard (Work orders &gt; Record work done) so that it appears here.</div>')
     return (f'<div class="section"><h3>Maintenance &amp; Event History <span class="sub">({n_manual} maintenance '
             f'record(s), {len(p["events"])} automatic event(s))</span></h3>{body}{hint}</div>')
 

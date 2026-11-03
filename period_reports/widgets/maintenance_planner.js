@@ -23,6 +23,7 @@ self.onInit = function () {
   TRANS[S.CMP] = [S.CLS, S.PRG]; TRANS[S.CLS] = []; TRANS[S.CAN] = [];
   var SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR', 'WARNING', 'INDETERMINATE'];   // ThingsBoard alarm severities
   var MAP_FIELDS = ['nominal_v', 'rated_a'];                                       // per-feeder maps in PM limits
+  var TEXT_MAP_FIELDS = ['alarm_codes'];                                           // code -> name maps in PM limits
   var WO_KEYS = ['wo_title', 'wo_type', 'wo_priority', 'wo_status', 'wo_source', 'wo_plan_id', 'wo_alarm_id', 'wo_equipment_id',
                  'wo_equipment_name', 'wo_due_date', 'wo_due_rh', 'wo_interval_rh', 'wo_assignee', 'wo_created_ts', 'wo_completed_ts',
                  'wo_closed_ts', 'wo_rev', 'wo_overdue_alerted', 'wo_detail'];
@@ -529,6 +530,9 @@ self.onInit = function () {
     if (MAP_FIELDS.indexOf(path.split('.').pop()) >= 0 && (v == null || typeof v === 'object')) {
       return '<label>' + esc(label) + ' (one per line: name = value)<textarea class="pm-map"' + dp + ' rows="4">' + esc(Object.keys(v || {}).map(function (k) { return k + ' = ' + v[k]; }).join('\n')) + '</textarea></label>';
     }
+    if (TEXT_MAP_FIELDS.indexOf(path.split('.').pop()) >= 0 && (v == null || typeof v === 'object')) {
+      return '<label class="wide">' + esc(label) + ' (one per line: code = name, from the controller manual)<textarea class="pm-tmap"' + dp + ' rows="4">' + esc(Object.keys(v || {}).map(function (k) { return k + ' = ' + v[k]; }).join('\n')) + '</textarea></label>';
+    }
     if (v instanceof Array) {
       if (v.length && typeof v[0] === 'string') return '<label>' + esc(label) + ' (one per line)<textarea class="pm-slist"' + dp + ' rows="3">' + esc(v.join('\n')) + '</textarea></label>';
       return '<label>' + esc(label) + ' (comma separated)<input class="pm-nlist"' + dp + ' value="' + esc(v.join(', ')) + '"></label>';
@@ -555,6 +559,10 @@ self.onInit = function () {
     if (/pm-nlist/.test(c)) return el.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean).map(Number).filter(function (x) { return isFinite(x); });
     if (/pm-slist/.test(c)) return lines(el.value);
     var m = {};
+    if (/pm-tmap/.test(c)) {
+      lines(el.value).forEach(function (l) { var i = l.indexOf('='); if (i > 0 && l.slice(0, i).trim() && l.slice(i + 1).trim()) m[l.slice(0, i).trim()] = l.slice(i + 1).trim(); });
+      return m;
+    }
     lines(el.value).forEach(function (l) { var p = l.split('='); if (p.length === 2 && p[0].trim() && isFinite(Number(p[1]))) m[p[0].trim()] = Number(p[1]); });
     return m;
   }

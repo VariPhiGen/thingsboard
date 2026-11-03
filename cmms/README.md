@@ -29,7 +29,7 @@ response days of the chosen priority; the meter field shows the equipment's late
 | Maintenance plan | ThingsBoard asset, type `Maintenance Plan`, server attributes `plan_*` | `PL-0001` |
 | Work order | ThingsBoard asset, type `Work Order`, server attributes `wo_*` (`wo_detail` = JSON: checklist + results, parts, failure codes, labour, downtime, attachments, history) | `WO-2026-00001` |
 | Technical document | ThingsBoard GENERAL resource; metadata list `maint_docs` on the equipment device, or on the asset `Maintenance Document Library` (all equipment) | - |
-| Work done | also telemetry `maintenance_record` on the equipment (Maintenance Log widget, period reports) | - |
+| Work done | also telemetry `maintenance_record` on the equipment (period reports) | - |
 
 Plans and work orders are related to their equipment device with relation type `Maintenance`.
 The asset name is the record number: ThingsBoard rejects duplicate asset names, so two creators can never get the

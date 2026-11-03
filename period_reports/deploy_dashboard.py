@@ -97,29 +97,22 @@ def main():
                                                  "description": "Equipment reports and maintenance log"})
     report_cfg = {"showTitle": True, "title": "Equipment Reports", "backgroundColor": "#ffffff", "padding": "0px",
                   "dropShadow": True, "settings": {"apiUrl": API_URL}, "datasources": []}
-    maint_cfg = {"showTitle": True, "title": "Maintenance Log", "backgroundColor": "#ffffff", "padding": "0px",
-                 "dropShadow": True, "settings": {}, "datasources": []}
     rd = widget_type(api, "report_download", "Equipment Report Download", "static", read("report_download.css"),
                      read("report_download.js"), (10, 9), report_cfg,
                      "Daily/weekly/monthly/custom equipment reports as PDF or Excel")
-    ml = widget_type(api, "maintenance_log", "Maintenance Log", "latest", read("maintenance_log.css"),
-                     read("maintenance_log.js"), (14, 18), maint_cfg,
-                     "Record maintenance work; resets the DG service-due counter")
     planner_cfg = {"showTitle": True, "title": "Maintenance Management", "backgroundColor": "#ffffff", "padding": "0px",
                    "dropShadow": True, "settings": {}, "datasources": []}
     mp = widget_type(api, "maintenance_planner", "Maintenance Management", "latest", read("maintenance_planner.css"),
                      read("maintenance_planner.js"), (24, 16), planner_cfg,
                      "CMMS: work orders, maintenance plans, technical documents and KPIs")
-    api.post(f"/api/widgetsBundle/{bundle['id']['id']}/widgetTypeFqns", [rd["fqn"], ml["fqn"], mp["fqn"]])
-    print("widget types:", rd["fqn"], ml["fqn"], mp["fqn"])
+    api.post(f"/api/widgetsBundle/{bundle['id']['id']}/widgetTypeFqns", [rd["fqn"], mp["fqn"]])
+    print("widget types:", rd["fqn"], mp["fqn"])
 
     # Asset that holds the documents that apply to all equipment (tenant attributes are read-only for tenant admins)
     lib = api.get("/api/tenant/assets", assetName=LIBRARY_ASSET)
     if not lib:
         lib = api.post("/api/asset", {"name": LIBRARY_ASSET, "type": LIBRARY_TYPE, "label": "Manuals, SOPs and checklists for all equipment"})
     print("document library asset:", lib["id"]["id"])
-    meter = settings["meter"]
-    run_hours_key = [{"name": meter["key"], "type": "timeseries", "label": meter["key"].replace("_", " ").title(), "color": "#607d8b", "settings": {}}]
     live_tw = {"realtime": {"realtimeType": 0, "interval": 1000, "timewindowMs": 60000}}
 
     alias_id = "reports-all-equipment"
@@ -130,22 +123,17 @@ def main():
         "planner": {"typeFullFqn": f"tenant.{mp['fqn']}", "type": "latest", "sizeX": 24, "sizeY": 16, "row": 0, "col": 0,
                     "id": "planner",
                     "config": dict(planner_cfg, datasources=[], timewindow=live_tw)},
-        "reports": {"typeFullFqn": f"tenant.{rd['fqn']}", "type": "static", "sizeX": 9, "sizeY": 10, "row": 16,
+        "reports": {"typeFullFqn": f"tenant.{rd['fqn']}", "type": "static", "sizeX": 12, "sizeY": 10, "row": 16,
                     "col": 0, "id": "reports", "config": report_cfg},
-        "maintenance": {"typeFullFqn": f"tenant.{ml['fqn']}", "type": "latest", "sizeX": 15, "sizeY": 20, "row": 16,
-                        "col": 9, "id": "maintenance",
-                        "config": dict(maint_cfg, datasources=[{"type": "entity", "name": "", "entityAliasId": alias_id,
-                                                                "dataKeys": run_hours_key}],
-                                       timewindow=live_tw)},
-        "about": {"typeFullFqn": "system.cards.markdown_card", "type": "static", "sizeX": 9, "sizeY": 10, "row": 26,
-                  "col": 0, "id": "about",
+        "about": {"typeFullFqn": "system.cards.markdown_card", "type": "static", "sizeX": 12, "sizeY": 10, "row": 16,
+                  "col": 12, "id": "about",
                   "config": {"showTitle": True, "title": "What the reports contain", "backgroundColor": "#ffffff",
                              "padding": "12px", "dropShadow": True, "datasources": [],
                              "settings": {"useMarkdownTextFunction": False, "applyDefaultMarkdownStyle": True,
                                           "markdownTextPattern": read("about.md"), "markdownCss": ""}}},
     }
     cfg = {
-        "description": "Maintenance planner, equipment period reports and maintenance log", "widgets": widgets,
+        "description": "Maintenance management (CMMS) and equipment period reports", "widgets": widgets,
         "states": {"default": {"name": DASHBOARD_TITLE, "root": True, "layouts": {"main": {
             "widgets": {k: {"sizeX": v["sizeX"], "sizeY": v["sizeY"], "row": v["row"], "col": v["col"]} for k, v in widgets.items()},
             "gridSettings": {"backgroundColor": "#F8FAFC", "columns": 24, "margin": 12, "outerMargin": True,

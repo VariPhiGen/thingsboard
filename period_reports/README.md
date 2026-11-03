@@ -1,7 +1,7 @@
-# Equipment period reports & maintenance log
+# Equipment period reports & maintenance management
 
 Downloadable **Daily / Weekly / Monthly / Custom (≤ 31 days)** equipment reports as **PDF** and **Excel**,
-plus a **Maintenance Log**, on the ThingsBoard dashboard **Reports & Maintenance**.
+plus **Maintenance Management** (CMMS), on the ThingsBoard dashboard **Reports & Maintenance**.
 
 Reports cover equipment readings (DG, LT panels, RO, fire suppression), runtime and energy, fuel use and
 refuels, alarms, maintenance history (logged work + automatic events) and the predictive-maintenance outlook.
@@ -34,19 +34,13 @@ ThingsBoard (live) ── maintenance records, ────┘
 - Served by the `n8n-report-api` container (router included from `vgi-cron-email-script/n8n_report_api.py`);
   nginx (`/etc/nginx/sites-available/n8n.variphi.com`) exposes only `/reports-api/v1/period-reports/`.
 
-## Maintenance log
-
-Widget *Maintenance Log* writes telemetry `maintenance_record` (JSON: type, description, technician,
-run_hours, parts, cost, next_due, service_reset, logged_by) on the equipment at the time of the work.
-A DG *Preventive service* with "restart the service-due counter" sets `pm_config.last_service_run_hours`,
-so the Predictive Maintenance service countdown restarts.
-
 ## Maintenance Management (CMMS)
 
 Widget *Maintenance Management* (top of this dashboard): work orders with lifecycle and verification, preventive
 maintenance plans (time / run-hours), technical documents with revision and expiry, KPIs, printable job cards.
 Server side scheduler, alerts and the full design: see `cmms/README.md`. Completed work orders also write
-`maintenance_record`, so they appear in the Maintenance Log and in the period reports.
+`maintenance_record` (JSON: type, description, technician, run hours, parts, cost) on the equipment at the time of
+the work, so they appear in the period reports. This is the only place where maintenance work is entered.
 
 ## Operations
 

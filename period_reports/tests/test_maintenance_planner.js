@@ -290,11 +290,13 @@ async function t(name, fn) { await fn(); passed++; console.log('ok -', name); }
     const crit = $$('[data-path="limits.battery.crit_v"]')[0]; crit.value = '22.5';
     const cap = $$('[data-path="limits.fuel.tank_capacity_l"]')[0]; cap.value = '990';
     const stale = $$('[data-path="engine.stale_minutes"]')[0]; stale.value = '20';
+    const codes = $$('[data-path="limits.alarm_codes"]')[0]; codes.value = '288 = Mains failure\n\n 320= Breaker trip ';
     click($('[data-act="savepm"]')); await tick(10);
     const pc = J(A('dg1').pm_config);
     assert.strictEqual(pc.limits.battery.crit_v, 22.5); assert.strictEqual(pc.limits.fuel.tank_capacity_l, 990); assert.strictEqual(pc.engine.stale_minutes, 20);
     assert.strictEqual(pc.limits.service.last_service_run_hours, 166.1, 'other values kept');
     assert.deepStrictEqual(pc.limits.valid.rpm, [0, 3000]);
+    assert.deepStrictEqual(pc.limits.alarm_codes, {'288': 'Mains failure', '320': 'Breaker trip'}, 'controller alarm names saved as text');
   });
 
   await t('equipment without predictive maintenance is configured from the template', async () => {
