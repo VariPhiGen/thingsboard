@@ -1,0 +1,16 @@
+[Unit]
+Description=ThingsBoard ownership guard: keeps dashboard devices with the customers the dashboards are shared with
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/home/ubuntu/thingsboard
+ExecStart=/usr/bin/python3 -m ownership_guard.guard
+Environment=GUARD_INTERVAL_S=60
+Restart=always
+RestartSec=10
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
