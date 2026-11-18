@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from infra_reports import delivery, healthcheck, pipeline, state
-from infra_reports.charts import nice_ticks, svg_line_chart
+from infra_reports.charts import nice_ticks, svg_line_chart, tick_labels
 from infra_reports.collect import DeviceSummary, classify
 from infra_reports.config import DEFAULT_PROFILES, REPORT_TZ, ConfigError, Settings
 from infra_reports.delivery import ReportError, render_pdf, send_email
@@ -71,6 +71,15 @@ class ChartsTest(unittest.TestCase):
         self.assertLessEqual(ticks[0], 81.7)
         self.assertGreaterEqual(ticks[-1], 100.0)
         self.assertEqual(nice_ticks(0, 0)[0] < 0 < nice_ticks(0, 0)[-1], True)
+
+    def test_small_range_ticks_have_distinct_labels(self):
+        for hi in (0.06, 0.1, 0.0627, 0.3, 0.07):
+            labels = tick_labels(nice_ticks(0, hi))
+            self.assertEqual(len(labels), len(set(labels)), (hi, labels))
+        self.assertEqual(tick_labels(nice_ticks(0, 0.1)), ["0", "0.025", "0.05", "0.075", "0.1"])
+        self.assertEqual(tick_labels([0, 5, 10, 15]), ["0", "5", "10", "15"])
+        self.assertEqual(tick_labels([0, 0.5, 1, 1.5]), ["0", "0.5", "1", "1.5"])
+        self.assertEqual(tick_labels([0, 250, 500, 1000]), ["0", "250", "500", "1,000"])
 
     def test_empty_chart(self):
         self.assertIn("No valid readings", svg_line_chart([("a", "#000", [None, None])], START))

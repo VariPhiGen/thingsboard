@@ -2,7 +2,7 @@
 from datetime import datetime
 from html import escape
 
-from infra_reports.charts import AXIS, GRID, INK, INK_2, INK_MUTED, SERIES_COLORS, fmt_tick, nice_ticks, no_data
+from infra_reports.charts import AXIS, GRID, INK, INK_2, INK_MUTED, SERIES_COLORS, fmt_tick, nice_ticks, no_data, tick_labels
 from infra_reports.config import REPORT_TZ
 from infra_reports.layout import REPORT_CSS, badge, kpi
 
@@ -69,10 +69,10 @@ def svg_daily_bars(days, series, unit, width=980, height=200):
     bw = max(2.0, min(18.0, slot * 0.8 / k))
     parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" xmlns="http://www.w3.org/2000/svg" '
              f'style="display:block;font-family:Arial,sans-serif;">']
-    for t in yt:
+    for t, tl in zip(yt, tick_labels(yt)):
         y = mt + ph - t / y1 * ph
         parts.append(f'<line x1="{ml}" x2="{width - mr}" y1="{y:.1f}" y2="{y:.1f}" stroke="{GRID}"/>'
-                     f'<text x="{ml - 6}" y="{y + 4:.1f}" text-anchor="end" font-size="12" fill="{INK_MUTED}">{fmt_tick(t)}</text>')
+                     f'<text x="{ml - 6}" y="{y + 4:.1f}" text-anchor="end" font-size="12" fill="{INK_MUTED}">{tl}</text>')
     parts.append(f'<line x1="{ml}" x2="{width - mr}" y1="{mt + ph}" y2="{mt + ph}" stroke="{AXIS}"/>')
     every = 1 if n <= 10 else (2 if n <= 20 else 3)
     for i, day in enumerate(days):

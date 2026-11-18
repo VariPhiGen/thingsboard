@@ -19,6 +19,17 @@ def fmt_tick(v):
     return f"{v:,.1f}".rstrip("0").rstrip(".")
 
 
+def tick_labels(ticks):
+    """Labels of the axis ticks with as many decimals as the tick step needs, so that small ranges (0 - 0.1) do not
+    show repeated labels like 0, 0.1, 0.1, 0.1. Large or whole-number ticks keep the plain format of fmt_tick."""
+    decimals = 0
+    while decimals < 6 and any(abs(round(t, decimals) - t) > 1e-9 for t in ticks):
+        decimals += 1
+    if decimals == 0:
+        return [fmt_tick(t) for t in ticks]
+    return [f"{t:,.{decimals}f}".rstrip("0").rstrip(".") for t in ticks]
+
+
 def nice_ticks(lo, hi, count=4):
     """Round axis ticks covering [lo, hi]."""
     if hi == lo:
@@ -71,10 +82,10 @@ def svg_line_chart(series, start_ts, width=900, height=210):
 
     parts = [f'<svg viewBox="0 0 {width} {height}" width="100%" xmlns="http://www.w3.org/2000/svg" '
              f'style="display:block;font-family:Arial,sans-serif;">']
-    for t in yt:
+    for t, tl in zip(yt, tick_labels(yt)):
         y = ys(t)
         parts.append(f'<line x1="{ml}" x2="{width - mr}" y1="{y:.1f}" y2="{y:.1f}" stroke="{GRID}" stroke-width="1"/>')
-        parts.append(f'<text x="{ml - 6}" y="{y + 4.5:.1f}" text-anchor="end" font-size="13" fill="{INK_MUTED}">{fmt_tick(t)}</text>')
+        parts.append(f'<text x="{ml - 6}" y="{y + 4.5:.1f}" text-anchor="end" font-size="13" fill="{INK_MUTED}">{tl}</text>')
     parts.append(f'<line x1="{ml}" x2="{width - mr}" y1="{mt + ph}" y2="{mt + ph}" stroke="{AXIS}" stroke-width="1"/>')
     for ts, label in x_ticks(start_ts, n):
         x = ml + (ts - start_ts) / (n * BUCKET_MS) * pw
