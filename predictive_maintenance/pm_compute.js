@@ -756,6 +756,75 @@ if (kind === 'DG') {
   }
 }
 
+// Alarm type = severity + the cause of the worst issue, so the alarm list says what triggered it. The cause is stable
+// (no readings in it): the readings stay in the alarm details. The type of the alarm raised last time is kept in the
+// state, so that the alarm of a cause that has gone is cleared when the cause changes.
+var CAUSES = [
+  [/^Battery .*\(min /, 'Battery voltage critically low'],
+  [/^Battery low on standby/, 'Battery voltage low'],
+  [/^Battery falling/, 'Battery voltage falling'],
+  [/^Battery overcharging/, 'Battery overcharging'],
+  [/^Fuel level sensor not reporting/, 'Fuel level sensor not reporting'],
+  [/^Fuel very low/, 'Fuel level critically low'],
+  [/^Fuel low/, 'Fuel level low'],
+  [/^Fuel (runs out|lasts|autonomy)/, 'Fuel autonomy short'],
+  [/^Coolant rising/, 'Coolant temperature rising'],
+  [/^Coolant/, 'Coolant temperature high'],
+  [/^Oil pressure/, 'Oil pressure low'],
+  [/^Frequency/, 'Frequency off nominal'],
+  [/^Output voltage/, 'Output voltage off nominal'],
+  [/^Low power factor/, 'Low power factor'],
+  [/^DG overloaded/, 'DG overloaded'],
+  [/^DG load high/, 'DG load high'],
+  [/^Controller alarm active/, 'Controller alarm active'],
+  [/^Service overdue/, 'Service overdue'],
+  [/^Service due/, 'Service due soon'],
+  [/^Service schedule not set up/, 'Service schedule not set up'],
+  [/^DG idle/, 'DG idle too long'],
+  [/engine starts today/, 'Too many engine starts'],
+  [/^(.+): meter not reporting/, '$1 meter not reporting'],
+  [/^(.+) voltage [\d.\-]+ V/, '$1 voltage off nominal'],
+  [/^(.+) frequency [\d.\-]+ Hz/, '$1 frequency off nominal'],
+  [/^(.+) overloaded: /, '$1 overloaded'],
+  [/^(.+) load \d+% of rating/, '$1 load high'],
+  [/^(.+) current \d+ A is /, '$1 current above normal peak'],
+  [/^(.+) power factor /, '$1 power factor low'],
+  [/^Product water TDS/, 'Product water TDS high'],
+  [/^TDS rising/, 'TDS rising'],
+  [/^Water temperature/, 'Water temperature high'],
+  [/^pH/, 'pH out of range'],
+  [/^Pressure [\d.\-]+ bar/, 'Pressure off normal'],
+  [/^(.+) not reporting \(last/, '$1 not reporting'],
+  [/^Low pressure on cylinder/, 'Low pressure on cylinder(s)'],
+  [/^Unstable pressure signal/, 'Unstable pressure signal on cylinder(s)']
+];
+function causeLabel(t) {
+  var txt = '' + (t || '');
+  for (var ci = 0; ci < CAUSES.length; ci++) {
+    var m = CAUSES[ci][0].exec(txt);
+    if (m) { return CAUSES[ci][1].replace('$1', m[1] || ''); }
+  }
+  var generic = txt.split(/ - |: |\(/)[0].replace(/[\d.~%]+/g, '').replace(/\s+/g, ' ').trim();
+  return generic || 'Equipment condition';
+}
+var topIssue = null;
+for (var ti = 0; ti < issues.length; ti++) {
+  var isu = issues[ti];
+  if (isu.sev === sev && (topIssue === null || isu.p > topIssue.p)) { topIssue = isu; }
+}
+var alarmType = '';
+var prevType = S.at || '';
+if (!noData && (sev === 'CRITICAL' || sev === 'WARNING')) {
+  var alarmHead = 'Predictive Maintenance - ' + (sev === 'CRITICAL' ? 'Critical' : 'Warning') + ': ';
+  // when the level is held after the cause has gone (hysteresis) the alarm keeps its type
+  alarmType = topIssue ? alarmHead + causeLabel(topIssue.text) : (prevType.indexOf(alarmHead) === 0 ? prevType : alarmHead + 'Equipment condition');
+}
+var prevOut = (!noData && prevType && prevType !== alarmType) ? prevType : '';
+metadata.pm_alarm_type = alarmType;
+metadata.pm_alarm_prev_crit = prevOut.indexOf('Predictive Maintenance - Critical') === 0 ? prevOut : '';
+metadata.pm_alarm_prev_warn = prevOut.indexOf('Predictive Maintenance - Warning') === 0 ? prevOut : '';
+if (!noData) { S.at = alarmType; }
+
 S.v = 1;
 S.t = NOW;
 metadata.pm_state_out = JSON.stringify(S);

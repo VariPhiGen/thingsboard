@@ -43,6 +43,8 @@ class SettingsValidation(unittest.TestCase):
     def test_condition_based_alarm_filter(self):
         self.assertTrue(CFG.cbm_alarm({"type": "Fire Cylinder 9 Low Pressure", "severity": "CRITICAL"}))
         self.assertTrue(CFG.cbm_alarm({"type": "Predictive Maintenance - Critical", "severity": "CRITICAL"}))
+        self.assertTrue(CFG.cbm_alarm({"type": "Predictive Maintenance - Critical: Fuel level critically low", "severity": "CRITICAL"}))
+        self.assertFalse(CFG.cbm_alarm({"type": "Predictive Maintenance - Warning: Fuel level low", "severity": "WARNING"}))
         self.assertFalse(CFG.cbm_alarm({"type": "Fire Cylinder 9 Low Pressure", "severity": "MAJOR"}))
         self.assertFalse(CFG.cbm_alarm({"type": "Transformer 1 Overcurrent", "severity": "CRITICAL"}))
         off = cfg(condition_based=dict(SEED["condition_based"], enabled=False))

@@ -37,7 +37,7 @@
   "condition_based": {
     "enabled": true,
     "severities": ["CRITICAL"],
-    "alarm_types": ["Predictive Maintenance - Critical", "Fire Cylinder * Low Pressure"],
+    "alarm_types": ["Predictive Maintenance - Critical*", "Fire Cylinder * Low Pressure"],
     "wo_type": "Condition-based",
     "priority": "P1"
   },

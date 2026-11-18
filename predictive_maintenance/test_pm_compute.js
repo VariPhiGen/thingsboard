@@ -335,6 +335,55 @@ t('Fire: ignore_channels respected', function () {
   assert.strictEqual(r.msg.pm_severity_raw, 'OK');
 });
 
+var WARN_STATE = {sev: {confirmed: 'WARNING', cand: 'WARNING', n: 0}};
+function fireData() {
+  var low = [], flap = [], ok = [];
+  for (var i = 0; i < 12; i++) {
+    low.push({ts: NOW - i * 75000, value: '0'});
+    flap.push({ts: NOW - i * 75000, value: i % 2 ? '1' : '0'});
+    ok.push({ts: NOW - i * 75000, value: 'true'});
+  }
+  return {fire_suppression_1_pressure: JSON.stringify(low), fire_suppression_5_pressure: JSON.stringify(flap),
+    cylinder_pressure_2: JSON.stringify(ok), fire_suppression_9_pressure: '[]',
+    fire_suppression_1_high_pressure: L(true), relay_1_online: L(true)};
+}
+t('Alarm type carries the cause, without readings', function () {
+  var r = run('LT Panel Fire Profile', fireData(), {state: WARN_STATE});
+  assert.strictEqual(r.metadata.pm_alarm, 'WARNING');
+  assert.strictEqual(r.metadata.pm_alarm_type, 'Predictive Maintenance - Warning: Low pressure on cylinder(s)');
+  assert.strictEqual(r.metadata.pm_alarm_prev_warn, '');
+  assert.strictEqual(JSON.parse(r.metadata.pm_state_out).at, r.metadata.pm_alarm_type);
+});
+
+t('Alarm of the previous cause is cleared when the cause changes', function () {
+  var r1 = run('LT Panel Fire Profile', fireData(), {state: WARN_STATE});
+  var st = JSON.parse(r1.metadata.pm_state_out);
+  var r2 = run('LT Panel Fire Profile', fireData(), {state: st, config: {ignore_channels: [1]}});
+  assert.strictEqual(r2.metadata.pm_alarm_type, 'Predictive Maintenance - Warning: Unstable pressure signal on cylinder(s)');
+  assert.strictEqual(r2.metadata.pm_alarm_prev_warn, 'Predictive Maintenance - Warning: Low pressure on cylinder(s)');
+  assert.strictEqual(r2.metadata.pm_alarm_prev_crit, '');
+});
+
+t('Alarm type is kept while the level is held after recovery, then cleared', function () {
+  var st = {sev: {confirmed: 'WARNING', cand: 'WARNING', n: 0}, at: 'Predictive Maintenance - Warning: TDS rising'};
+  var lat = function () { return {tds_ppm: L(57), temperature_c: L(30)}; };
+  var r = runN(2, 'RO System Profile', lat, {state: st, baseline: {tds_ppm: {median: 57}}});
+  assert.strictEqual(r.metadata.pm_alarm_type, 'Predictive Maintenance - Warning: TDS rising');
+  assert.strictEqual(r.metadata.pm_alarm_prev_warn, '');
+  r = runN(3, 'RO System Profile', lat, {state: st, baseline: {tds_ppm: {median: 57}}});
+  assert.strictEqual(r.metadata.pm_alarm, 'OK');
+  assert.strictEqual(r.metadata.pm_alarm_type, '');
+  assert.strictEqual(r.metadata.pm_alarm_prev_warn, 'Predictive Maintenance - Warning: TDS rising');
+  assert.strictEqual(JSON.parse(r.metadata.pm_state_out).at, '');
+});
+
+t('Cause labels are stable across readings', function () {
+  var a = run('LT Panels Profile', {EVM_voltage: L(380), EVM_current: L(10), EVM_power: L(5), EVM_frequency: L(50)}, {config: {nominal_v: {EVM: 415}}});
+  var b = run('LT Panels Profile', {EVM_voltage: L(375), EVM_current: L(10), EVM_power: L(5), EVM_frequency: L(50)}, {config: {nominal_v: {EVM: 415}}});
+  assert.strictEqual(a.metadata.pm_alarm_type, b.metadata.pm_alarm_type);
+  assert.ok(!/\d/.test(a.metadata.pm_alarm_type.replace('Predictive Maintenance - ', '')));
+});
+
 t('Severity relaxes only after 3 runs', function () {
   var st = {sev: {confirmed: 'WARNING', cand: 'WARNING', n: 0}};
   var lat = function () { return {tds_ppm: L(57), temperature_c: L(30)}; };

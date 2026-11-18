@@ -34,6 +34,7 @@ SEED = json.load(open(os.path.join(HERE, 'pm_seed.json')))
 KINDS = SEED['profiles']   # device profile -> equipment kind (template; each device keeps its kind in pm_config)
 ALARM_CRITICAL = 'Predictive Maintenance - Critical'
 ALARM_WARNING = 'Predictive Maintenance - Warning'
+PM_ALARM_TYPE = '${pm_alarm_type}'   # filled from the message metadata by TbCreateAlarmNode
 ALARM_FUEL_DROP = 'Fuel Drop While DG Off'
 FIRST_NODE = 30   # 'Fetch PM Config' -> 'Route': configured equipment to the PM path, DG fuel messages also to the fuel path
 # Nodes of the previous DG-only AI path in the Root Rule Chain (replaced by the new chain)
@@ -434,8 +435,10 @@ def build_pm_chain(keysets):
             "alarmType": atype}, x, y)
 
     N += [
-        create_alarm('Create PM Critical', ALARM_CRITICAL, 'CRITICAL', 1880, 200),  # 12
-        create_alarm('Create PM Warning', ALARM_WARNING, 'WARNING', 1880, 280),  # 13
+        # the alarm type carries the cause (pm_alarm_type, set by pm_compute.js), e.g. 'Predictive Maintenance - Warning: Low pressure on cylinder(s)'
+        create_alarm('Create PM Critical', PM_ALARM_TYPE, 'CRITICAL', 1880, 200),  # 12
+        create_alarm('Create PM Warning', PM_ALARM_TYPE, 'WARNING', 1880, 280),  # 13
+        # 14 / 15: alarms of the old fixed types (before the cause was part of the type); they only clear what is left of them
         clear_alarm('Clear PM Critical', ALARM_CRITICAL, 1880, 360),  # 14
         clear_alarm('Clear PM Warning', ALARM_WARNING, 1880, 440),  # 15
         node('org.thingsboard.rule.engine.rest.TbRestApiCallNode', 'Telegram Webhook (PM Critical)', {
@@ -479,6 +482,9 @@ def build_pm_chain(keysets):
         node('org.thingsboard.rule.engine.metadata.TbGetAttributesNode', 'Fetch PM Config', {
             "fetchTo": "METADATA", "clientAttributeNames": [], "sharedAttributeNames": [], "serverAttributeNames": ["pm_config"],
             "latestTsKeyNames": [], "tellFailureIfAbsent": False, "getLatestValueWithTs": False}, 60, 520, 1),  # 30
+        # the alarm of the cause that was raised last time, when the cause or the level has changed (empty = nothing to clear)
+        clear_alarm('Clear Previous PM Critical', '${pm_alarm_prev_crit}', 1880, 520),  # 31
+        clear_alarm('Clear Previous PM Warning', '${pm_alarm_prev_warn}', 1880, 600),  # 32
     ]
     C = [(30, 21, 'Success'), (21, 0, 'PM'), (21, 22, 'FUEL'), (22, 23, 'Success'), (23, 24, 'Success'), (23, 25, 'Success'),
          (25, 26, 'Success'), (23, 27, 'Success'), (27, 28, 'DROP'), (27, 29, 'CLEAR_DROP'),
@@ -488,6 +494,8 @@ def build_pm_chain(keysets):
          (7, 8, 'Success'), (7, 9, 'Success'), (9, 10, 'Success'), (7, 11, 'Success'), (7, 17, 'Success'),
          (11, 12, 'CRITICAL'), (11, 15, 'CRITICAL'), (11, 13, 'WARNING'), (11, 14, 'WARNING'),
          (11, 14, 'OK'), (11, 15, 'OK'), (12, 16, 'Created'), (14, 16, 'Cleared'),
+         (11, 31, 'CRITICAL'), (11, 31, 'WARNING'), (11, 31, 'OK'), (11, 32, 'CRITICAL'), (11, 32, 'WARNING'), (11, 32, 'OK'),
+         (31, 16, 'Cleared'),
          (17, 18, 'Success'), (18, 19, 'Success'), (19, 20, 'Success')]
     return N, [{"fromIndex": a, "toIndex": b, "type": t} for a, b, t in C]
 

@@ -122,8 +122,8 @@ Maintenance service countdown (`pm_config.last_service_run_hours`, `service_inte
 
 1. **Preventive work orders**: one per active plan whose next occurrence is inside its lead time (time plans: lead
    days, default 7; run-hour plans: 10 % of the interval). Never a second one while the previous is not closed.
-2. **Condition-based work orders**: one P1 work order per active CRITICAL alarm `Predictive Maintenance - Critical`
-   or `Fire Cylinder N Low Pressure` (keyed by alarm id), announced on Telegram + email.
+2. **Condition-based work orders**: one P1 work order per active CRITICAL alarm `Predictive Maintenance - Critical: <cause>`
+   (the pattern `Predictive Maintenance - Critical*` also matches the cause) or `Fire Cylinder N Low Pressure` (keyed by alarm id), announced on Telegram + email.
 3. **Overdue P1/P2** work orders: alerted once on Telegram + email.
 4. **Daily digest 08:00 IST** (Telegram + email to `REPORT_RECIPIENTS`): work requests awaiting approval, overdue,
    due within 7 days, awaiting verification, documents expiring within 30 days.
