@@ -133,6 +133,21 @@ def fill_battery_float(limits, baseline):
     return [] if bat.get("float_v") is not None else ["battery float level not derivable (no history) - falling-trend check off until set"]
 
 
+def fill_lt_nominal(limits, baseline):
+    """Nominal voltage of every LT feeder that has none yet, from its own history (feeders added after the first
+    migration get theirs too; configured values and ignored feeders are left alone). Returns the feeders filled."""
+    rule, sfx = SEED["derive"]["nominal_voltage"], limits["feeder_suffix"]["voltage"]
+    skip, filled = set(limits.get("ignore_feeders") or []), []
+    nominal = limits.setdefault("nominal_v", {})
+    for k, st in baseline.items():
+        if k.endswith(sfx) and st.get("median") and st["median"] >= rule["min_valid_v"]:
+            feeder = k[:-len(sfx)]
+            if feeder not in nominal and feeder not in skip:
+                nominal[feeder] = nominal_from(st["median"], rule)
+                filled.append(feeder)
+    return filled
+
+
 def derive(tb, device, kind, limits, baseline):
     """Per-device values from the device's own history (only where the device has no configured value yet)."""
     d, notes = SEED["derive"], []
@@ -154,12 +169,7 @@ def derive(tb, device, kind, limits, baseline):
             limits["voltage"]["nominal_v"] = None
             notes.append("DG nominal voltage not derivable (no running data) - voltage check off until set")
     elif kind == "LT":
-        rule, sfx = d["nominal_voltage"], limits["feeder_suffix"]["voltage"]
-        for k, st in baseline.items():
-            if k.endswith(sfx) and st.get("median") and st["median"] >= rule["min_valid_v"]:
-                feeder = k[:-len(sfx)]
-                if feeder not in limits["nominal_v"]:
-                    limits["nominal_v"][feeder] = nominal_from(st["median"], rule)
+        fill_lt_nominal(limits, baseline)
         notes.append(f"LT nominal V for {len(limits['nominal_v'])} feeders")
     elif kind == "RO":
         med = (baseline.get(limits["keys"]["tds"]) or {}).get("median")
@@ -180,6 +190,11 @@ def new_config(tb, device, kind, current):
         if kind == "DG":
             baseline = tb.attrs(device["id"], ["pm_baseline"]).get("pm_baseline") or {}
             notes += fill_battery_float(cfg["limits"], baseline)
+        elif kind == "LT":
+            baseline = tb.attrs(device["id"], ["pm_baseline"]).get("pm_baseline") or {}
+            filled = fill_lt_nominal(cfg["limits"], baseline)
+            if filled:
+                notes.append("LT nominal V added for: " + ", ".join(sorted(filled)))
         return cfg, notes
     limits = strip_notes(copy.deepcopy(SEED["kinds"][kind]))
     baseline = tb.attrs(device["id"], ["pm_baseline"]).get("pm_baseline") or {}

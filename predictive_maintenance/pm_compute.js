@@ -415,6 +415,9 @@ if (kind === 'DG') {
       if (mk.indexOf('ss_') !== 0 && mk.length > sfx.voltage.length && mk.slice(-sfx.voltage.length) === sfx.voltage) feeders.push(mk.slice(0, -sfx.voltage.length));
     }
   }
+  // feeders listed in limits.ignore_feeders are not monitored (retired / not on the dashboard); the list lives in the device's pm_config
+  var skipF = cfgv('ignore_feeders') || [];
+  feeders = feeders.filter(function (f) { return skipF.indexOf(f) < 0; });
   feeders.sort();
   var fsum = {};
   for (var i = 0; i < feeders.length; i++) {

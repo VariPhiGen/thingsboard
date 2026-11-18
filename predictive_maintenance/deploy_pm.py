@@ -586,7 +586,7 @@ var ORDER = {CRITICAL: 0, WARNING: 1, 'NO DATA': 2, OK: 3};
 var rows = (data || []).slice().filter(function (r) { return r && r.entityName; });
 rows.sort(function (a, b) {
   var d = (ORDER[a.Severity] === undefined ? 4 : ORDER[a.Severity]) - (ORDER[b.Severity] === undefined ? 4 : ORDER[b.Severity]);
-  return d !== 0 ? d : ('' + a.entityName).localeCompare('' + b.entityName);
+  return d !== 0 ? d : ('' + a.entityName).localeCompare('' + b.entityName, undefined, {numeric: true, sensitivity: 'base'});
 });
 var counts = {OK: 0, WARNING: 0, CRITICAL: 0, 'NO DATA': 0};
 var cards = '';

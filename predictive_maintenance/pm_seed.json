@@ -58,6 +58,7 @@
       "feeder_suffix": {"voltage": "_voltage", "current": "_current", "power": "_power", "frequency": "_frequency"},
       "valid": {"voltage": [1, 1000], "current": [0, 100000], "power": [-100000, 100000], "frequency": [1, 100]},
       "nominal_v": {}, "_nominal_from_baseline": "per feeder: 415 V when its 7-day median is above 300 V, else 230 V",
+      "ignore_feeders": [], "_ignore_feeders": "feeder names (telemetry key prefix, e.g. UPS_Panel_2) that are not monitored: retired meters or feeders that are not on the dashboard",
       "rated_a": {},
       "voltage": {"warn_pct": 7.5, "crit_pct": 10, "trend_alpha": 0.4},
       "frequency": {"nominal_hz": 50, "warn_dev_hz": 0.6, "crit_dev_hz": 1, "trend_alpha": 0.4},

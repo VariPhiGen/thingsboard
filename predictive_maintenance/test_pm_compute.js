@@ -220,6 +220,17 @@ t('LT feeders: N/A meters are INFO, healthy feeders OK, PF computed', function (
   assert.strictEqual(f.UPS_Panel_2, 'NO DATA');
 });
 
+t('LT: feeders in ignore_feeders are not monitored', function () {
+  var r = run('LT Panels Profile', {
+    UPS_Room_1_voltage: L(411.6), UPS_Room_1_current: L(388), UPS_Room_1_power: L(253), UPS_Room_1_frequency: L(50.0),
+    UPS_Panel_2_voltage: L(230.8, 9000)
+  }, {baseline: {UPS_Room_1_voltage: {median: 411}, UPS_Room_1_current: {p95: 423}}, config: {ignore_feeders: ['UPS_Panel_2']}});
+  var f = JSON.parse(r.msg.pm_feeders);
+  assert.strictEqual(f.UPS_Room_1, 'OK');
+  assert.ok(!('UPS_Panel_2' in f));
+  assert.ok(!/UPS Panel 2/.test(r.msg.pm_issues));
+});
+
 t('LT under-voltage and overload vs history', function () {
   var r = runN(8, 'LT Panels Profile', function () {
     return {EVM_Charger_voltage: L(370), EVM_Charger_current: L(300), EVM_Charger_power: L(170), EVM_Charger_frequency: L(50)};
