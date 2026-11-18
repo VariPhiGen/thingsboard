@@ -39,6 +39,27 @@ class ReportAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    # ---- Maintenance Management (CMMS) API: same origin as the dashboard, no CORS
+    def _cmms(self, method):
+        from cmms.api import default_api, HttpError
+        cache = {}
+
+        def read_body(limit):
+            if "b" not in cache:
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > limit:
+                    raise HttpError(413, f"Too large (maximum {limit // 1048576} MB)")
+                cache["b"] = self.rfile.read(n) if n > 0 else b""
+            return cache["b"]
+        status, headers, body = default_api().handle(method, self.path, self.headers, read_body)
+        self.send_response(status)
+        self.close_connection = True
+        for k, v in headers.items():
+            self.send_header(k, v)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_OPTIONS(self):
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -49,6 +70,9 @@ class ReportAPIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+        if path.startswith("/cmms/"):
+            self._cmms("GET")
+            return
         if path == "/health":
             self._send_json(200, {"ok": True, "service": "virtuoso-report-api", "version": "1.0.0"})
             return
@@ -57,6 +81,9 @@ class ReportAPIHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+        if path.startswith("/cmms/"):
+            self._cmms("POST")
+            return
 
         if path in (
             "/v1/generate-infrastructure-separate-pdfs-report",

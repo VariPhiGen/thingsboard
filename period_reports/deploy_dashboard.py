@@ -149,7 +149,9 @@ def main():
     body = {"title": DASHBOARD_TITLE, "configuration": cfg}
     if existing:
         full = api.get(f"/api/dashboard/{existing['id']['id']}")
-        body.update(id=full["id"], version=full.get("version"))
+        # keep everything else of the saved dashboard: ThingsBoard replaces assignedCustomers with what is posted,
+        # so leaving it out would silently withdraw the dashboard from every customer it was shared with
+        body = dict(full, title=DASHBOARD_TITLE, configuration=cfg)
     res = api.post("/api/dashboard", body)
     print("dashboard:", res["id"]["id"])
     return 0

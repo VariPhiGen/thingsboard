@@ -36,9 +36,11 @@ ThingsBoard (live) ── maintenance records, ────┘
 
 ## Maintenance Management (CMMS)
 
-Widget *Maintenance Management* (top of this dashboard): work orders with lifecycle and verification, preventive
+Widget *Maintenance Management* (top of this dashboard): work requests, work orders with lifecycle and verification, preventive
 maintenance plans (time / run-hours), technical documents with revision and expiry, KPIs, printable job cards.
-Server side scheduler, alerts and the full design: see `cmms/README.md`. Completed work orders also write
+It works through the CMMS API with the user's maintenance role (viewer, requester, technician, supervisor,
+admin), so customer users can be given access. Server side API, roles, scheduler, alerts and the full design: see
+`cmms/README.md`. Completed work orders also write
 `maintenance_record` (JSON: type, description, technician, run hours, parts, cost) on the equipment at the time of
 the work, so they appear in the period reports. This is the only place where maintenance work is entered.
 

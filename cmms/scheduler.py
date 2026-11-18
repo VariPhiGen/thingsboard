@@ -10,8 +10,8 @@ missing or incomplete the pass stops with an error instead of assuming values. E
 2. Condition-based work orders: every active alarm matching condition_based (severities + alarm type patterns) on
    configured equipment gets one work order (keyed by the alarm id), announced immediately.
 3. Overdue work orders with a priority listed in alerts.overdue_priorities are alerted once.
-4. Daily digest at alerts.digest_hour (local time zone of the settings), once per day: overdue, due soon,
-   awaiting verification, documents expiring within doc_expiry_alert_days.
+4. Daily digest at alerts.digest_hour (local time zone of the settings), once per day: work requests awaiting
+   approval, overdue, due soon, awaiting verification, documents expiring within doc_expiry_alert_days.
 """
 import argparse
 import logging
@@ -43,7 +43,8 @@ def wo_from_plan(plan, created_ts):
               "due_date": "" if meter else plan.get("next_due_date") or "",
               "due_rh": plan.get("next_due_rh") if meter else None,
               "interval_rh": plan.get("interval_rh") if meter else None,
-              "assignee": d.get("assignee") or "", "created_ts": created_ts, "completed_ts": None, "closed_ts": None}
+              "assignee": d.get("assignee") or "", "assignee_id": d.get("assignee_id") or "", "created_ts": created_ts,
+              "completed_ts": None, "closed_ts": None}
     detail = {"description": d.get("notes") or "", "checklist": d.get("checklist") or [], "docs": d.get("docs") or [],
               "est_hours": d.get("est_hours"), "plan_number": plan.get("number"),
               "history": [history("created", f"Generated from plan {plan.get('number')}", to=m.SCHEDULED)]}
@@ -59,7 +60,7 @@ def wo_from_alarm(alarm, equipment_name, created_ts, today, settings):
               "source": "alarm", "plan_id": "", "alarm_id": alarm["id"]["id"],
               "equipment_id": alarm["originator"]["id"], "equipment_name": equipment_name,
               "due_date": m.due_date_for_priority(pri, today, settings), "due_rh": None, "interval_rh": None, "assignee": "",
-              "created_ts": created_ts, "completed_ts": None, "closed_ts": None}
+              "assignee_id": "", "created_ts": created_ts, "completed_ts": None, "closed_ts": None}
     detail = {"description": (text + (" Recommended: " + action if action else "")).strip(), "checklist": [], "docs": [],
               "alarm_type": alarm["type"], "alarm_start_ts": alarm.get("startTs"),
               "history": [history("created", f"Raised by alarm '{alarm['type']}' ({alarm.get('severity')})", to=m.SCHEDULED)]}
@@ -152,6 +153,7 @@ def digest_lines(wos, docs, meter, today, settings):
     overdue = [w for w in open_wos if state(w) == "overdue"]
     due = [w for w in open_wos if state(w) == "due"]
     verify = [w for w in wos if w.get("status") == m.COMPLETED]
+    requests = sorted((w for w in wos if w.get("status") == m.REQUESTED), key=lambda w: w.get("number"))
     horizon = today + timedelta(days=int(settings.raw["doc_expiry_alert_days"]))
     expiring = sorted(((m.parse_date(d.get("expiry")), d) for d in docs if m.parse_date(d.get("expiry")) and m.parse_date(d.get("expiry")) <= horizon),
                       key=lambda x: x[0])
@@ -160,7 +162,11 @@ def digest_lines(wos, docs, meter, today, settings):
         return (f"- {w['number']} [{w.get('priority')}] {w.get('title')} - {w.get('equipment_name')} "
                 f"(due {fmt_due(w, settings)}, {w.get('status')}, {w.get('assignee') or 'unassigned'})")
     soon = settings.raw["due_soon_days"]
-    lines = [f"Open work orders: {len(open_wos)} | Overdue: {len(overdue)} | Due within {soon} days: {len(due)} | Awaiting verification: {len(verify)}", ""]
+    lines = [f"Open work orders: {len(open_wos)} | Overdue: {len(overdue)} | Due within {soon} days: {len(due)} | "
+             f"Awaiting verification: {len(verify)} | Requests to approve: {len(requests)}", ""]
+    lines += ["WORK REQUESTS AWAITING APPROVAL:"] + ([f"- {w['number']} {w.get('title')} - {w.get('equipment_name')} "
+                                                   f"(by {((w.get('detail') or {}).get('requested_by') or {}).get('name') or 'unknown'})"
+                                                   for w in requests] or ["- none"]) + [""]
     lines += ["OVERDUE:"] + ([line(w) for w in overdue] or ["- none"]) + [""]
     lines += [f"DUE WITHIN {soon} DAYS:"] + ([line(w) for w in due] or ["- none"]) + [""]
     lines += ["COMPLETED, AWAITING VERIFICATION:"] + ([f"- {w['number']} {w.get('title')} - {w.get('equipment_name')}" for w in verify] or ["- none"]) + [""]

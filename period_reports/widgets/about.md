@@ -12,4 +12,4 @@
 
 **Formats** &nbsp; PDF for review and audit; Excel with one row per day and equipment for analysis.
 
-**Maintenance work** &nbsp; Record every service, repair and inspection in *Maintenance Management* above (Work orders > Record work done); it appears in these reports. Completing a DG *Preventive* work order with *Scheduled service done* restarts the predictive maintenance service countdown.
+**Maintenance work** &nbsp; Record every service, repair and inspection in *Maintenance Management* above (*Record work done* on the work order, or *Work done > + Record work done*); it appears in these reports. Problems are reported with *+ Work request*. Completing a DG *Preventive* work order with *Scheduled service done* restarts the predictive maintenance service countdown.

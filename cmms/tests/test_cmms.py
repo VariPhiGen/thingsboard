@@ -242,3 +242,17 @@ class Scheduler(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DigestRequests(unittest.TestCase):
+    def test_digest_lists_work_requests_awaiting_approval(self):
+        wos = [{"number": "WO-2026-00007", "status": m.REQUESTED, "title": "Oil leak", "equipment_name": "DG SET1",
+                "detail": {"requested_by": {"name": "Priya"}}},
+               {"number": "WO-2026-00008", "status": m.CANCELLED, "title": "Withdrawn", "equipment_name": "DG SET1"}]
+        lines = sch.digest_lines(wos, [], {}, TODAY, CFG)
+        self.assertIn("Requests to approve: 1", lines[0])
+        self.assertIn("- WO-2026-00007 Oil leak - DG SET1 (by Priya)", lines)
+        self.assertEqual(m.due_state(wos[0], None, TODAY, CFG), "request")
+        m.check_transition(m.REQUESTED, m.SCHEDULED)
+        with self.assertRaises(m.TransitionError):
+            m.check_transition(m.REQUESTED, m.IN_PROGRESS)

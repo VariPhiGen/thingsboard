@@ -272,6 +272,9 @@ def history_section(p):
             f'by {escape(str(m["technician"]))}' if m.get("technician") else "",
             f'at {f(float(m["run_hours"]), 1)} run-h' if _num(m.get("run_hours")) else "",
             f'parts: {escape(str(m["parts"]))}' if m.get("parts") else "",
+            f'after: {escape(str(m["condition_after"]))}' + (f' ({escape(str(m["condition_note"]))})' if m.get("condition_note") else "")
+            if m.get("condition_after") else "",
+            f'follow-up {escape(str(m["follow_up"]))}' if m.get("follow_up") else "",
         ] if x)
         rows.append((m["ts"], [ts_str(m["ts"]), escape(m["device"]), badge(m.get("type") or "Maintenance", "blue"),
                                escape(str(m.get("description") or "")) + (f'<div class="muted">{extra}</div>' if extra else "")]))
@@ -289,7 +292,7 @@ def history_section(p):
         if len(rows) > PDF_HISTORY_ROWS:
             body += f'<div class="note">Showing the latest {PDF_HISTORY_ROWS} of {len(rows)} entries. The Excel report lists all.</div>'
     hint = ('' if n_manual else '<div class="note">No maintenance work was logged in this period. Record work in the '
-            '<b>Maintenance Management</b> on the Reports &amp; Maintenance dashboard (Work orders &gt; Record work done) so that it appears here.</div>')
+            '<b>Maintenance Management</b> on the Reports &amp; Maintenance dashboard (Record work done on the work order, or Work done &gt; + Record work done) so that it appears here.</div>')
     return (f'<div class="section"><h3>Maintenance &amp; Event History <span class="sub">({n_manual} maintenance '
             f'record(s), {len(p["events"])} automatic event(s))</span></h3>{body}{hint}</div>')
 

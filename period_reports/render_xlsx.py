@@ -156,12 +156,13 @@ def render_xlsx(p):
     rows = []
     for m in p["maintenance"]:
         rows.append([_dt(m["ts"]), m["device"], "Maintenance", m.get("type"), m.get("description"),
-                     m.get("technician"), m.get("run_hours"), m.get("parts"), m.get("cost"), m.get("next_due")])
+                     m.get("technician"), m.get("run_hours"), m.get("parts"), m.get("cost"), m.get("next_due"),
+                     " - ".join(x for x in (m.get("condition_after"), m.get("condition_note")) if x) or None, m.get("follow_up")])
     for e in p["events"]:
-        rows.append([_dt(e["ts"]), e["device"], "Automatic", e["kind"], e["text"], None, None, None, None, None])
+        rows.append([_dt(e["ts"]), e["device"], "Automatic", e["kind"], e["text"], None, None, None, None, None, None, None])
     rows.sort(key=lambda r: r[0] or datetime.min)
     _sheet(wb, "Maintenance & Events", ["When", "Equipment", "Source", "Type", "Description", "Technician",
-                                        "Run hours", "Parts", "Cost", "Next due"], rows,
+                                        "Run hours", "Parts", "Cost", "Next due", "Condition after", "Follow-up"], rows,
            {"When": 18, "Description": 60})
     # ---- PM daily
     rows = []

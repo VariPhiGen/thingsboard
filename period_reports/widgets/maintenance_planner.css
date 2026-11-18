@@ -89,3 +89,13 @@
 .mp-fs legend { font-size: 11px; font-weight: 700; color: #0d2b55; text-transform: uppercase; letter-spacing: .4px; padding: 0 4px; }
 .mp-fs .mp-fs { background: #fafbfc; }
 .mp-set h5.wide { grid-column: 1 / -1; margin: 10px 0 0; }
+.mp .st.s-req { border-color: #0277bd; color: #01579b; }
+.mp .mp-who { font-size: 11px; color: #607d8b; margin-left: auto; padding: 0 4px; align-self: center; white-space: nowrap; }
+.mp .mp-roles td, .mp .mp-roles th { padding: 4px 6px; }
+.mp-btn.solid-danger { background: #c62828; border-color: #c62828; color: #fff; }
+.mp-btn.solid-danger:disabled { background: #e0b4b4; border-color: #e0b4b4; cursor: not-allowed; }
+.mp-panel.mp-danger { border-color: #ef9a9a; border-left-color: #c62828; background: #fff8f8; }
+.mp-panel.mp-danger h4 { color: #b71c1c; }
+.mp-warn-ico { display: inline-flex; width: 22px; height: 22px; border-radius: 50%; background: #c62828; color: #fff; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; }
+.mp-consq { margin: 12px 0 4px; padding: 8px 10px 8px 28px; background: #fff1f0; border-radius: 4px; font-size: 13px; color: #4e342e; }
+.mp-consq li { margin: 3px 0; }

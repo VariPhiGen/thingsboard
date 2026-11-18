@@ -688,11 +688,9 @@ def build_dashboard(tb, existing):
         "settings": {"stateControllerId": "entity", "showTitle": True, "showDashboardsSelect": True,
                      "showEntitiesSelect": True, "showDashboardTimewindow": True, "showDashboardExport": True,
                      "toolbarAlwaysOpen": True}}
-    body = {"title": DASHBOARD_TITLE, "configuration": cfg}
-    if existing:
-        body["id"] = existing["id"]
-        body["version"] = existing.get("version")
-    return body
+    # an existing dashboard keeps its other fields: ThingsBoard replaces assignedCustomers with what is posted, so
+    # leaving it out would silently withdraw the dashboard from every customer it was shared with
+    return dict(existing or {}, title=DASHBOARD_TITLE, configuration=cfg)
 
 
 DG_DASHBOARDS = ['09c06030-81cc-11f1-a760-b3ba4cbe1b98', '12254780-b373-11f1-9522-c1f9998e0221',

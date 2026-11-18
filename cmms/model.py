@@ -9,11 +9,12 @@ import fnmatch
 from datetime import date, datetime, timedelta, timezone
 
 # ----------------------------------------------------------------------------- lifecycle (workflow definition)
-SCHEDULED, IN_PROGRESS, ON_HOLD, COMPLETED, CLOSED, CANCELLED = (
-    "Scheduled", "In Progress", "On Hold", "Completed", "Closed", "Cancelled")
-OPEN = {SCHEDULED, IN_PROGRESS, ON_HOLD}          # work still to be done
+REQUESTED, SCHEDULED, IN_PROGRESS, ON_HOLD, COMPLETED, CLOSED, CANCELLED = (
+    "Requested", "Scheduled", "In Progress", "On Hold", "Completed", "Closed", "Cancelled")
+OPEN = {SCHEDULED, IN_PROGRESS, ON_HOLD}          # approved work still to be done (the backlog)
 ACTIVE = OPEN | {COMPLETED}                       # not yet closed
 TRANSITIONS = {
+    REQUESTED: {SCHEDULED, CANCELLED},            # work request: approved into a work order, or rejected / withdrawn
     SCHEDULED: {IN_PROGRESS, ON_HOLD, CANCELLED, COMPLETED},
     IN_PROGRESS: {ON_HOLD, COMPLETED, CANCELLED},
     ON_HOLD: {IN_PROGRESS, CANCELLED},
@@ -21,6 +22,10 @@ TRANSITIONS = {
     CLOSED: set(),
     CANCELLED: set(),
 }
+
+# Operating state of the equipment after maintenance work (EN 13306: up / degraded / down). Part of the workflow:
+# anything but the first needs a remark, and a follow-up request is suggested.
+CONDITIONS = ["In service", "In service with limitations", "Out of service"]
 
 REQUIRED = ["timezone_offset_minutes", "equipment_profiles", "meter", "priorities", "wo_types", "due_soon_days",
             "meter_due_window", "failure_codes", "doc_categories", "attachment_categories", "doc_expiry_alert_days",
@@ -98,8 +103,10 @@ def parse_date(s):
 
 # ----------------------------------------------------------------------------- work-order due state
 def due_state(wo, run_hours, today, settings):
-    """'overdue' | 'due' | 'upcoming' | 'done' | 'closed' | 'unknown' for a work order."""
+    """'overdue' | 'due' | 'upcoming' | 'done' | 'closed' | 'request' | 'unknown' for a work order."""
     status = wo.get("status")
+    if status == REQUESTED:
+        return "request"
     if status in (CLOSED, CANCELLED):
         return "closed"
     if status == COMPLETED:
